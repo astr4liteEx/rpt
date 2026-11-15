@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/report.schema.json",
+  "title": "rpt report record",
+  "description": "The whole render-ready document emitted by rpt assemble, as one record on one line.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "report"},
+    "schema_version": {"type": "integer", "minimum": 1},
+    "report": {"$ref": "#/$defs/reportMeta"},
+    "summary": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}, "description": "Finding count per severity level."},
+    "scope": {"type": "array", "items": {"$ref": "scope.schema.json"}},
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/reportFinding"}, "description": "Sorted by the config's severity order, then by ID."}
+  },
+  "required": ["kind", "schema_version", "report", "summary", "scope", "findings"],
+  "additionalProperties": true,
+  "$defs": {
+    "reportMeta": {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"},
+        "client": {"type": "string"},
+        "period": {"$ref": "#/$defs/period"}
+      },
+      "required": ["name", "client", "period"],
+      "additionalProperties": true
+    },
+    "period": {
+      "type": "object",
+      "properties": {
+        "start": {"type": "string", "format": "date"},
+        "end": {"type": "string", "format": "date"}
+      },
+      "required": ["start", "end"],
+      "additionalProperties": true
+    },
+    "reportFinding": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "severity": {"type": "string"},
+        "scope": {"type": "array", "items": {"$ref": "scope.schema.json"}, "description": "Full scope rows in place of scope IDs."},
+        "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section."},
+        "assets": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths of evidence files."}
+      },
+      "required": ["id", "title", "severity", "scope", "sections", "assets"],
+      "additionalProperties": true
+    }
+  }
+}

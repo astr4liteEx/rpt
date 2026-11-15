@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/problem.schema.json",
+  "title": "rpt problem record",
+  "description": "One broken rule found by rpt validate. Schema version 1.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "problem"},
+    "path": {"type": "string", "description": "File the problem is in, relative to the report root."},
+    "line": {"type": "integer", "minimum": 1, "description": "1-based line; absent when the problem has no line."},
+    "rule": {"type": "string"},
+    "level": {"enum": ["error", "warning"]},
+    "message": {"type": "string"}
+  },
+  "required": ["kind", "path", "rule", "level", "message"],
+  "additionalProperties": true
+}

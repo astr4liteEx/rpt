@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/scope.schema.json",
+  "title": "rpt scope record",
+  "description": "One in-scope asset, a row of scope.csv. Schema version 1. Other CSV columns appear as extra string members.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "scope"},
+    "id": {"type": "string"},
+    "host": {"type": "string", "description": "Host name, address or range."},
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Absent when the asset has no port."}
+  },
+  "required": ["kind", "id", "host"],
+  "additionalProperties": true
+}

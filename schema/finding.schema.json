@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/finding.schema.json",
+  "title": "rpt finding record",
+  "description": "One finding in a report. Schema version 1. Unknown members are allowed and must be passed through unchanged.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "finding"},
+    "id": {"type": "string", "description": "Finding ID; assigned by rpt add when absent."},
+    "title": {"type": "string"},
+    "scope": {"type": "array", "items": {"type": "string"}, "description": "Scope IDs from scope.csv."},
+    "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
+    "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
+    "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section, keyed description, remediation, poc."}
+  },
+  "required": ["kind", "title", "scope", "severity"],
+  "additionalProperties": true
+}
