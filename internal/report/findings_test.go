@@ -3,6 +3,8 @@ package report
 import (
 	"encoding/json/jsontext"
 	"errors"
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 
@@ -118,5 +120,45 @@ func TestFindingsEdgeCases(t *testing.T) {
 	last := got[len(got)-1]
 	if last.Path != "findings/zz-empty.md" || last.Sections["description"] != "No trailing newline" {
 		t.Errorf("empty-frontmatter finding = %#v", last)
+	}
+}
+
+func TestFindingsInReviewFolders(t *testing.T) {
+	r := openFixture(t)
+	staged, err := r.FindingsIn(StagingDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(staged) != 1 {
+		t.Fatalf("got %d staged findings, want 1", len(staged))
+	}
+	f := staged[0]
+	if f.ID != "F-004" || f.Key != "2617ba239ba6c4fa" || f.Path != "staging/F-004-ssh-weak-ciphers.md" {
+		t.Errorf("id/key/path = %s/%s/%s", f.ID, f.Key, f.Path)
+	}
+	if f.Target == nil || f.Target.Host != "10.0.1.5" || f.Target.Port != 22 || f.Target.Protocol != "tcp" {
+		t.Errorf("target = %+v, want 10.0.1.5 tcp/22", f.Target)
+	}
+	if _, ok := f.Extra["key"]; ok {
+		t.Error("key also left in Extra")
+	}
+	if _, ok := f.Extra["target"]; ok {
+		t.Error("target also left in Extra")
+	}
+	if string(f.Extra["source"]) != `{"plugin":"nuclei","template":"ssh-weak-cipher"}` {
+		t.Errorf("source = %s, want it passed through", f.Extra["source"])
+	}
+
+	dir := copyFixture(t)
+	if err := os.RemoveAll(filepath.Join(dir, StagingDir)); err != nil {
+		t.Fatal(err)
+	}
+	r2, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r2.Close()
+	if got, err := r2.FindingsIn(StagingDir); err != nil || len(got) != 0 {
+		t.Errorf("missing staging/ = %v, %v; want no findings, no error", got, err)
 	}
 }

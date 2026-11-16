@@ -39,8 +39,10 @@ var builtins map[string]verb
 
 func init() {
 	builtins = map[string]verb{
+		"add":      addVerb,
 		"findings": findingsVerb,
 		"scope":    scopeVerb,
+		"set":      setVerb,
 	}
 }
 

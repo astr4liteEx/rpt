@@ -6,7 +6,8 @@
   "type": "object",
   "properties": {
     "kind": {"const": "finding"},
-    "id": {"type": "string", "description": "Finding ID; assigned by rpt add when absent."},
+    "id": {"type": "string", "pattern": "^F-[0-9]{3,}$", "description": "Finding ID; assigned by rpt add when absent."},
+    "key": {"type": "string", "minLength": 1, "description": "Finding key, set by the producing plugin; rpt add --upsert matches it as an opaque string."},
     "title": {"type": "string"},
     "scope": {"type": "array", "items": {"type": "string"}, "description": "Scope IDs from scope.csv."},
     "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},

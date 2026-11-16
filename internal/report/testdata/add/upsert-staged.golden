@@ -1,0 +1,17 @@
+---
+reviewer: lite  # checked twice
+id: F-004
+key: 2617ba239ba6c4fa
+title: SSH weak ciphers
+scope: [S-20]
+severity: high
+target: {host: 10.0.1.5, port: 22, protocol: tcp}
+source: {plugin: nuclei, template: ssh-weak-cipher}
+---
+## Description
+
+The SSH server offers CBC-mode and arcfour ciphers.
+
+## Remediation
+
+Disable CBC-mode ciphers.

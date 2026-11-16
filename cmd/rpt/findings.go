@@ -1,15 +1,20 @@
 package main
 
-import "github.com/astr4liteEx/rpt/internal/cli"
+import (
+	"github.com/astr4liteEx/rpt/internal/cli"
+	"github.com/astr4liteEx/rpt/internal/report"
+)
 
 var findingColumns = []cli.Column{
 	{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity"},
 	{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Field: "scope"},
 }
 
-// findingsVerb prints every finding in the report.
+// findingsVerb prints every finding in the report, or with --staging every
+// finding awaiting review.
 func findingsVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings")
+	staging := flags.Bool("staging", false, "list findings in staging/ awaiting review")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -24,7 +29,11 @@ func findingsVerb(e *env, args []string) int {
 	}
 	defer r.Close()
 
-	list, readErr := r.Findings()
+	dir := report.FindingsDir
+	if *staging {
+		dir = report.StagingDir
+	}
+	list, readErr := r.FindingsIn(dir)
 	for _, f := range list {
 		if err := out.Write(f); err != nil {
 			e.log.Error(err.Error())
