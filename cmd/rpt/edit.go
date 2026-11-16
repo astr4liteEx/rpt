@@ -152,3 +152,50 @@ func addVerb(e *env, args []string) int {
 	}
 	return code
 }
+
+// deleteVerb removes each named finding's file and prints the finding as it
+// was. An unknown ID is logged and the rest are still deleted (exit 1).
+func deleteVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "delete")
+	pos, err := parseInterspersed(flags, args)
+	if err != nil {
+		return cli.ExitUsage
+	}
+	if len(pos) == 0 {
+		fmt.Fprintln(e.stderr, "usage: rpt delete <id>...")
+		return cli.ExitUsage
+	}
+	out, err := of.output(e, findingColumns)
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	r := openReport(e, *of.report)
+	if r == nil {
+		return cli.ExitUsage
+	}
+	defer r.Close()
+
+	code := cli.ExitOK
+	for _, id := range pos {
+		f, err := r.Delete(id)
+		if err != nil {
+			if errors.Is(err, report.ErrNoFinding) {
+				e.log.Error(err.Error())
+				code = max(code, cli.ExitProblems)
+			} else {
+				code = max(code, logEditError(e, err, 0))
+			}
+			continue
+		}
+		if err := out.Write(f); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+	}
+	if err := out.Flush(); err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	return code
+}

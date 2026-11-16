@@ -41,6 +41,7 @@ func init() {
 	builtins = map[string]verb{
 		"add":      addVerb,
 		"assemble": assembleVerb,
+		"delete":   deleteVerb,
 		"findings": findingsVerb,
 		"plugins":  pluginsVerb,
 		"scope":    scopeVerb,
