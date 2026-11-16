@@ -2,7 +2,7 @@
 
 A plugin is any program, in any language, that follows this page. The core runs it as `rpt <verb>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional.
 
-Supported systems: Linux and macOS.
+Supported systems: Linux.
 
 ## Finding and running a plugin
 
