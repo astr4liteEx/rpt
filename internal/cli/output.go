@@ -90,6 +90,31 @@ func (o *Output) Write(rec any) error {
 	}
 }
 
+// WriteRaw passes through a record this verb doesn't own, as the exact
+// bytes it arrived with. Only JSON Lines output carries it: a table or a
+// --format template shows the verb's own records, and a person reading a
+// terminal isn't feeding another program.
+func (o *Output) WriteRaw(raw []byte) error {
+	if o.mode != modeJSONLines {
+		return nil
+	}
+	if _, err := o.w.Write(raw); err != nil {
+		return fmt.Errorf("write record: %w", err)
+	}
+	_, err := io.WriteString(o.w, "\n")
+	return err
+}
+
+// WriteOwn writes one of the verb's own records that arrived as raw and
+// may have been edited: JSON Lines output gets raw exactly, a table or
+// template gets rec.
+func (o *Output) WriteOwn(rec any, raw []byte) error {
+	if o.mode == modeJSONLines {
+		return o.WriteRaw(raw)
+	}
+	return o.Write(rec)
+}
+
 // Flush writes anything buffered, such as a table.
 func (o *Output) Flush() error {
 	if o.tw != nil {

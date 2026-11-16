@@ -12,8 +12,22 @@
     "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
     "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
-    "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."}
+    "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
+    "target": {"$ref": "#/$defs/target"}
   },
   "required": ["kind", "title", "scope", "severity"],
-  "additionalProperties": true
+  "additionalProperties": true,
+  "$defs": {
+    "target": {
+      "type": "object",
+      "description": "What the finding was found on. Set by parser plugins; read by rpt scope match, never rewritten.",
+      "properties": {
+        "host": {"type": "string"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "protocol": {"enum": ["tcp", "udp"]}
+      },
+      "required": ["host"],
+      "additionalProperties": true
+    }
+  }
 }

@@ -1,6 +1,5 @@
-// Command rpt defines and enforces the rpt report format over a plain,
-// git-tracked folder, and hands every verb it doesn't know to an rpt-<verb>
-// plugin.
+// Command rpt defines and enforces the rpt report format over a plain
+// folder, and hands every verb it doesn't know to an rpt-<verb> plugin.
 package main
 
 import (
@@ -10,6 +9,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
@@ -19,74 +20,88 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-// run executes one rpt invocation and returns its exit code. Only main calls
+// env is one invocation's streams. Verbs never touch os.Stdin, os.Stdout
+// or os.Stderr directly, so tests can run them in-process.
+type env struct {
+	stdin          io.Reader
+	stdout, stderr io.Writer
+	log            *slog.Logger
+}
+
+// A verb runs one built-in and returns its exit code. Only main calls
 // os.Exit, so deferred calls in verbs always run.
+type verb func(e *env, args []string) int
+
+// builtins maps each built-in verb to its function. A verb is built in only
+// if it defines or enforces the report format; built-ins are checked
+// before plugins, so no plugin can shadow one.
+var builtins map[string]verb
+
+func init() {
+	builtins = map[string]verb{
+		"findings": findingsVerb,
+		"scope":    scopeVerb,
+	}
+}
+
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	e := &env{stdin: stdin, stdout: stdout, stderr: stderr, log: cli.NewLogger(stderr)}
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "usage: rpt <verb> [args]")
+		fmt.Fprintln(stderr, usage())
 		return cli.ExitUsage
 	}
-	switch args[0] {
-	case "findings":
-		return findings(args[1:], stdout, stderr)
+	if v, ok := builtins[args[0]]; ok {
+		return v(e, args[1:])
 	}
-	fmt.Fprintf(stderr, "rpt: unknown verb %q\nusage: rpt <verb> [args]\n", args[0])
+	fmt.Fprintf(stderr, "rpt: unknown verb %q\n%s\n", args[0], usage())
 	return cli.ExitUsage
 }
 
-// findings prints every finding in the report.
-func findings(args []string, stdout, stderr io.Writer) int {
-	log := cli.NewLogger(stderr)
-	flags := flag.NewFlagSet("findings", flag.ContinueOnError)
-	flags.SetOutput(stderr)
-	jsonFlag := flags.Bool("json", false, "write JSON Lines even on a terminal")
-	format := flags.String("format", "", "Go template run against each record's JSON fields")
-	reportFlag := flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
+func usage() string {
+	names := make([]string, 0, len(builtins))
+	for n := range builtins {
+		names = append(names, n)
 	}
+	sort.Strings(names)
+	return "usage: rpt <verb> [args]\nverbs: " + strings.Join(names, ", ")
+}
 
-	out, err := cli.NewOutput(stdout, isTerminal(stdout), *jsonFlag, *format, []cli.Column{
-		{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity"},
-		{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Field: "scope"},
-	})
-	if err != nil {
-		log.Error(err.Error())
-		return cli.ExitUsage
-	}
-	r, code := openReport(*reportFlag, log)
-	if r == nil {
-		return code
-	}
-	defer r.Close()
+// outputFlags are the flags every verb that writes records shares.
+type outputFlags struct {
+	json   *bool
+	format *string
+	report *string
+}
 
-	list, err := r.Findings()
-	for _, f := range list {
-		if err := out.Write(f); err != nil {
-			log.Error(err.Error())
-			return cli.ExitUsage
-		}
+// newFlags returns a FlagSet for verb name with the shared output flags.
+func newFlags(e *env, name string) (*flag.FlagSet, outputFlags) {
+	flags := flag.NewFlagSet(name, flag.ContinueOnError)
+	flags.SetOutput(e.stderr)
+	return flags, outputFlags{
+		json:   flags.Bool("json", false, "write JSON Lines even on a terminal"),
+		format: flags.String("format", "", "Go template run against each record's JSON fields"),
+		report: flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)"),
 	}
-	if err := out.Flush(); err != nil {
-		log.Error(err.Error())
-		return cli.ExitUsage
-	}
-	return logReportErrors(log, err)
+}
+
+// output builds the verb's writer from the shared flags.
+func (o outputFlags) output(e *env, columns []cli.Column) (*cli.Output, error) {
+	return cli.NewOutput(e.stdout, isTerminal(e.stdout), *o.json, *o.format, columns)
 }
 
 // openReport finds and opens the report, logging why when it can't.
-func openReport(flag string, log *slog.Logger) (*report.Report, int) {
-	dir, err := report.Root(flag)
+func openReport(e *env, flagValue string) *report.Report {
+	dir, err := report.Root(flagValue)
 	if err != nil {
-		log.Error(err.Error())
-		return nil, cli.ExitUsage
+		e.log.Error(err.Error())
+		return nil
 	}
 	r, err := report.Open(dir)
 	if err != nil {
-		log.Error(err.Error())
-		return nil, cli.ExitUsage
+		e.log.Error(err.Error())
+		return nil
 	}
-	return r, cli.ExitOK
+	return r
 }
 
 // logReportErrors logs each error from reading the report and returns the

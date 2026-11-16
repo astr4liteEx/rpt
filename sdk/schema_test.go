@@ -25,6 +25,7 @@ func TestSchemasMatchTypes(t *testing.T) {
 		{"report.schema.json", []string{"$defs", "reportMeta"}, reflect.TypeFor[ReportMeta]()},
 		{"report.schema.json", []string{"$defs", "period"}, reflect.TypeFor[Period]()},
 		{"report.schema.json", []string{"$defs", "reportFinding"}, reflect.TypeFor[ReportFinding]()},
+		{"finding.schema.json", []string{"$defs", "target"}, reflect.TypeFor[Target]()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.typ.Name(), func(t *testing.T) {

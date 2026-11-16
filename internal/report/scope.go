@@ -17,8 +17,9 @@ import (
 // ScopeFile is the scope table's file name at the report root.
 const ScopeFile = "scope.csv"
 
-// Scope reads scope.csv. Its header row must name id and host; port is
-// optional, and every other column is kept as a string in ScopeRow.Extra. A
+// Scope reads scope.csv. Its header row must name id and host; port and
+// protocol (tcp or udp) are optional, and every other column is kept as a
+// string in ScopeRow.Extra. A
 // bad row doesn't stop the read: good rows are returned together with a
 // joined error holding one *FileError per bad row.
 func (r *Report) Scope() ([]sdk.ScopeRow, error) {
@@ -82,6 +83,13 @@ func scopeRow(header, rec []string) (sdk.ScopeRow, error) {
 				return row, fmt.Errorf("port %q is not a number from 1 to 65535", v)
 			}
 			row.Port = p
+		case "protocol":
+			switch v {
+			case "", "tcp", "udp":
+				row.Protocol = v
+			default:
+				return row, fmt.Errorf("protocol %q is not tcp or udp", v)
+			}
 		default:
 			b, err := json.Marshal(v)
 			if err != nil {

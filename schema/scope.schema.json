@@ -8,7 +8,8 @@
     "kind": {"const": "scope"},
     "id": {"type": "string"},
     "host": {"type": "string", "description": "Host name, address or range."},
-    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Absent when the asset has no port."}
+    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Absent: every port."},
+    "protocol": {"enum": ["tcp", "udp"], "description": "Absent: any protocol."}
   },
   "required": ["kind", "id", "host"],
   "additionalProperties": true

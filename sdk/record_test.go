@@ -30,14 +30,14 @@ func TestRecordsRoundTrip(t *testing.T) {
 		{
 			name: "finding keeps known and unknown fields",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"source":{"kb":"sqli"},"cvss":"9.1"}`,
-			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}`,
+			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","target":{"host":"10.0.0.5","port":443,"protocol":"tcp","vhost":"login.acme.com"},"source":{"kb":"sqli"}}`,
+			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"target":{"host":"10.0.0.5","port":443,"protocol":"tcp","vhost":"login.acme.com"},"cvss":"9.1","source":{"kb":"sqli"}}`,
 		},
 		{
 			name: "scope row keeps extra CSV columns",
 			run:  roundTrip[ScopeRow],
 			in:   `{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"protocol":"tcp","env":"prod"}`,
-			want: `{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod","protocol":"tcp"}`,
+			want: `{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"protocol":"tcp","env":"prod"}`,
 		},
 		{
 			name: "scope row without a port omits it",
@@ -67,7 +67,7 @@ func TestRecordsRoundTrip(t *testing.T) {
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"}],` +
 				`"sections":{"description":"d","remediation":"r","poc":"p"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
+				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1","target":{"host":"10.0.0.5","port":443}}],` +
 				`"generator":"rpt 0.1.0"}`,
 			want: `{"kind":"report","schema_version":1,` +
 				`"report":{"name":"Acme external test","client":"Acme","period":{"start":"2026-11-02","end":"2026-11-06","tz":"UTC"},"renderer":"typst"},` +
@@ -76,7 +76,7 @@ func TestRecordsRoundTrip(t *testing.T) {
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"}],` +
 				`"sections":{"description":"d","poc":"p","remediation":"r"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
+				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"target":{"host":"10.0.0.5","port":443},"cvss":"9.1"}],` +
 				`"generator":"rpt 0.1.0"}`,
 		},
 	}

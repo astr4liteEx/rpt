@@ -42,7 +42,8 @@
         "severity": {"type": "string"},
         "scope": {"type": "array", "items": {"$ref": "scope.schema.json"}, "description": "Full scope rows in place of scope IDs."},
         "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section."},
-        "assets": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths of evidence files."}
+        "assets": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths of evidence files."},
+        "target": {"$ref": "finding.schema.json#/$defs/target"}
       },
       "required": ["id", "title", "severity", "scope", "sections", "assets"],
       "additionalProperties": true

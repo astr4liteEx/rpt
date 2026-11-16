@@ -26,6 +26,7 @@ type Finding struct {
 	Path     string            `json:"path,omitzero"` // relative to the report root
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
+	Target   *Target           `json:"target,omitzero"`   // what was hit; set by parser plugins
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.
@@ -38,7 +39,9 @@ type ScopeRow struct {
 	Kind string `json:"kind"`
 	ID   string `json:"id"`
 	Host string `json:"host"`
-	Port int    `json:"port,omitzero"` // absent for a host or range without a port
+	Port int    `json:"port,omitzero"` // absent: every port
+	// Protocol is "tcp" or "udp"; absent: any protocol.
+	Protocol string `json:"protocol,omitzero"`
 
 	// Extra holds the row's other CSV columns and any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
@@ -110,7 +113,19 @@ type ReportFinding struct {
 	Scope    []ScopeRow        `json:"scope"`
 	Sections map[string]string `json:"sections"` // markdown, keyed description, remediation, poc
 	Assets   []string          `json:"assets"`   // absolute paths
+	Target   *Target           `json:"target,omitzero"`
 
 	// Extra holds the finding's unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Target is the host, port and protocol a finding was actually found on.
+// rpt scope match reads it to assign scope IDs and never rewrites it.
+type Target struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port,omitzero"`
+	Protocol string `json:"protocol,omitzero"` // "tcp" or "udp"
+
+	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
