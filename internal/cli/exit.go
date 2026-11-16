@@ -5,7 +5,7 @@ import "os"
 // Exit codes every rpt verb uses.
 const (
 	ExitOK           = 0   // clean
-	ExitProblems     = 1   // problems in the report
+	ExitProblems     = 1   // problems in the report or its input
 	ExitUsage        = 2   // usage or config error
 	ExitPluginFailed = 126 // a plugin failed to start
 )
