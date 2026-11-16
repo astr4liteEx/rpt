@@ -5,7 +5,7 @@ rpt is a pentest report engine: a report is a plain, git-tracked folder, and the
 ## Report
 
 **Report**:
-A git-tracked folder holding one engagement's config, scope and findings; the only state rpt has.
+A plain folder holding one engagement's config, scope and findings; the only state rpt has. It may be version-controlled by whoever owns it, but rpt never requires that.
 _Avoid_: project, engagement folder, workspace
 
 **Report root**:
@@ -29,6 +29,18 @@ _Avoid_: issue, vuln, vulnerability
 **Evidence**:
 A file inside the report that backs a finding, listed in the finding's frontmatter relative to the finding file.
 _Avoid_: asset (that is evidence as an absolute path in an assembled report), attachment
+
+**Staged finding**:
+A finding added by automation, in `staging/`, awaiting review.
+_Avoid_: draft, pending finding
+
+**Promote**:
+Move a staged finding's file into `findings/`, accepting it into the report.
+_Avoid_: approve, accept, publish
+
+**Rejected finding**:
+A staged finding judged false, moved to `rejected/` so automation never adds it again.
+_Avoid_: deleted finding, false positive (that is the reason, not the state)
 
 **Finding ID**:
 A finding's permanent name, `F-` and a number, cited by clients and retests.
