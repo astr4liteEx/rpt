@@ -25,6 +25,7 @@ type Finding struct {
 	Severity Severity          `json:"severity"`
 	Path     string            `json:"path,omitzero"` // relative to the report root
 	Sections map[string]string `json:"sections,omitzero"`
+	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.

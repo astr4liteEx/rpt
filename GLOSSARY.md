@@ -26,6 +26,10 @@ _Avoid_: schema version (that numbers the record schemas)
 One issue found during the test, stored as one markdown file with YAML frontmatter.
 _Avoid_: issue, vuln, vulnerability
 
+**Evidence**:
+A file inside the report that backs a finding, listed in the finding's frontmatter relative to the finding file.
+_Avoid_: asset (that is evidence as an absolute path in an assembled report), attachment
+
 **Severity level**:
 One of the levels listed in the report config, most severe first; the list is both the sort order and the only allowed values.
 _Avoid_: rating, risk, priority

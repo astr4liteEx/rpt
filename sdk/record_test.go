@@ -30,8 +30,8 @@ func TestRecordsRoundTrip(t *testing.T) {
 		{
 			name: "finding keeps known and unknown fields",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"source":{"kb":"sqli"},"cvss":"9.1"}`,
-			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"cvss":"9.1","source":{"kb":"sqli"}}`,
+			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"source":{"kb":"sqli"},"cvss":"9.1"}`,
+			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}`,
 		},
 		{
 			name: "scope row keeps extra CSV columns",

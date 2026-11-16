@@ -11,7 +11,8 @@
     "scope": {"type": "array", "items": {"type": "string"}, "description": "Scope IDs from scope.csv."},
     "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
     "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
-    "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section, keyed description, remediation, poc."}
+    "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
+    "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."}
   },
   "required": ["kind", "title", "scope", "severity"],
   "additionalProperties": true
