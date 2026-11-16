@@ -30,6 +30,14 @@ _Avoid_: issue, vuln, vulnerability
 A file inside the report that backs a finding, listed in the finding's frontmatter relative to the finding file.
 _Avoid_: asset (that is evidence as an absolute path in an assembled report), attachment
 
+**Finding ID**:
+A finding's permanent name, `F-` and a number, cited by clients and retests.
+_Avoid_: finding number, ref
+
+**Finding key**:
+A hash an automated finding carries so re-runs of the same check update it instead of adding a duplicate.
+_Avoid_: stable ID, hash ID, fingerprint
+
 **Severity level**:
 One of the levels listed in the report config, most severe first; the list is both the sort order and the only allowed values.
 _Avoid_: rating, risk, priority
