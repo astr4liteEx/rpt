@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -94,5 +95,64 @@ func TestConfigBadYAMLNamesFileAndLine(t *testing.T) {
 	}
 	if fe.Path != "rpt.yaml" || fe.Line == 0 {
 		t.Errorf("FileError = %s:%d, want rpt.yaml with a line", fe.Path, fe.Line)
+	}
+}
+
+func TestConfigRequiredSectionsAndKeyLines(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want []string
+	}{
+		{"absent: the three fixed sections", "format: 1\n", []string{"description", "remediation", "poc"}},
+		{"empty: none required", "format: 1\nrequired_sections: []\n", []string{}},
+		{"custom headings keep their text", "format: 1\nrequired_sections: [description, References]\n", []string{"description", "References"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dir := copyFixture(t)
+			writeFile(t, dir, "rpt.yaml", tt.yaml)
+			r, err := Open(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer r.Close()
+			cfg, err := r.Config()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(cfg.RequiredSections, tt.want) || cfg.RequiredSections == nil {
+				t.Errorf("required sections = %#v, want %#v", cfg.RequiredSections, tt.want)
+			}
+			if len(cfg.UnknownKeys) != 0 {
+				t.Errorf("unknown keys = %v", cfg.UnknownKeys)
+			}
+		})
+	}
+
+	cfg, err := openFixture(t).Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]int{"format": 2, "name": 3, "client": 4, "period": 5, "severities": 6}
+	if !maps.Equal(cfg.KeyLines, want) {
+		t.Errorf("key lines = %v, want %v", cfg.KeyLines, want)
+	}
+}
+
+func TestConfigEmptySeveritiesStayEmpty(t *testing.T) {
+	dir := copyFixture(t)
+	writeFile(t, dir, "rpt.yaml", "format: 1\nseverities: []\n")
+	r, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	cfg, err := r.Config()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.Severities) != 0 {
+		t.Errorf("severities = %v; an explicit empty list must not become the defaults, so validate can report it", cfg.Severities)
 	}
 }

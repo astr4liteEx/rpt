@@ -19,9 +19,9 @@ const ScopeFile = "scope.csv"
 
 // Scope reads scope.csv. Its header row must name id and host; port and
 // protocol (tcp or udp) are optional, and every other column is kept as a
-// string in ScopeRow.Extra. A
-// bad row doesn't stop the read: good rows are returned together with a
-// joined error holding one *FileError per bad row.
+// string in ScopeRow.Extra. A row needs an id and a host, and an id no
+// earlier row has. A bad row doesn't stop the read: good rows are returned
+// together with a joined error holding one *FileError per bad row.
 func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 	src, err := r.root.ReadFile(ScopeFile)
 	if err != nil {
@@ -41,6 +41,7 @@ func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 	var (
 		rows []sdk.ScopeRow
 		errs []error
+		seen = map[string]int{} // id -> line of the row that has it
 	)
 	for {
 		rec, err := cr.Read()
@@ -56,10 +57,14 @@ func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 			continue
 		}
 		row, err := scopeRow(header, rec)
+		if err == nil {
+			err = checkRow(row, seen)
+		}
 		if err != nil {
 			errs = append(errs, &FileError{Path: ScopeFile, Line: line, Err: err})
 			continue
 		}
+		seen[row.ID] = line
 		rows = append(rows, row)
 	}
 	return rows, errors.Join(errs...)
@@ -102,4 +107,17 @@ func scopeRow(header, rec []string) (sdk.ScopeRow, error) {
 		}
 	}
 	return row, nil
+}
+
+// checkRow checks a parsed row against the rows before it.
+func checkRow(row sdk.ScopeRow, seen map[string]int) error {
+	switch {
+	case row.ID == "":
+		return errors.New("row has no id")
+	case row.Host == "":
+		return fmt.Errorf("%s has no host", row.ID)
+	case seen[row.ID] > 0:
+		return fmt.Errorf("%s is already the id of the row on line %d", row.ID, seen[row.ID])
+	}
+	return nil
 }

@@ -20,9 +20,10 @@
       "properties": {
         "name": {"type": "string"},
         "client": {"type": "string"},
-        "period": {"$ref": "#/$defs/period"}
+        "period": {"$ref": "#/$defs/period"},
+        "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."}
       },
-      "required": ["name", "client", "period"],
+      "required": ["name", "client", "period", "severities"],
       "additionalProperties": true
     },
     "period": {

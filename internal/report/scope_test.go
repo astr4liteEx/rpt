@@ -38,6 +38,9 @@ func TestScopeErrors(t *testing.T) {
 		{"port out of range", "id,host,port\nS-1,a,70000\n", 0, 2},
 		{"missing host column", "id,port\nS-1,80\n", 0, 1},
 		{"bad protocol", "id,host,port,protocol\nS-1,a,53,udp\nS-2,b,80,http\n", 1, 3},
+		{"row without a host", "id,host\nS-1,a\nS-2,\n", 1, 3},
+		{"row without an id", "id,host\n,a\nS-2,b\n", 1, 2},
+		{"repeated id keeps the first row", "id,host\nS-1,a\nS-2,b\nS-1,c\n", 2, 4},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

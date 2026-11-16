@@ -95,17 +95,6 @@ func TestFindingsKeepsGoodFilesWhenOneIsBroken(t *testing.T) {
 	}
 }
 
-// unjoin splits an errors.Join result into its parts.
-func unjoin(err error) []error {
-	if j, ok := err.(interface{ Unwrap() []error }); ok {
-		return j.Unwrap()
-	}
-	if err != nil {
-		return []error{err}
-	}
-	return nil
-}
-
 func TestFindingsEdgeCases(t *testing.T) {
 	dir := copyFixture(t)
 	writeFile(t, dir, "findings/zz-empty.md", "---\n---\n## Description\n\nNo trailing newline")

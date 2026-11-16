@@ -42,6 +42,14 @@ _Avoid_: asset, affected host (in data), endpoint
 One entry of the agreed scope in `scope.csv`: a host, address range or wildcard domain, optionally narrowed by port and protocol.
 _Avoid_: scope item, asset, in-scope host
 
+**Required section**:
+A section every finding must have and fill in, listed in the report config; by default description, remediation and proof of concept.
+_Avoid_: mandatory field, template section
+
+**Problem**:
+One broken rule found in a report, at a file and, when known, a line; an error or a warning.
+_Avoid_: lint error, issue, violation
+
 **Severity level**:
 One of the levels listed in the report config, most severe first; the list is both the sort order and the only allowed values.
 _Avoid_: rating, risk, priority

@@ -1,0 +1,113 @@
+{
+  "kind": "report",
+  "schema_version": 1,
+  "report": {
+    "name": "Acme external test",
+    "client": "Acme",
+    "period": {
+      "start": "2026-11-02",
+      "end": "2026-11-06"
+    },
+    "severities": [
+      "critical",
+      "high",
+      "medium",
+      "low",
+      "info"
+    ]
+  },
+  "summary": {
+    "critical": 0,
+    "high": 1,
+    "info": 1,
+    "low": 0,
+    "medium": 1
+  },
+  "scope": [
+    {
+      "kind": "scope",
+      "id": "S-12",
+      "host": "10.0.0.5",
+      "port": 443,
+      "env": "prod"
+    },
+    {
+      "kind": "scope",
+      "id": "S-14",
+      "host": "10.0.0.6",
+      "port": 8443,
+      "env": "prod"
+    },
+    {
+      "kind": "scope",
+      "id": "S-20",
+      "host": "10.0.1.0/24",
+      "env": "staging"
+    }
+  ],
+  "findings": [
+    {
+      "id": "F-003",
+      "title": "SQL injection in login",
+      "severity": "high",
+      "scope": [
+        {
+          "kind": "scope",
+          "id": "S-12",
+          "host": "10.0.0.5",
+          "port": 443,
+          "env": "prod"
+        },
+        {
+          "kind": "scope",
+          "id": "S-14",
+          "host": "10.0.0.6",
+          "port": 8443,
+          "env": "prod"
+        }
+      ],
+      "sections": {
+        "description": "The `user` parameter of `/login` is concatenated into a SQL query.",
+        "poc": "```sh\n## not a heading: inside a code fence\ncurl -d \"user=' OR 1=1--\" https://10.0.0.5/login\n```\n\n![login bypass]($REPORT/findings/evidence/F-003-login.png)",
+        "remediation": "Use parameterised queries."
+      },
+      "assets": [
+        "$REPORT/findings/evidence/F-003-login.png"
+      ],
+      "cvss": "9.1"
+    },
+    {
+      "id": "F-001",
+      "title": "Reflected XSS in search",
+      "severity": "medium",
+      "scope": [
+        {
+          "kind": "scope",
+          "id": "S-14",
+          "host": "10.0.0.6",
+          "port": 8443,
+          "env": "prod"
+        }
+      ],
+      "sections": {
+        "References": "- OWASP XSS Prevention Cheat Sheet",
+        "description": "The `q` parameter is reflected unescaped.",
+        "poc": "`/search?q=<script>alert(1)</script>`",
+        "remediation": "Encode output."
+      },
+      "assets": []
+    },
+    {
+      "id": "F-002",
+      "title": "Weak TLS configuration",
+      "severity": "info",
+      "scope": [],
+      "sections": {
+        "description": "TLS 1.0 is still enabled.",
+        "poc": "`nmap --script ssl-enum-ciphers -p 443 10.0.0.5`",
+        "remediation": "Disable TLS 1.0 and 1.1."
+      },
+      "assets": []
+    }
+  ]
+}

@@ -61,7 +61,7 @@ func TestRecordsRoundTrip(t *testing.T) {
 			name: "report nests full scope rows in findings and keeps unknown fields at every level",
 			run:  roundTrip[Report],
 			in: `{"kind":"report","schema_version":1,` +
-				`"report":{"name":"Acme external test","client":"Acme","period":{"start":"2026-11-02","end":"2026-11-06","tz":"UTC"},"renderer":"typst"},` +
+				`"report":{"name":"Acme external test","client":"Acme","period":{"start":"2026-11-02","end":"2026-11-06","tz":"UTC"},"severities":["critical","high","medium","low","info"],"renderer":"typst"},` +
 				`"summary":{"high":1,"critical":0,"medium":1,"low":0,"info":2},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
@@ -70,7 +70,7 @@ func TestRecordsRoundTrip(t *testing.T) {
 				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1","target":{"host":"10.0.0.5","port":443}}],` +
 				`"generator":"rpt 0.1.0"}`,
 			want: `{"kind":"report","schema_version":1,` +
-				`"report":{"name":"Acme external test","client":"Acme","period":{"start":"2026-11-02","end":"2026-11-06","tz":"UTC"},"renderer":"typst"},` +
+				`"report":{"name":"Acme external test","client":"Acme","period":{"start":"2026-11-02","end":"2026-11-06","tz":"UTC"},"severities":["critical","high","medium","low","info"],"renderer":"typst"},` +
 				`"summary":{"critical":0,"high":1,"info":2,"low":0,"medium":1},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +

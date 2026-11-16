@@ -89,8 +89,12 @@ type ReportMeta struct {
 	Name   string `json:"name"`
 	Client string `json:"client"`
 	Period Period `json:"period"`
+	// Severities are the report's levels, most severe first, so renderers
+	// can order the summary and the findings without guessing.
+	Severities []Severity `json:"severities"`
 
-	// Extra holds any other config keys.
+	// Extra holds unknown members of the record. rpt never copies unknown
+	// config keys here.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 

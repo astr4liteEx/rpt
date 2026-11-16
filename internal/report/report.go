@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strconv"
@@ -17,22 +18,31 @@ import (
 const ConfigFile = "rpt.yaml"
 
 // DefaultSeverities is the severity order used when the report config has no
-// severities list, most severe first.
+// severities key, most severe first.
 var DefaultSeverities = []sdk.Severity{sdk.Critical, sdk.High, sdk.Medium, sdk.Low, sdk.Info}
+
+// DefaultRequiredSections are the sections every finding needs when the
+// report config has no required_sections key.
+var DefaultRequiredSections = []string{"description", "remediation", "poc"}
 
 // Report is an open report folder. Every file access goes through its
 // os.Root, so no path can escape the folder.
 type Report struct {
 	root *os.Root
+	abs  string // the folder's absolute path, for assembled asset paths
 }
 
 // Open opens the report folder at dir.
 func Open(dir string) (*Report, error) {
-	root, err := os.OpenRoot(dir)
+	abs, err := filepath.Abs(dir)
 	if err != nil {
 		return nil, fmt.Errorf("open report %s: %w", dir, err)
 	}
-	return &Report{root: root}, nil
+	root, err := os.OpenRoot(abs)
+	if err != nil {
+		return nil, fmt.Errorf("open report %s: %w", dir, err)
+	}
+	return &Report{root: root, abs: abs}, nil
 }
 
 // Close releases the report folder.
@@ -65,6 +75,15 @@ type Config struct {
 	Period     sdk.Period
 	Severities []sdk.Severity // most severe first; the only allowed levels
 
+	// RequiredSections are the section keys every finding must have and
+	// fill in: description, remediation and poc for the fixed headings,
+	// the exact heading text for any other.
+	RequiredSections []string
+
+	// KeyLines maps each top-level key to its 1-based line in rpt.yaml,
+	// so problems can point at it.
+	KeyLines map[string]int
+
 	// UnknownKeys lists top-level keys rpt doesn't define, for validate to
 	// warn about. They are never copied into an assembled report.
 	UnknownKeys []string
@@ -84,7 +103,8 @@ func (r *Report) Config() (Config, error) {
 			Start string
 			End   string
 		}
-		Severities []sdk.Severity
+		Severities       []sdk.Severity
+		RequiredSections []string `yaml:"required_sections"`
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(normaliseNewlines(src), &doc); err != nil {
@@ -94,17 +114,39 @@ func (r *Report) Config() (Config, error) {
 		return Config{}, yamlFileError(ConfigFile, 0, err)
 	}
 	cfg := Config{
-		Format:     raw.Format,
-		Name:       raw.Name,
-		Client:     raw.Client,
-		Period:     sdk.Period{Start: raw.Period.Start, End: raw.Period.End},
-		Severities: raw.Severities,
+		Format:           raw.Format,
+		Name:             raw.Name,
+		Client:           raw.Client,
+		Period:           sdk.Period{Start: raw.Period.Start, End: raw.Period.End},
+		Severities:       raw.Severities,
+		RequiredSections: raw.RequiredSections,
+		KeyLines:         keyLines(&doc),
 	}
-	if len(cfg.Severities) == 0 {
+	// Defaults apply only when a key is absent: an explicit empty list
+	// stays empty, so validate can tell it from no list at all.
+	if _, ok := cfg.KeyLines["severities"]; !ok {
 		cfg.Severities = slices.Clone(DefaultSeverities)
 	}
-	cfg.UnknownKeys = unknownKeys(&doc, "format", "name", "client", "period", "severities")
+	if _, ok := cfg.KeyLines["required_sections"]; !ok {
+		cfg.RequiredSections = slices.Clone(DefaultRequiredSections)
+	} else if cfg.RequiredSections == nil {
+		cfg.RequiredSections = []string{}
+	}
+	cfg.UnknownKeys = unknownKeys(&doc, "format", "name", "client", "period", "severities", "required_sections")
 	return cfg, nil
+}
+
+// keyLines maps the top-level keys of doc to their 1-based lines.
+func keyLines(doc *yaml.Node) map[string]int {
+	lines := map[string]int{}
+	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return lines
+	}
+	m := doc.Content[0].Content
+	for i := 0; i+1 < len(m); i += 2 {
+		lines[m[i].Value] = m[i].Line
+	}
+	return lines
 }
 
 // unknownKeys returns the top-level mapping keys of doc not in known.
