@@ -43,12 +43,12 @@ func TestSetChangesOneValue(t *testing.T) {
 	dir := reportCopy(t)
 	before, _ := os.ReadFile(filepath.Join(dir, "findings/sqli-login.md"))
 	// Flags after the positional arguments work too.
-	code, out, errOut := runIn(t, "", "set", "F-003", "severity", "critical", "--report", dir, "--format", "{{.id}} {{.severity}}")
+	code, out, errOut := runIn(t, "", "set", "F-003", "severity", "critical", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if out != "F-003 critical\n" {
-		t.Errorf("stdout = %q", out)
+	if got := pick(t, out, "id", "severity"); got != "F-003 critical\n" {
+		t.Errorf("stdout = %q", got)
 	}
 	after, _ := os.ReadFile(filepath.Join(dir, "findings/sqli-login.md"))
 	b, a := strings.Split(string(before), "\n"), strings.Split(string(after), "\n")
@@ -95,70 +95,39 @@ func TestSetUsageErrors(t *testing.T) {
 	}
 }
 
-const telnet = `{"kind":"finding","key":"9c1d0e7f2a3b4c5d","title":"Telnet enabled","scope":["S-20"],"severity":"high","target":{"host":"10.0.1.9","port":23,"protocol":"tcp"},"sections":{"description":"Telnet accepts logins in plaintext."}}`
-
-// Done-when: rpt add --upsert run twice leaves the folder unchanged.
-func TestAddUpsertTwice(t *testing.T) {
+func TestSetValueStartingWithDash(t *testing.T) {
 	dir := reportCopy(t)
-	foreign := `{"kind":"scope",  "id":"S-1"}`
-	in := telnet + "\n" + foreign + "\n"
-	args := []string{"add", "--report", dir, "--staging", "--upsert", "--format", "{{.id}} {{.path}}"}
-
-	code, out, errOut := runIn(t, in, args[:len(args)-2]...) // JSON Lines
-	if code != 0 || errOut != "" {
-		t.Fatalf("first run: exit %d, stderr %q", code, errOut)
-	}
-	lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-	if len(lines) != 2 || !strings.HasPrefix(lines[0], `{"kind":"finding","id":"F-006","key":"9c1d0e7f2a3b4c5d"`) ||
-		!strings.Contains(lines[0], `"path":"staging/F-006-telnet-enabled.md"`) || lines[1] != foreign {
-		t.Errorf("first run stdout:\n%s", out)
-	}
-
-	before := folderState(t, dir)
-	code, out, errOut = runIn(t, in, args...)
-	if code != 0 || errOut != "" {
-		t.Fatalf("second run: exit %d, stderr %q", code, errOut)
-	}
-	if out != "F-006 staging/F-006-telnet-enabled.md\n" {
-		t.Errorf("second run stdout = %q", out)
-	}
-	if !maps.Equal(before, folderState(t, dir)) {
-		t.Error("second run changed the folder")
+	code, out, errOut := runIn(t, "", "set", "--report", dir, "F-003", "offset", "--", "-1")
+	if code != 0 || pick(t, out, "offset") != "-1\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
 }
 
-func TestAddSkipsAndRefuses(t *testing.T) {
+func TestAdd(t *testing.T) {
 	dir := reportCopy(t)
+	foreign := `{"kind":"scope",  "id":"S-1"}`
 	in := strings.Join([]string{
-		`{"kind":"finding","key":"01b9b837704da8cf","title":"Open redirect in logout","scope":["S-14"],"severity":"low"}`, // 1: rejected
-		`{"kind":"finding","title":"No severity","scope":[]}`,                                                             // 2: refused
-		`{"kind":"finding","title":"Weak password policy","scope":[],"severity":"medium"}`,                                // 3: new
+		`{"kind":"finding","title":"Telnet enabled","scope":["S-20"],"severity":"high","target":{"host":"10.0.1.9","port":23,"protocol":"tcp"},"sections":{"description":"Telnet accepts logins in plaintext."}}`,
+		foreign,
+		`{"kind":"finding","title":"No severity","scope":[]}`, // 3: refused
+		`{"kind":"finding","title":"Weak password policy","scope":[],"severity":"medium"}`,
 	}, "\n") + "\n"
-	code, out, errOut := runIn(t, in, "add", "--report", dir, "--staging", "--upsert", "--format", "{{.id}} {{.path}}")
+	code, out, errOut := runIn(t, in, "add", "--report", dir)
 	if code != 1 {
 		t.Errorf("exit %d, want 1 for the refused record", code)
 	}
-	if out != "F-006 staging/F-006-weak-password-policy.md\n" {
-		t.Errorf("stdout = %q", out)
+	if want := "F-004 findings/F-004-telnet-enabled.md\nS-1 \nF-005 findings/F-005-weak-password-policy.md\n"; pick(t, out, "id", "path") != want {
+		t.Errorf("stdout:\n%s", out)
 	}
-	wantErr := "rpt: rejected/F-005-open-redirect.md: kept F-005, already reviewed\n" +
-		"rpt: stdin:2: bad value: severity \"\" is not one of [critical high medium low info]\n"
-	if errOut != wantErr {
-		t.Errorf("stderr\n got: %q\nwant: %q", errOut, wantErr)
+	if !strings.Contains(out, foreign+"\n") {
+		t.Error("foreign record not passed through byte for byte")
 	}
-}
-
-func TestFindingsStaging(t *testing.T) {
-	code, out, errOut := runIn(t, "", "findings", "--staging", "--report", fixture, "--format", "{{.id}} {{.path}}")
-	if code != 0 || errOut != "" || out != "F-004 staging/F-004-ssh-weak-ciphers.md\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	if want := "rpt: stdin:3: bad value: severity \"\" is not one of [critical high medium low info]\n"; errOut != want {
+		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 	}
-}
-
-func TestSetValueStartingWithDash(t *testing.T) {
-	dir := reportCopy(t)
-	code, out, errOut := runIn(t, "", "set", "--report", dir, "--format", "{{.offset}}", "F-003", "offset", "--", "-1")
-	if code != 0 || out != "-1\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	for _, f := range []string{"F-004-telnet-enabled.md", "F-005-weak-password-policy.md"} {
+		if _, err := os.Stat(filepath.Join(dir, "findings", f)); err != nil {
+			t.Error(err)
+		}
 	}
 }

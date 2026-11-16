@@ -15,11 +15,11 @@ func runIn(t *testing.T, stdin string, args ...string) (int, string, string) {
 }
 
 func TestScopeVerb(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "--report", fixture, "--format", "{{.id}} {{.host}} {{.port}}")
+	code, out, errOut := runIn(t, "", "scope", "--report", fixture)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if want := "S-12 10.0.0.5 443\nS-14 10.0.0.6 8443\nS-20 10.0.1.0/24 \n"; out != want {
+	if want := "S-12 10.0.0.5 443\nS-14 10.0.0.6 8443\nS-20 10.0.1.0/24 \n"; pick(t, out, "id", "host", "port") != want {
 		t.Errorf("stdout\n got: %q\nwant: %q", out, want)
 	}
 }

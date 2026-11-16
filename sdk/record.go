@@ -20,7 +20,6 @@ const (
 type Finding struct {
 	Kind     string            `json:"kind"`
 	ID       string            `json:"id,omitzero"`
-	Key      string            `json:"key,omitzero"` // finding key; set by the producing plugin
 	Title    string            `json:"title"`
 	Scope    []string          `json:"scope"` // scope IDs
 	Severity Severity          `json:"severity"`
@@ -109,7 +108,6 @@ type Period struct {
 // never read scope.csv or resolve paths.
 type ReportFinding struct {
 	ID       string            `json:"id"`
-	Key      string            `json:"key,omitzero"`
 	Title    string            `json:"title"`
 	Severity Severity          `json:"severity"`
 	Scope    []ScopeRow        `json:"scope"`

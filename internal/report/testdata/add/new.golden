@@ -1,6 +1,5 @@
 ---
-id: F-006
-key: 9c1d0e7f2a3b4c5d
+id: F-004
 title: 'Telnet enabled: plaintext logins (port 23)!'
 scope: [S-20]
 severity: high

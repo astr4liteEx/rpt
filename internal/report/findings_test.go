@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"github.com/astr4liteEx/rpt/sdk"
@@ -123,42 +124,47 @@ func TestFindingsEdgeCases(t *testing.T) {
 	}
 }
 
-func TestFindingsInReviewFolders(t *testing.T) {
-	r := openFixture(t)
-	staged, err := r.FindingsIn(StagingDir)
+func TestFindingsReadsTarget(t *testing.T) {
+	dir := copyFixture(t)
+	writeFile(t, dir, "findings/ssh.md", "---\nid: F-004\ntitle: SSH weak ciphers\nscope: [S-20]\nseverity: medium\n"+
+		"target: {host: 10.0.1.5, port: 22, protocol: tcp, vhost: ssh.acme.com}\nsource: {plugin: nuclei}\n---\n")
+	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(staged) != 1 {
-		t.Fatalf("got %d staged findings, want 1", len(staged))
+	defer r.Close()
+	list, err := r.Findings()
+	if err != nil {
+		t.Fatal(err)
 	}
-	f := staged[0]
-	if f.ID != "F-004" || f.Key != "2617ba239ba6c4fa" || f.Path != "staging/F-004-ssh-weak-ciphers.md" {
-		t.Errorf("id/key/path = %s/%s/%s", f.ID, f.Key, f.Path)
+	i := slices.IndexFunc(list, func(f sdk.Finding) bool { return f.ID == "F-004" })
+	if i < 0 {
+		t.Fatal("F-004 not read")
 	}
-	if f.Target == nil || f.Target.Host != "10.0.1.5" || f.Target.Port != 22 || f.Target.Protocol != "tcp" {
-		t.Errorf("target = %+v, want 10.0.1.5 tcp/22", f.Target)
-	}
-	if _, ok := f.Extra["key"]; ok {
-		t.Error("key also left in Extra")
+	f := list[i]
+	if f.Target == nil || f.Target.Host != "10.0.1.5" || f.Target.Port != 22 || f.Target.Protocol != "tcp" ||
+		string(f.Target.Extra["vhost"]) != `"ssh.acme.com"` {
+		t.Errorf("target = %+v, want 10.0.1.5 tcp/22 with vhost kept", f.Target)
 	}
 	if _, ok := f.Extra["target"]; ok {
 		t.Error("target also left in Extra")
 	}
-	if string(f.Extra["source"]) != `{"plugin":"nuclei","template":"ssh-weak-cipher"}` {
+	if string(f.Extra["source"]) != `{"plugin":"nuclei"}` {
 		t.Errorf("source = %s, want it passed through", f.Extra["source"])
 	}
+}
 
+func TestFindingsMissingFolder(t *testing.T) {
 	dir := copyFixture(t)
-	if err := os.RemoveAll(filepath.Join(dir, StagingDir)); err != nil {
+	if err := os.RemoveAll(filepath.Join(dir, FindingsDir)); err != nil {
 		t.Fatal(err)
 	}
-	r2, err := Open(dir)
+	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer r2.Close()
-	if got, err := r2.FindingsIn(StagingDir); err != nil || len(got) != 0 {
-		t.Errorf("missing staging/ = %v, %v; want no findings, no error", got, err)
+	defer r.Close()
+	if got, err := r.Findings(); err != nil || len(got) != 0 {
+		t.Errorf("missing findings/ = %v, %v; want no findings, no error", got, err)
 	}
 }

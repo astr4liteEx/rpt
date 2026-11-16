@@ -71,7 +71,6 @@ func usage() string {
 // outputFlags are the flags every verb that writes records shares.
 type outputFlags struct {
 	json   *bool
-	format *string
 	report *string
 }
 
@@ -81,14 +80,13 @@ func newFlags(e *env, name string) (*flag.FlagSet, outputFlags) {
 	flags.SetOutput(e.stderr)
 	return flags, outputFlags{
 		json:   flags.Bool("json", false, "write JSON Lines even on a terminal"),
-		format: flags.String("format", "", "Go template run against each record's JSON fields"),
 		report: flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)"),
 	}
 }
 
 // output builds the verb's writer from the shared flags.
 func (o outputFlags) output(e *env, columns []cli.Column) (*cli.Output, error) {
-	return cli.NewOutput(e.stdout, isTerminal(e.stdout), *o.json, *o.format, columns)
+	return cli.NewOutput(e.stdout, isTerminal(e.stdout), *o.json, columns)
 }
 
 // openReport finds and opens the report, logging why when it can't.

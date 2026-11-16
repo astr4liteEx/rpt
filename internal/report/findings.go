@@ -19,13 +19,9 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-// The review folders, relative to the report root. Each holds one markdown
-// file per finding; which folder a file is in is its review state.
-const (
-	FindingsDir = "findings" // promoted: part of the report
-	StagingDir  = "staging"  // added by automation, awaiting review
-	RejectedDir = "rejected" // judged false; kept so automation never re-adds it
-)
+// FindingsDir is the folder, relative to the report root, that holds one
+// markdown file per finding.
+const FindingsDir = "findings"
 
 // sectionKeys maps the fixed section headings to their keys. Any other ##
 // heading is kept under its exact text.
@@ -37,24 +33,19 @@ var sectionKeys = map[string]string{
 
 // frontmatterKeys are the frontmatter keys that map to declared Finding
 // fields; every other key is kept in Finding.Extra.
-var frontmatterKeys = []string{"id", "key", "title", "scope", "severity", "evidence", "target"}
+var frontmatterKeys = []string{"id", "title", "scope", "severity", "evidence", "target"}
 
-// Findings reads every finding file in the findings folder; see FindingsIn.
-func (r *Report) Findings() ([]sdk.Finding, error) {
-	return r.FindingsIn(FindingsDir)
-}
-
-// FindingsIn reads every finding file in one review folder, in file-name
+// Findings reads every finding file in the findings folder, in file-name
 // order. A missing folder holds no findings. A malformed file doesn't stop
 // the read: the findings that parsed are returned together with a joined
 // error holding one *FileError per bad file.
-func (r *Report) FindingsIn(dir string) ([]sdk.Finding, error) {
-	entries, err := fs.ReadDir(r.root.FS(), dir)
+func (r *Report) Findings() ([]sdk.Finding, error) {
+	entries, err := fs.ReadDir(r.root.FS(), FindingsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", dir, err)
+		return nil, fmt.Errorf("read %s: %w", FindingsDir, err)
 	}
 	var (
 		findings []sdk.Finding
@@ -64,7 +55,7 @@ func (r *Report) FindingsIn(dir string) ([]sdk.Finding, error) {
 		if !e.Type().IsRegular() || path.Ext(e.Name()) != ".md" {
 			continue
 		}
-		rel := path.Join(dir, e.Name())
+		rel := path.Join(FindingsDir, e.Name())
 		src, err := r.root.ReadFile(rel)
 		if err != nil {
 			errs = append(errs, &FileError{Path: rel, Err: err})
@@ -95,7 +86,6 @@ func parseFinding(rel string, src []byte) (sdk.Finding, error) {
 	}
 	var fm struct {
 		ID       string `yaml:"id"`
-		Key      string
 		Title    string
 		Scope    []string
 		Severity sdk.Severity
@@ -117,7 +107,6 @@ func parseFinding(rel string, src []byte) (sdk.Finding, error) {
 	return sdk.Finding{
 		Kind:     "finding",
 		ID:       fm.ID,
-		Key:      fm.Key,
 		Title:    fm.Title,
 		Scope:    fm.Scope,
 		Severity: fm.Severity,
@@ -282,26 +271,8 @@ func sectionOrder(secs map[string]string) []string {
 	return append(keys, rest...)
 }
 
-// setSection replaces the text of the section with the given key, or
-// appends the section when the body has none. Text that is already there
-// changes nothing.
-func (ff *findingFile) setSection(key, text string) {
-	text = strings.TrimSpace(text)
-	spans := sectionSpans(ff.body)
-	for i, s := range spans {
-		if s.key != key {
-			continue
-		}
-		if sectionText(ff.body, s) == text {
-			return
-		}
-		repl := "\n" + text + "\n"
-		if i < len(spans)-1 {
-			repl += "\n"
-		}
-		ff.body = slices.Concat(ff.body[:s.bodyAt], []byte(repl), ff.body[s.end:])
-		return
-	}
+// appendSection adds a ## section to the end of the body.
+func (ff *findingFile) appendSection(key, text string) {
 	heading := key
 	if h, ok := sectionHeadings[key]; ok {
 		heading = h
@@ -312,7 +283,7 @@ func (ff *findingFile) setSection(key, text string) {
 		}
 		ff.body = append(ff.body, '\n')
 	}
-	ff.body = append(ff.body, "## "+heading+"\n\n"+text+"\n"...)
+	ff.body = append(ff.body, "## "+heading+"\n\n"+strings.TrimSpace(text)+"\n"...)
 }
 
 // lineEnd returns the offset just past the newline that ends the line

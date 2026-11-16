@@ -8,7 +8,7 @@ func TestNextID(t *testing.T) {
 		files map[string]string // extra files written into a fixture copy
 		want  string
 	}{
-		{name: "rejected/ counts: fixture's highest is F-005", want: "F-006"},
+		{name: "fixture's highest is F-003", want: "F-004"},
 		{
 			name:  "more than three digits",
 			files: map[string]string{"findings/big.md": "---\nid: F-1234\ntitle: t\n---\n"},
@@ -17,11 +17,11 @@ func TestNextID(t *testing.T) {
 		{
 			name: "malformed IDs and broken files are ignored",
 			files: map[string]string{
-				"staging/odd.md":    "---\nid: F-9x\ntitle: t\n---\n",
-				"staging/short.md":  "---\nid: F-99\ntitle: t\n---\n",
-				"staging/broken.md": "---\nid: F-900\ntitle: : bad\n---\n",
+				"findings/odd.md":    "---\nid: F-9x\ntitle: t\n---\n",
+				"findings/short.md":  "---\nid: F-99\ntitle: t\n---\n",
+				"findings/broken.md": "---\nid: F-900\ntitle: : bad\n---\n",
 			},
-			want: "F-006",
+			want: "F-004",
 		},
 	}
 	for _, tt := range tests {

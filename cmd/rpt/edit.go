@@ -86,18 +86,17 @@ func logEditError(e *env, err error, line int) int {
 	return cli.ExitUsage
 }
 
-// addVerb writes the finding records on stdin into the report and prints
-// each finding as stored. Other records pass through untouched.
+// addVerb writes each finding record on stdin into the report as a new
+// finding file and prints the finding as stored. Other records pass
+// through untouched.
 func addVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "add")
-	staging := flags.Bool("staging", false, "write to staging/ for review instead of findings/")
-	upsert := flags.Bool("upsert", false, "update the finding with the same key instead of adding a new one")
 	pos, err := parseInterspersed(flags, args)
 	if err != nil {
 		return cli.ExitUsage
 	}
 	if len(pos) != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt add [--staging] [--upsert] < records.jsonl")
+		fmt.Fprintln(e.stderr, "usage: rpt add < records.jsonl")
 		return cli.ExitUsage
 	}
 	out, err := of.output(e, findingColumns)
@@ -110,7 +109,6 @@ func addVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	defer r.Close()
-	opts := report.AddOptions{Staging: *staging, Upsert: *upsert}
 
 	code := cli.ExitOK
 	for rec, err := range sdk.Records(e.stdin) {
@@ -135,7 +133,7 @@ func addVerb(e *env, args []string) int {
 			code = cli.ExitProblems
 			continue
 		}
-		res, err := r.Add(f, opts)
+		added, err := r.Add(f)
 		if err != nil {
 			if c := logEditError(e, err, rec.Line); c == cli.ExitUsage {
 				return c
@@ -143,11 +141,7 @@ func addVerb(e *env, args []string) int {
 			code = cli.ExitProblems
 			continue
 		}
-		if res.Skipped {
-			e.log.Info(fmt.Sprintf("kept %s, already reviewed", res.Finding.ID), "path", res.Finding.Path)
-			continue
-		}
-		if err := out.Write(res.Finding); err != nil {
+		if err := out.Write(added); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitUsage
 		}

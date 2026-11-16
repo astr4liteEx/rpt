@@ -14,10 +14,10 @@ var findings = []sdk.Finding{
 
 var findingColumns = []Column{{"ID", "id"}, {"SEVERITY", "severity"}, {"TITLE", "title"}, {"SCOPE", "scope"}}
 
-func render(t *testing.T, terminal, jsonFlag bool, format string) string {
+func render(t *testing.T, terminal, jsonFlag bool) string {
 	t.Helper()
 	var buf bytes.Buffer
-	out, err := NewOutput(&buf, terminal, jsonFlag, format, findingColumns)
+	out, err := NewOutput(&buf, terminal, jsonFlag, findingColumns)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,44 +39,19 @@ func TestOutputModes(t *testing.T) {
 		name     string
 		terminal bool
 		json     bool
-		format   string
 		want     string
 	}{
 		{name: "pipe gets JSON Lines", want: jsonl},
 		{name: "--json forces JSON Lines on a terminal", terminal: true, json: true, want: jsonl},
-		{name: "--format with shell-escaped tab", format: `{{.id}}\t{{.severity}}`, want: "F-003\thigh\nF-001\tmedium\n"},
-		{name: "--format wins over the terminal table", terminal: true, format: `{{.id}}`, want: "F-003\nF-001\n"},
-		{name: "--format missing field prints empty", format: `{{.id}}|{{.cvss}}|`, want: "F-003||\nF-001||\n"},
-		{name: "--format missing field inside if and range", format: `{{if .cvss}}x{{end}}{{range .refs}}r{{end}}{{.id}}`, want: "F-003\nF-001\n"},
 		{name: "terminal gets a table, lists joined with commas", terminal: true, want: "" +
 			"ID     SEVERITY  TITLE                   SCOPE\n" +
 			"F-003  high      SQL injection in login  S-12,S-14\n" +
 			"F-001  medium    Reflected XSS           S-14\n"},
-		{name: "--format sees arrays as lists", format: `{{range .scope}}{{.}} {{end}}`, want: "S-12 S-14 \nS-14 \n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := render(t, tt.terminal, tt.json, tt.format); got != tt.want {
+			if got := render(t, tt.terminal, tt.json); got != tt.want {
 				t.Errorf("output\n got: %q\nwant: %q", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestNewOutputRejectsBadFlags(t *testing.T) {
-	tests := []struct {
-		name   string
-		json   bool
-		format string
-	}{
-		{"--json with --format", true, "{{.id}}"},
-		{"unparsable template", false, "{{.id"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var buf bytes.Buffer
-			if _, err := NewOutput(&buf, false, tt.json, tt.format, nil); err == nil {
-				t.Error("NewOutput succeeded, want a usage error")
 			}
 		})
 	}
@@ -88,18 +63,16 @@ func TestOutputPassThrough(t *testing.T) {
 		name     string
 		terminal bool
 		json     bool
-		format   string
 		want     string
 	}{
 		{name: "JSON Lines writes the original bytes", want: string(raw) + "\n"},
 		{name: "--json on a terminal too", terminal: true, json: true, want: string(raw) + "\n"},
 		{name: "a table leaves foreign records out", terminal: true, want: "ID  SEVERITY  TITLE  SCOPE\n"},
-		{name: "a template leaves foreign records out", format: "{{.id}}", want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			out, err := NewOutput(&buf, tt.terminal, tt.json, tt.format, findingColumns)
+			out, err := NewOutput(&buf, tt.terminal, tt.json, findingColumns)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -131,7 +104,7 @@ func TestOutputWriteOwn(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			out, err := NewOutput(&buf, tt.terminal, false, "", findingColumns)
+			out, err := NewOutput(&buf, tt.terminal, false, findingColumns)
 			if err != nil {
 				t.Fatal(err)
 			}

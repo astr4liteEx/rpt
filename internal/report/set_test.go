@@ -38,7 +38,6 @@ func TestSet(t *testing.T) {
 		{"scope-keeps-comment-spacing", "F-003", "scope", "[S-12, S-20]", "findings/sqli-login.md"},
 		{"quoted-stays-quoted", "F-003", "cvss", "9.4", "findings/sqli-login.md"},
 		{"new-key-in-crlf-file", "F-001", "retest", "pending", "findings/xss-search.md"},
-		{"staged", "F-004", "severity", "low", "staging/F-004-ssh-weak-ciphers.md"},
 		{"unchanged-value-is-a-no-op", "F-003", "severity", "high", "findings/sqli-login.md"},
 	}
 	for _, tt := range tests {
@@ -71,7 +70,6 @@ func TestSetRefuses(t *testing.T) {
 		want                 error
 	}{
 		{"unknown ID", "F-404", "severity", "high", ErrNoFinding},
-		{"rejected findings are not edited", "F-005", "severity", "high", ErrNoFinding},
 		{"id is permanent", "F-003", "id", "F-010", ErrRefusedKey},
 		{"sections are edited by hand", "F-003", "sections", "{}", ErrRefusedKey},
 		{"kind", "F-003", "kind", "scope", ErrRefusedKey},
@@ -82,7 +80,6 @@ func TestSetRefuses(t *testing.T) {
 		{"empty title", "F-003", "title", "", ErrBadValue},
 		{"target needs a host", "F-003", "target", "{port: 22}", ErrBadValue},
 		{"target protocol", "F-003", "target", "{host: a, protocol: icmp}", ErrBadValue},
-		{"empty key", "F-003", "key", "''", ErrBadValue},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

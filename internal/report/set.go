@@ -27,7 +27,7 @@ var refusedKeys = map[string]string{
 }
 
 // Set changes one top-level frontmatter key of the finding with the given
-// ID in findings/ or staging/, and returns the finding as now stored. value
+// ID, and returns the finding as now stored. value
 // is YAML. Nothing else in the file changes.
 func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 	if why, ok := refusedKeys[key]; ok {
@@ -51,24 +51,21 @@ func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 	return r.edit(rel, func(ff *findingFile) error { return ff.setEntry(key, val) })
 }
 
-// locate returns the path of the finding with the given ID in findings/ or
-// staging/.
+// locate returns the path of the finding with the given ID.
 func (r *Report) locate(id string) (string, error) {
+	list, err := r.Findings()
+	if err != nil && !onlyFileErrors(err) {
+		return "", err
+	}
 	var found []string
-	for _, dir := range []string{FindingsDir, StagingDir} {
-		list, err := r.FindingsIn(dir)
-		if err != nil && !onlyFileErrors(err) {
-			return "", err
-		}
-		for _, f := range list {
-			if f.ID == id {
-				found = append(found, f.Path)
-			}
+	for _, f := range list {
+		if f.ID == id {
+			found = append(found, f.Path)
 		}
 	}
 	switch len(found) {
 	case 0:
-		return "", fmt.Errorf("%w: %s in %s/ or %s/", ErrNoFinding, id, FindingsDir, StagingDir)
+		return "", fmt.Errorf("%w: %s in %s/", ErrNoFinding, id, FindingsDir)
 	case 1:
 		return found[0], nil
 	default:
@@ -120,7 +117,7 @@ func checkValue(key string, val *yaml.Node, severities []sdk.Severity) error {
 		return val.Value, nil
 	}
 	switch key {
-	case "title", "key":
+	case "title":
 		_, err := scalarText()
 		return err
 	case "severity":

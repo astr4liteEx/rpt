@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"encoding/json/v2"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +32,27 @@ func brokenFixture(t *testing.T) string {
 	return dir
 }
 
+// pick reads JSON Lines and returns, for each record, the named fields
+// joined with spaces, one line per record; a missing field is empty.
+func pick(t *testing.T, jsonl string, fields ...string) string {
+	t.Helper()
+	var out strings.Builder
+	for line := range strings.Lines(jsonl) {
+		var m map[string]any
+		if err := json.Unmarshal([]byte(line), &m); err != nil {
+			t.Fatalf("not JSON Lines: %q: %v", line, err)
+		}
+		vals := make([]string, len(fields))
+		for i, f := range fields {
+			if v, ok := m[f]; ok {
+				vals[i] = fmt.Sprint(v)
+			}
+		}
+		out.WriteString(strings.Join(vals, " ") + "\n")
+	}
+	return out.String()
+}
+
 func TestRun(t *testing.T) {
 	jsonl := func(ids ...string) func(string) bool {
 		return func(out string) bool {
@@ -46,6 +69,9 @@ func TestRun(t *testing.T) {
 		}
 	}
 	exactly := func(want string) func(string) bool { return func(out string) bool { return out == want } }
+	ids := func(want string) func(string) bool {
+		return func(out string) bool { return pick(t, out, "id") == want }
+	}
 
 	tests := []struct {
 		name      string
@@ -63,27 +89,22 @@ func TestRun(t *testing.T) {
 			wantCode: 0, wantOut: jsonl("F-003", "F-002", "F-001"),
 		},
 		{
-			name:     "findings --format with a shell-escaped tab",
-			args:     []string{"findings", "--report", fixture, "--format", `{{.id}}\t{{.severity}}`},
-			wantCode: 0, wantOut: exactly("F-003\thigh\nF-002\tinfo\nF-001\tmedium\n"),
-		},
-		{
 			name:     "findings finds the report through RPT_REPORT_DIR",
-			args:     []string{"findings", "--format", "{{.id}}"},
+			args:     []string{"findings"},
 			env:      fixture,
-			wantCode: 0, wantOut: exactly("F-003\nF-002\nF-001\n"),
+			wantCode: 0, wantOut: ids("F-003\nF-002\nF-001\n"),
 		},
 		{
 			name:     "a broken finding is reported, the rest still printed, exit 1",
-			args:     []string{"findings", "--format", "{{.id}}"},
+			args:     []string{"findings"},
 			env:      "BROKEN",
-			wantCode: 1, wantOut: exactly("F-003\nF-002\nF-001\n"),
+			wantCode: 1, wantOut: ids("F-003\nF-002\nF-001\n"),
 			wantInErr: "rpt: findings/broken.md:3: ",
 		},
 		{
-			name:     "--json with --format is a usage error",
-			args:     []string{"findings", "--report", fixture, "--json", "--format", "{{.id}}"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "--json and --format",
+			name:     "--format is gone: use jq",
+			args:     []string{"findings", "--report", fixture, "--format", "{{.id}}"},
+			wantCode: 2, wantOut: exactly(""), wantInErr: "flag provided but not defined: -format",
 		},
 		{
 			name:     "an unknown flag is a usage error",

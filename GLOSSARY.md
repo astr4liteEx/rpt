@@ -1,6 +1,6 @@
 # rpt
 
-rpt is a pentest report engine: a report is a plain, git-tracked folder, and the rpt core defines and enforces its format.
+rpt is a pentest report engine: a report is a plain folder, and the rpt core defines and enforces its format.
 
 ## Report
 
@@ -30,25 +30,9 @@ _Avoid_: issue, vuln, vulnerability
 A file inside the report that backs a finding, listed in the finding's frontmatter relative to the finding file.
 _Avoid_: asset (that is evidence as an absolute path in an assembled report), attachment
 
-**Staged finding**:
-A finding added by automation, in `staging/`, awaiting review.
-_Avoid_: draft, pending finding
-
-**Promote**:
-Move a staged finding's file into `findings/`, accepting it into the report.
-_Avoid_: approve, accept, publish
-
-**Rejected finding**:
-A staged finding judged false, moved to `rejected/` so automation never adds it again.
-_Avoid_: deleted finding, false positive (that is the reason, not the state)
-
 **Finding ID**:
 A finding's permanent name, `F-` and a number, cited by clients and retests.
 _Avoid_: finding number, ref
-
-**Finding key**:
-A string set by the plugin that produced an automated finding, so re-runs of the same check update it instead of adding a duplicate; rpt only compares keys.
-_Avoid_: stable ID, hash ID, fingerprint
 
 **Target**:
 The host, port and protocol a finding was actually found on.
