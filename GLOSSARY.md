@@ -50,6 +50,14 @@ _Avoid_: finding number, ref
 A string set by the plugin that produced an automated finding, so re-runs of the same check update it instead of adding a duplicate; rpt only compares keys.
 _Avoid_: stable ID, hash ID, fingerprint
 
+**Target**:
+The host, port and protocol a finding was actually found on.
+_Avoid_: asset, affected host (in data), endpoint
+
+**Scope row**:
+One entry of the agreed scope in `scope.csv`: a host, address range or wildcard domain, optionally narrowed by port and protocol.
+_Avoid_: scope item, asset, in-scope host
+
 **Severity level**:
 One of the levels listed in the report config, most severe first; the list is both the sort order and the only allowed values.
 _Avoid_: rating, risk, priority
