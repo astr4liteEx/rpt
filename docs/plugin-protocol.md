@@ -54,6 +54,14 @@ Filtering a stream (stdin to stdout):
 - stderr carries messages, one per line: `<program>: <path>:<line>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known.
 - Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could); `2` usage error. `126` belongs to rpt (the plugin couldn't start).
 
+## In a pipeline
+
+A plugin is one stage of a shell pipeline, so its failures reach the other stages:
+
+- **A hang stalls the whole chain.** Downstream waits for input, upstream blocks once the pipe buffer fills, and nothing times out; only Ctrl-C stops it. Make every wait the plugin does (network, child processes) end on its own.
+- **A crash looks like a short input.** Downstream sees end of input and finishes on the records that arrived; upstream is killed by a broken pipe. Write each record as one complete line, so a crash leaves at most one cut-off line, which readers report as malformed. On any failure, exit non-zero.
+- **Shells hide mid-chain failures.** A pipeline's exit status is its last command's, so `rpt-parse | rpt-x | rpt add` exits 0 even when `rpt-x` died, and `rpt add` has added a partial set. Tell users of the plugin, in its usage or docs, to run chains with `set -o pipefail` (bash, zsh), and to stage an import through a file when a partial import would hurt: `rpt-x < in > out.jsonl && rpt add < out.jsonl`.
+
 ## Working with a report
 
 - **Read** through rpt: `$RPT_BIN findings --json`, `$RPT_BIN scope --json`, `$RPT_BIN assemble` (one `report` record, made for renderers).
