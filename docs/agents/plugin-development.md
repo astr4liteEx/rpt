@@ -1,0 +1,49 @@
+# Building an rpt plugin
+
+Steps for building or changing an rpt plugin, in any language. The rules a plugin follows are in [`docs/plugin-protocol.md`](../plugin-protocol.md); read it first and keep it open, since every step below applies it. Record shapes are in [`schema/`](../../schema).
+
+## 1. Place the plugin
+
+Decide what the plugin is, since that decides which protocol sections bind it:
+
+- **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt.
+- **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
+- **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`.
+- **Checker**: emits `problem` records under its own rule names.
+
+Done when the plugin has a verb name that is not an rpt built-in (`rpt` lists them) and a one-line summary.
+
+## 2. Write `--describe`
+
+Print the description object and exit 0, before any other work. Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
+
+## 3. Write the work
+
+Read and write records as the protocol's Records section says; reach the report only through `$RPT_BIN` (falling back to `rpt`). Done when every record kind the plugin reads or writes has been checked against its schema, member by member.
+
+## 4. Prove it
+
+Run every check; the plugin is done when all pass:
+
+- [ ] `--describe` answers within 2 seconds, with no other effect.
+- [ ] A malformed input line gives one stderr line with its line number and exit 1, and the other records still come out.
+- [ ] A record of a kind the plugin doesn't handle comes out byte-identical (filters).
+- [ ] An unknown member on a record the plugin changes survives (filters).
+- [ ] The plugin works with no `RPT_*` variable set.
+- [ ] Findings it writes go into a scratch copy of a report with `rpt add`, and `rpt validate` on that copy reports no new errors (sources).
+- [ ] With the plugin on `PATH`, `rpt plugins` lists it with its summary, and `rpt <verb>` runs it.
+
+## Go plugins
+
+The [`sdk`](../../sdk) package implements the protocol; use it instead of re-deriving the rules:
+
+| Need | Use |
+| --- | --- |
+| `main` | `func main() { sdk.Main(plugin) }`, with `plugin` an `sdk.Plugin{Description, Run}` |
+| Tests, `--describe` included | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
+| Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line |
+| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`; unknown members ride in `Extra` |
+| Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
+| Calling rpt | `exec.Command(sdk.Bin(), "findings", "--json")` |
+
+Cleanup goes in `Plugin.Run`: `sdk.Main` exits when `Run` returns.

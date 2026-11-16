@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/plugin.schema.json",
+  "title": "rpt plugin record",
+  "description": "One plugin found by rpt plugins. Summary, usage and version come from the plugin's --describe answer and are absent when it gave none in time.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "plugin"},
+    "name": {"type": "string", "description": "The verb: the file name without its rpt- prefix."},
+    "path": {"type": "string", "description": "Absolute path of the program rpt <name> runs."},
+    "summary": {"type": "string"},
+    "usage": {"type": "string"},
+    "version": {"type": "string"}
+  },
+  "required": ["kind", "name", "path"],
+  "additionalProperties": true,
+  "$defs": {
+    "description": {
+      "type": "object",
+      "description": "What a plugin prints for --describe: one JSON object on one line, then exit 0.",
+      "properties": {
+        "summary": {"type": "string", "description": "One line: what the plugin does."},
+        "usage": {"type": "string", "description": "One line, e.g. rpt parse-nuclei < results.jsonl."},
+        "version": {"type": "string", "description": "The plugin's own version."}
+      },
+      "required": ["summary"],
+      "additionalProperties": true
+    }
+  }
+}

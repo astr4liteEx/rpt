@@ -65,5 +65,5 @@ The `rpt` binary and its built-in verbs, which only define and enforce the repor
 _Avoid_: engine (alone), server
 
 **Plugin**:
-A separate `rpt-<verb>` program that does anything beyond the format: parsing, rendering, knowledge base, detection.
+A separate `rpt-<verb>` program, in any language, that follows the plugin protocol and does anything beyond the format: parsing, rendering, knowledge base, detection.
 _Avoid_: extension, addon, module

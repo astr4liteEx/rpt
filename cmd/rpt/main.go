@@ -42,6 +42,7 @@ func init() {
 		"add":      addVerb,
 		"assemble": assembleVerb,
 		"findings": findingsVerb,
+		"plugins":  pluginsVerb,
 		"scope":    scopeVerb,
 		"set":      setVerb,
 		"validate": validateVerb,
@@ -57,8 +58,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	if v, ok := builtins[args[0]]; ok {
 		return v(e, args[1:])
 	}
-	fmt.Fprintf(stderr, "rpt: unknown verb %q\n%s\n", args[0], usage())
-	return cli.ExitUsage
+	return dispatch(e, args[0], args[1:])
 }
 
 func usage() string {
@@ -67,7 +67,7 @@ func usage() string {
 		names = append(names, n)
 	}
 	sort.Strings(names)
-	return "usage: rpt <verb> [args]\nverbs: " + strings.Join(names, ", ")
+	return "usage: rpt <verb> [args]\nverbs: " + strings.Join(names, ", ") + "\nany other verb runs the rpt-<verb> plugin on PATH; rpt plugins lists them"
 }
 
 // outputFlags are the flags every verb that writes records shares.
