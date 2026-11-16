@@ -110,8 +110,8 @@ func (v *validation) checkConfig() {
 
 	if _, ok := cfg.KeyLines["format"]; !ok {
 		bad("format", "no format; add format: 1")
-	} else if cfg.Format != 1 {
-		bad("format", "format %d is not 1, the only format this rpt reads", cfg.Format)
+	} else if cfg.Format != FormatVersion {
+		bad("format", "format %d is not %d, the only format this rpt reads", cfg.Format, FormatVersion)
 	}
 	if _, ok := cfg.KeyLines["severities"]; ok && len(cfg.Severities) == 0 {
 		bad("severities", "severities is empty; list the levels most severe first, or remove the key for the defaults")

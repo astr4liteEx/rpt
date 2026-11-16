@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# check.sh runs every check CI runs: vet, staticcheck, race tests,
+# govulncheck, and a smoke test of the static release binary. CI calls
+# only this script, so running it locally is running CI.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# The tools are pinned in the separate tools module; go tool -n builds
+# each one (cached) and prints its path.
+staticcheck=$(go -C tools tool -n staticcheck)
+govulncheck=$(go -C tools tool -n govulncheck)
+
+echo "== go vet"
+go vet ./...
+echo "== staticcheck"
+"$staticcheck" ./...
+echo "== go test -race"
+go test -race ./...
+echo "== govulncheck"
+"$govulncheck" ./...
+
+echo "== smoke test of the static binary"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=smoke" -o "$tmp/rpt" ./cmd/rpt
+
+got=$("$tmp/rpt" version --json)
+want='{"kind":"version","version":"smoke","schema_version":1,"format":1}'
+if [ "$got" != "$want" ]; then
+	echo "rpt version --json: got $got, want $want" >&2
+	exit 1
+fi
+
+# The fixture has one planted problem: a finding citing scope ID S-99.
+code=0
+got=$("$tmp/rpt" validate --report testdata/fixture) || code=$?
+want='{"kind":"problem","path":"findings/tls-weak.md","line":5,"rule":"scopeIDsExist","level":"error","message":"S-99 is not in scope.csv"}'
+if [ "$code" != 1 ] || [ "$got" != "$want" ]; then
+	echo "rpt validate on the fixture: exit $code, output $got; want exit 1 and only the planted S-99 problem" >&2
+	exit 1
+fi
+echo "all checks passed"

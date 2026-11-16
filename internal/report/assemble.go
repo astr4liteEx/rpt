@@ -15,6 +15,10 @@ import (
 // SchemaVersion is the version of the record schemas rpt writes.
 const SchemaVersion = 1
 
+// FormatVersion is the report format this rpt reads: the format key in
+// rpt.yaml.
+const FormatVersion = 1
+
 // Assemble builds the render-ready report record: findings sorted by the
 // config's severity order then ID number, scope IDs replaced by their full
 // rows, evidence and relative section links made absolute and listed as

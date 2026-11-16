@@ -46,6 +46,7 @@ func init() {
 		"scope":    scopeVerb,
 		"set":      setVerb,
 		"validate": validateVerb,
+		"version":  versionVerb,
 	}
 }
 

@@ -138,3 +138,14 @@ type PluginInfo struct {
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
+
+// VersionInfo is the "version" record rpt version emits.
+type VersionInfo struct {
+	Kind          string `json:"kind"`
+	Version       string `json:"version"`        // release tag, module version, or "dev"
+	SchemaVersion int    `json:"schema_version"` // record schemas this rpt writes
+	Format        int    `json:"format"`         // report format this rpt reads
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}

@@ -1,0 +1,15 @@
+# Runs every check on each push and pull request. All the steps live in
+# scripts/check.sh, so running that script locally is running CI.
+name: ci
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: scripts/check.sh
