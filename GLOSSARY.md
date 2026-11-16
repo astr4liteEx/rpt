@@ -47,7 +47,7 @@ A finding's permanent name, `F-` and a number, cited by clients and retests.
 _Avoid_: finding number, ref
 
 **Finding key**:
-A hash an automated finding carries so re-runs of the same check update it instead of adding a duplicate.
+A string set by the plugin that produced an automated finding, so re-runs of the same check update it instead of adding a duplicate; rpt only compares keys.
 _Avoid_: stable ID, hash ID, fingerprint
 
 **Severity level**:
