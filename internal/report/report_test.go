@@ -28,11 +28,8 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Format != 1 || cfg.Name != "Acme external test" || cfg.Client != "Acme" {
-		t.Errorf("format/name/client = %d/%q/%q", cfg.Format, cfg.Name, cfg.Client)
-	}
-	if cfg.Period.Start != "2026-11-02" || cfg.Period.End != "2026-11-06" {
-		t.Errorf("period = %+v, want 2026-11-02..2026-11-06", cfg.Period)
+	if cfg.Format != 1 {
+		t.Errorf("format = %d, want 1", cfg.Format)
 	}
 	want := []sdk.Severity{"critical", "high", "medium", "low", "info"}
 	if !slices.Equal(cfg.Severities, want) {
@@ -62,7 +59,7 @@ func writeFile(t *testing.T, dir, rel, content string) {
 
 func TestConfigDefaultsAndUnknownKeys(t *testing.T) {
 	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 1\nname: N\nclient: C\nrenderer: typst\nlogo: acme.png\n")
+	writeFile(t, dir, "rpt.yaml", "format: 1\nrenderer: typst\nlogo: acme.png\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -134,7 +131,7 @@ func TestConfigRequiredSectionsAndKeyLines(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string]int{"format": 2, "name": 3, "client": 4, "period": 5, "severities": 6}
+	want := map[string]int{"format": 2, "severities": 3}
 	if !maps.Equal(cfg.KeyLines, want) {
 		t.Errorf("key lines = %v, want %v", cfg.KeyLines, want)
 	}

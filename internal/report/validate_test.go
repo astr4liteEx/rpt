@@ -16,7 +16,7 @@ import (
 const finding = "---\nid: F-050\ntitle: T\nscope: [S-12]\nseverity: low\n---\n" +
 	"## Description\n\nd\n\n## Remediation\n\nr\n\n## Proof of concept\n\np\n"
 
-const config = "format: 1\nname: N\nclient: C\nperiod: {start: 2026-11-02, end: 2026-11-06}\n"
+const config = "format: 1\n"
 
 type want struct {
 	path  string
@@ -80,27 +80,17 @@ func TestValidate(t *testing.T) {
 			want: []want{{"findings/x.md", 8, "textBeforeHeading", W, "text before the first ## heading is not part of any section"}}},
 		{name: "config: format", files: map[string]string{"rpt.yaml": strings.Replace(config, "format: 1", "format: 2", 1)},
 			want: []want{{"rpt.yaml", 1, "config", E, "format 2 is not 1"}}},
-		{name: "config: required keys", files: map[string]string{"rpt.yaml": "format: 1\nname: N\n"},
-			want: []want{
-				{"rpt.yaml", 0, "config", E, "no client"},
-				{"rpt.yaml", 0, "config", E, "no period.end"},
-				{"rpt.yaml", 0, "config", E, "no period.start"},
-			}},
-		{name: "config: dates", files: map[string]string{"rpt.yaml": strings.Replace(config, "{start: 2026-11-02, end: 2026-11-06}", "{start: 2026-11-09, end: 6 Nov}", 1)},
-			want: []want{{"rpt.yaml", 4, "config", E, `period.end "6 Nov" is not a date like 2026-11-06`}}},
-		{name: "config: start after end", files: map[string]string{"rpt.yaml": strings.Replace(config, "2026-11-02", "2026-11-09", 1)},
-			want: []want{{"rpt.yaml", 4, "config", E, "period.start 2026-11-09 is after period.end 2026-11-06"}}},
 		{name: "config: lists", files: map[string]string{"rpt.yaml": config +
 			"severities: [critical, high, medium, low, info, low]\nrequired_sections: [poc, '']\n"},
 			want: []want{
-				{"rpt.yaml", 5, "config", E, `severities lists "low" twice`},
-				{"rpt.yaml", 6, "config", E, "required_sections has an empty name"},
+				{"rpt.yaml", 2, "config", E, `severities lists "low" twice`},
+				{"rpt.yaml", 3, "config", E, "required_sections has an empty name"},
 			}},
 		{name: "config: empty severities; knownSeverity has nothing to check against", files: map[string]string{
 			"rpt.yaml": config + "severities: []\n"},
-			want: []want{{"rpt.yaml", 5, "config", E, "severities is empty"}}},
+			want: []want{{"rpt.yaml", 2, "config", E, "severities is empty"}}},
 		{name: "configUnknownKey", files: map[string]string{"rpt.yaml": config + "severites: [high]\n"},
-			want: []want{{"rpt.yaml", 5, "configUnknownKey", W, `unknown key "severites"`}}},
+			want: []want{{"rpt.yaml", 2, "configUnknownKey", W, `unknown key "severites"`}}},
 		{name: "scope: bad rows", files: map[string]string{"scope.csv": "id,host,port\nS-12,10.0.0.5,443\nS-14,,8443\nS-20,10.0.1.0/24,x\n"},
 			want: []want{
 				{"scope.csv", 3, "scope", E, "S-14 has no host"},

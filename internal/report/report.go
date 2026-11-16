@@ -70,9 +70,6 @@ func (e *FileError) Unwrap() error { return e.Err }
 // Config is the report config read from rpt.yaml.
 type Config struct {
 	Format     int
-	Name       string
-	Client     string
-	Period     sdk.Period
 	Severities []sdk.Severity // most severe first; the only allowed levels
 
 	// RequiredSections are the section keys every finding must have and
@@ -96,13 +93,7 @@ func (r *Report) Config() (Config, error) {
 		return Config{}, fmt.Errorf("read report config: %w", err)
 	}
 	var raw struct {
-		Format int `yaml:"format"`
-		Name   string
-		Client string
-		Period struct {
-			Start string
-			End   string
-		}
+		Format           int `yaml:"format"`
 		Severities       []sdk.Severity
 		RequiredSections []string `yaml:"required_sections"`
 	}
@@ -115,9 +106,6 @@ func (r *Report) Config() (Config, error) {
 	}
 	cfg := Config{
 		Format:           raw.Format,
-		Name:             raw.Name,
-		Client:           raw.Client,
-		Period:           sdk.Period{Start: raw.Period.Start, End: raw.Period.End},
 		Severities:       raw.Severities,
 		RequiredSections: raw.RequiredSections,
 		KeyLines:         keyLines(&doc),
@@ -132,7 +120,7 @@ func (r *Report) Config() (Config, error) {
 	} else if cfg.RequiredSections == nil {
 		cfg.RequiredSections = []string{}
 	}
-	cfg.UnknownKeys = unknownKeys(&doc, "format", "name", "client", "period", "severities", "required_sections")
+	cfg.UnknownKeys = unknownKeys(&doc, "format", "severities", "required_sections")
 	return cfg, nil
 }
 

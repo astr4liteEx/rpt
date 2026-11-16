@@ -68,3 +68,4 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
 - **Change** a report only through rpt: pipe `finding` records into `$RPT_BIN add` to add findings, and use `$RPT_BIN set <id> <key> <value>` to change one value. Both write atomically and keep the author's formatting; editing report files directly is outside the protocol.
 - **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json).
 - A plugin reading `report` records checks that `schema_version` is one it knows.
+- A report holds no engagement details: no client, title or dates. A renderer takes them from its own input (flags, environment, its own file), as in `rpt assemble | rpt-render-pdf --client Acme --period 2026-11-02..2026-11-06`.

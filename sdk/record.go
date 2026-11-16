@@ -84,26 +84,16 @@ type Report struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// ReportMeta describes the engagement, from the report's config.
+// ReportMeta is what the report's config tells a renderer. Engagement
+// details (client, dates, title) are not part of a report: renderers take
+// them from their own input.
 type ReportMeta struct {
-	Name   string `json:"name"`
-	Client string `json:"client"`
-	Period Period `json:"period"`
 	// Severities are the report's levels, most severe first, so renderers
 	// can order the summary and the findings without guessing.
 	Severities []Severity `json:"severities"`
 
 	// Extra holds unknown members of the record. rpt never copies unknown
 	// config keys here.
-	Extra map[string]jsontext.Value `json:",embed"`
-}
-
-// Period is the engagement's date range, as ISO 8601 dates.
-type Period struct {
-	Start string `json:"start"`
-	End   string `json:"end"`
-
-	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 

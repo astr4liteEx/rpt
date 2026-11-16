@@ -1,6 +1,3 @@
 # Fixture report for rpt's tests.
 format: 1
-name: Acme external test
-client: Acme
-period: {start: 2026-11-02, end: 2026-11-06}
 severities: [critical, high, medium, low, info]

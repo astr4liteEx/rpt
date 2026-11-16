@@ -18,21 +18,9 @@
     "reportMeta": {
       "type": "object",
       "properties": {
-        "name": {"type": "string"},
-        "client": {"type": "string"},
-        "period": {"$ref": "#/$defs/period"},
         "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."}
       },
-      "required": ["name", "client", "period", "severities"],
-      "additionalProperties": true
-    },
-    "period": {
-      "type": "object",
-      "properties": {
-        "start": {"type": "string", "format": "date"},
-        "end": {"type": "string", "format": "date"}
-      },
-      "required": ["start", "end"],
+      "required": ["severities"],
       "additionalProperties": true
     },
     "reportFinding": {

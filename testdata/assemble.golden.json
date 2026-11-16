@@ -2,12 +2,6 @@
   "kind": "report",
   "schema_version": 1,
   "report": {
-    "name": "Acme external test",
-    "client": "Acme",
-    "period": {
-      "start": "2026-11-02",
-      "end": "2026-11-06"
-    },
     "severities": [
       "critical",
       "high",

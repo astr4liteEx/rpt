@@ -9,7 +9,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"time"
 
 	"go.yaml.in/yaml/v3"
 
@@ -114,17 +113,6 @@ func (v *validation) checkConfig() {
 	} else if cfg.Format != 1 {
 		bad("format", "format %d is not 1, the only format this rpt reads", cfg.Format)
 	}
-	if strings.TrimSpace(cfg.Name) == "" {
-		bad("name", "no name")
-	}
-	if strings.TrimSpace(cfg.Client) == "" {
-		bad("client", "no client")
-	}
-	start, startOK := v.date("period.start", cfg.Period.Start)
-	end, endOK := v.date("period.end", cfg.Period.End)
-	if startOK && endOK && start.After(end) {
-		bad("period", "period.start %s is after period.end %s", cfg.Period.Start, cfg.Period.End)
-	}
 	if _, ok := cfg.KeyLines["severities"]; ok && len(cfg.Severities) == 0 {
 		bad("severities", "severities is empty; list the levels most severe first, or remove the key for the defaults")
 	}
@@ -133,21 +121,6 @@ func (v *validation) checkConfig() {
 	for _, k := range cfg.UnknownKeys {
 		v.add(ConfigFile, line(k), RuleConfigUnknownKey, sdk.Warning, "unknown key %q is ignored and never reaches the report", k)
 	}
-}
-
-// date checks one period date and parses it.
-func (v *validation) date(name, s string) (time.Time, bool) {
-	line := v.cfg.KeyLines["period"]
-	if s == "" {
-		v.add(ConfigFile, line, RuleConfig, sdk.Error, "no %s", name)
-		return time.Time{}, false
-	}
-	t, err := time.Parse(time.DateOnly, s)
-	if err != nil {
-		v.add(ConfigFile, line, RuleConfig, sdk.Error, "%s %q is not a date like 2026-11-06", name, s)
-		return time.Time{}, false
-	}
-	return t, true
 }
 
 // checkList reports empty and repeated names in a config list.

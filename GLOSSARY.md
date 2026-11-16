@@ -5,7 +5,7 @@ rpt is a pentest report engine: a report is a plain folder, and the rpt core def
 ## Report
 
 **Report**:
-A plain folder holding one engagement's config, scope and findings; the only state rpt has. It may be version-controlled by whoever owns it, but rpt never requires that.
+A plain folder holding a report's config, scope and findings; the only state rpt has. Engagement details (client, dates, title) belong to whatever manages the project, not to the report. It may be version-controlled by whoever owns it, but rpt never requires that.
 _Avoid_: project, engagement folder, workspace
 
 **Report root**:
@@ -13,7 +13,7 @@ The top folder of a report, the one that holds `rpt.yaml`.
 _Avoid_: report dir, base dir
 
 **Report config**:
-The `rpt.yaml` file at the report root: format version, name, client, period and severity levels.
+The `rpt.yaml` file at the report root: format version, severity levels and required sections.
 _Avoid_: settings, rpt.toml
 
 **Format version**:

@@ -73,9 +73,6 @@ func (r *Report) Assemble() (sdk.Report, []sdk.Problem, error) {
 		Kind:          "report",
 		SchemaVersion: SchemaVersion,
 		Report: sdk.ReportMeta{
-			Name:       cfg.Name,
-			Client:     cfg.Client,
-			Period:     cfg.Period,
 			Severities: cfg.Severities,
 		},
 		Summary:  summary,
