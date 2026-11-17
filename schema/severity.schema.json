@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/severity.schema.json",
+  "title": "rpt severity record",
+  "description": "One severity level the report allows, emitted by rpt severities in order, most severe first: the levels rpt.yaml lists, or the defaults when it lists none.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "severity"},
+    "level": {"type": "string"},
+    "rank": {"type": "integer", "minimum": 1, "description": "Position in the report's order; 1 is the most severe."}
+  },
+  "required": ["kind", "level", "rank"],
+  "additionalProperties": true
+}

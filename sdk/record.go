@@ -151,3 +151,14 @@ type VersionInfo struct {
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
+
+// SeverityLevel is one "severity" record rpt severities emits: a level the
+// report allows, with its rank (1 is the most severe).
+type SeverityLevel struct {
+	Kind  string   `json:"kind"`
+	Level Severity `json:"level"`
+	Rank  int      `json:"rank"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}

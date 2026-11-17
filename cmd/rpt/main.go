@@ -39,15 +39,16 @@ var builtins map[string]verb
 
 func init() {
 	builtins = map[string]verb{
-		"add":      addVerb,
-		"assemble": assembleVerb,
-		"delete":   deleteVerb,
-		"findings": findingsVerb,
-		"plugins":  pluginsVerb,
-		"scope":    scopeVerb,
-		"set":      setVerb,
-		"validate": validateVerb,
-		"version":  versionVerb,
+		"add":        addVerb,
+		"assemble":   assembleVerb,
+		"delete":     deleteVerb,
+		"findings":   findingsVerb,
+		"plugins":    pluginsVerb,
+		"scope":      scopeVerb,
+		"set":        setVerb,
+		"severities": severitiesVerb,
+		"validate":   validateVerb,
+		"version":    versionVerb,
 	}
 }
 
