@@ -124,9 +124,9 @@ type Target struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// PluginInfo is a "plugin" record: one plugin rpt plugins found. Summary,
-// Usage and Version come from the plugin's --describe answer and are empty
-// when it gave none in time.
+// PluginInfo is a "plugin" record: one plugin rpt plugins found. Every
+// member but Kind, Name and Path comes from the plugin's --describe answer,
+// unknown ones in Extra, and is empty when it gave none in time.
 type PluginInfo struct {
 	Kind    string `json:"kind"`
 	Name    string `json:"name"` // the verb: the file name without "rpt-"
@@ -134,6 +134,8 @@ type PluginInfo struct {
 	Summary string `json:"summary,omitzero"`
 	Usage   string `json:"usage,omitzero"`
 	Version string `json:"version,omitzero"`
+	Input   string `json:"input,omitzero"`
+	Output  string `json:"output,omitzero"`
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

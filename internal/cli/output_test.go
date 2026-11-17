@@ -2,6 +2,7 @@ package cli
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 
 	"github.com/astr4liteEx/rpt/sdk"
@@ -12,7 +13,9 @@ var findings = []sdk.Finding{
 	{Kind: "finding", ID: "F-001", Title: "Reflected XSS", Scope: []string{"S-14"}, Severity: "medium"},
 }
 
-var findingColumns = []Column{{"ID", "id"}, {"SEVERITY", "severity"}, {"TITLE", "title"}, {"SCOPE", "scope"}}
+var findingColumns = []Column{
+	{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity"}, {Header: "TITLE", Field: "title"}, {Header: "SCOPE", Field: "scope"},
+}
 
 func render(t *testing.T, terminal, jsonFlag bool) string {
 	t.Helper()
@@ -54,6 +57,27 @@ func TestOutputModes(t *testing.T) {
 				t.Errorf("output\n got: %q\nwant: %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestOutputComputedColumn(t *testing.T) {
+	var buf bytes.Buffer
+	cols := []Column{
+		{Header: "ID", Field: "id"},
+		{Header: "WHERE", Value: func(m map[string]any) string { return fmt.Sprint(m["scope"]) + "\t!" }},
+	}
+	out, err := NewOutput(&buf, true, false, cols)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Write(findings[1]); err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if want := "ID     WHERE\nF-001  [S-14] !\n"; buf.String() != want {
+		t.Errorf("table\n got: %q\nwant: %q", buf.String(), want)
 	}
 }
 

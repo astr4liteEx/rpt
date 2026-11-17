@@ -16,6 +16,12 @@ type Description struct {
 	Usage   string `json:"usage,omitzero"`   // one line, e.g. "rpt parse-nuclei < results.jsonl"
 	Version string `json:"version,omitzero"` // the plugin's own version
 
+	// Input and Output name the data the plugin takes and gives: "records"
+	// for an rpt JSON Lines stream, otherwise "<format>" or
+	// "<format>/<tool>", such as "xml/nessus" or "pdf". Empty is "not said".
+	Input  string `json:"input,omitzero"`
+	Output string `json:"output,omitzero"`
+
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }

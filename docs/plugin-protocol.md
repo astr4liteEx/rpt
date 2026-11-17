@@ -27,10 +27,18 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 Given the single argument `--describe`, print one JSON object on one line and exit 0, within 2 seconds, with no other effect:
 
 ```json
-{"summary":"Parse nuclei JSON Lines into finding records","usage":"rpt parse-nuclei < results.jsonl","version":"0.3.1"}
+{"summary":"Parse nuclei JSON Lines into finding records","usage":"rpt parse-nuclei < results.jsonl","version":"0.3.1","input":"jsonl/nuclei","output":"records"}
 ```
 
 `summary` is required; the shape is `$defs/description` in [`schema/plugin.schema.json`](../schema/plugin.schema.json). A plugin that is slower, fails or prints anything else is still listed by `rpt plugins`, with a warning and no summary.
+
+`input` and `output` name the data the plugin takes and gives, so a person sees what it does at a glance and another plugin can find, say, the parser for Nessus XML in `rpt plugins --json`:
+
+- `records`: an rpt JSON Lines stream (see Records).
+- Anything else: `<format>` or `<format>/<tool>`, lowercase, e.g. `xml/nessus`, `jsonl/nuclei`, `pdf`. The format alone is the plain answer; the tool tells two files of one format apart. There is no registry: reuse a name another plugin already uses for the same data.
+- Leave a side out when there is nothing to say; absent means "not said", not "none".
+
+rpt never checks or acts on them. `rpt plugins` carries every member of the answer into the `plugin` record, unknown ones too, except `kind`, `name` and `path`, which are rpt's.
 
 ## Records
 

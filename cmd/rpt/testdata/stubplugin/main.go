@@ -1,9 +1,11 @@
 // Command stubplugin is the plugin rpt's dispatch tests run. It prints its
 // arguments and RPT_* environment as JSON and exits with the code given as
-// "exit=N". Installed as rpt-hang, it never answers --describe.
+// "exit=N". It declares input, output and extra --describe members.
+// Installed as rpt-hang, it never answers --describe.
 package main
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"io"
 	"os"
@@ -20,7 +22,16 @@ func main() {
 		time.Sleep(time.Hour)
 	}
 	sdk.Main(sdk.Plugin{
-		Description: sdk.Description{Summary: "Stub plugin for tests", Usage: "rpt stub [exit=N]", Version: "0.0.1"},
+		Description: sdk.Description{
+			Summary: "Stub plugin for tests", Usage: "rpt stub [exit=N]", Version: "0.0.1",
+			Input: "records", Output: "json/stub",
+			// An unknown member rpt plugins must carry, and members it must
+			// not let a plugin override.
+			Extra: map[string]jsontext.Value{
+				"homepage": jsontext.Value(`"https://example.com"`),
+				"kind":     jsontext.Value(`"evil"`), "name": jsontext.Value(`"evil"`), "path": jsontext.Value(`"/evil"`),
+			},
+		},
 		Run: func(args []string, _ io.Reader, stdout, _ io.Writer) int {
 			env := map[string]string{}
 			for _, kv := range os.Environ() {

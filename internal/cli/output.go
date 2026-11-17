@@ -17,6 +17,9 @@ import (
 type Column struct {
 	Header string
 	Field  string
+	// Value, when set, computes the cell from the record's JSON object
+	// instead of reading Field.
+	Value func(map[string]any) string
 }
 
 type mode int
@@ -108,7 +111,11 @@ func (o *Output) writeRow(rec any) error {
 	}
 	cells := make([]string, len(o.columns))
 	for i, c := range o.columns {
-		cells[i] = cell(m[c.Field])
+		if c.Value != nil {
+			cells[i] = cell(c.Value(m))
+		} else {
+			cells[i] = cell(m[c.Field])
+		}
 	}
 	_, err = fmt.Fprintln(o.tw, strings.Join(cells, "\t"))
 	return err

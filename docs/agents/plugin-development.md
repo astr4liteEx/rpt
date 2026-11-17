@@ -15,7 +15,7 @@ Done when the plugin has a verb name that is not an rpt built-in (`rpt` lists th
 
 ## 2. Write `--describe`
 
-Print the description object and exit 0, before any other work. Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
+Print the description object and exit 0, before any other work. Declare `input` and `output` (`records`, or a data type like `xml/nessus`; see the protocol's `--describe` section), reusing names other plugins already use for the same data (`rpt plugins --json | jq -r '.input, .output'`). Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
 
 ## 3. Write the work
 
@@ -31,7 +31,7 @@ Run every check; the plugin is done when all pass:
 - [ ] An unknown member on a record the plugin changes survives (filters).
 - [ ] The plugin works with no `RPT_*` variable set.
 - [ ] Findings it writes go into a scratch copy of a report with `rpt add`, and `rpt validate` on that copy reports no new errors (sources).
-- [ ] With the plugin on `PATH`, `rpt plugins` lists it with its summary, and `rpt <verb>` runs it.
+- [ ] With the plugin on `PATH`, `rpt plugins` lists it with its summary and IO, and `rpt <verb>` runs it.
 
 ## Go plugins
 

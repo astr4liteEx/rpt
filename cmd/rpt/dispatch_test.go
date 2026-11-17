@@ -135,11 +135,14 @@ func TestPluginsVerb(t *testing.T) {
 	if code != 0 {
 		t.Errorf("exit %d, want 0: the listing worked", code)
 	}
-	want := "broken " + filepath.Join(b, "rpt-broken") + " \n" +
-		"hang " + filepath.Join(b, "rpt-hang") + " \n" +
-		"stub " + filepath.Join(b, "rpt-stub") + " Stub plugin for tests\n"
-	if got := pick(t, out, "name", "path", "summary"); got != want {
+	want := "plugin broken " + filepath.Join(b, "rpt-broken") + "    \n" +
+		"plugin hang " + filepath.Join(b, "rpt-hang") + "    \n" +
+		"plugin stub " + filepath.Join(b, "rpt-stub") + " Stub plugin for tests records json/stub https://example.com\n"
+	if got := pick(t, out, "kind", "name", "path", "summary", "input", "output", "homepage"); got != want {
 		t.Errorf("listed\n%s\nwant\n%s", got, want)
+	}
+	if strings.Contains(out, "evil") {
+		t.Errorf("a plugin overrode kind, name or path:\n%s", out)
 	}
 	for _, w := range []string{
 		"rpt: " + filepath.Join(b, "rpt-broken") + ": warning: --describe failed",
@@ -148,5 +151,22 @@ func TestPluginsVerb(t *testing.T) {
 		if !strings.Contains(errOut, w) {
 			t.Errorf("stderr %q\nlacks %q", errOut, w)
 		}
+	}
+}
+
+func TestPluginIO(t *testing.T) {
+	tests := []struct{ in, out, want string }{
+		{"xml/nessus", "records", "xml/nessus → records"},
+		{"", "pdf", "? → pdf"},
+		{"records", "", "records → ?"},
+		{"", "", ""},
+	}
+	for _, tt := range tests {
+		if got := pluginIO(map[string]any{"input": tt.in, "output": tt.out}); got != tt.want {
+			t.Errorf("pluginIO(%q, %q) = %q, want %q", tt.in, tt.out, got, tt.want)
+		}
+	}
+	if got := pluginIO(map[string]any{}); got != "" {
+		t.Errorf("no members: %q, want empty", got)
 	}
 }

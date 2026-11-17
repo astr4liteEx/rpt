@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/json/v2"
 	"fmt"
@@ -21,11 +22,25 @@ import (
 var describeTimeout = 2 * time.Second
 
 var pluginColumns = []cli.Column{
-	{Header: "NAME", Field: "name"}, {Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
+	{Header: "NAME", Field: "name"}, {Header: "IO", Value: pluginIO},
+	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
+}
+
+// pluginIO renders a plugin's declared input and output for the table,
+// "xml/nessus → records", with "?" for a side not said and nothing when
+// neither is.
+func pluginIO(m map[string]any) string {
+	in, _ := m["input"].(string)
+	out, _ := m["output"].(string)
+	if in == "" && out == "" {
+		return ""
+	}
+	return cmp.Or(in, "?") + " → " + cmp.Or(out, "?")
 }
 
 // pluginsVerb lists the rpt-* programs on PATH that rpt <verb> would run,
-// asking each to --describe itself. A plugin that doesn't answer in time,
+// asking each to --describe itself and carrying every member of its
+// answer into the plugin record. A plugin that doesn't answer in time,
 // fails, or answers with something other than a JSON object is still listed,
 // with a warning; the listing itself exits 0.
 func pluginsVerb(e *env, args []string) int {
@@ -57,7 +72,12 @@ func pluginsVerb(e *env, args []string) int {
 		if errs[i] != nil {
 			e.log.Warn(errs[i].Error(), "path", p.Path)
 		}
-		p.Summary, p.Usage, p.Version = descs[i].Summary, descs[i].Usage, descs[i].Version
+		d := descs[i]
+		p.Summary, p.Usage, p.Version, p.Input, p.Output = d.Summary, d.Usage, d.Version, d.Input, d.Output
+		p.Extra = d.Extra
+		for _, own := range []string{"kind", "name", "path"} {
+			delete(p.Extra, own) // the record's own members aren't the plugin's to set
+		}
 		if err := out.Write(p); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitUsage
