@@ -1,0 +1,23 @@
+# Publishes a GitHub release for each v* tag. scripts/release.sh builds the
+# archives and SHA256SUMS; the release notes are the tag's annotation.
+name: release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # checkout turns the pushed tag into a lightweight one; fetch the
+      # annotated tag so its message can become the release notes.
+      - run: git fetch --force origin "+${GITHUB_REF}:${GITHUB_REF}"
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: scripts/release.sh
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-from-tag --title "rpt $GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}
