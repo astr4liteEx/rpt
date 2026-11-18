@@ -1,8 +1,10 @@
-// Package sdk is the Go implementation of the rpt plugin protocol
-// (docs/plugin-protocol.md): the record wire types, the Records stream
-// reader, SetMember, and the plugin entry points Run, Main and Bin. Plugins
-// in other languages follow the protocol directly; this package is a
-// convenience, never a requirement.
+// Package sdk is the Go implementation of the rpt plugin protocol: the
+// record wire types, the Records stream reader, SetMember, and the plugin
+// entry points Run, Main and Bin. Plugins in other languages follow the
+// protocol directly; this package is a convenience, never a requirement.
+//
+// The protocol:
+// https://github.com/astr4liteEx/rpt/blob/main/docs/plugin-protocol.md
 //
 // Versioning: the module is tagged v0.N.M; a breaking change to this
 // package's API bumps N. The record format is versioned separately by
