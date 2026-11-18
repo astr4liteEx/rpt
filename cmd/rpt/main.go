@@ -43,6 +43,7 @@ func init() {
 		"assemble":   assembleVerb,
 		"delete":     deleteVerb,
 		"findings":   findingsVerb,
+		"new":        newVerb,
 		"plugins":    pluginsVerb,
 		"scope":      scopeVerb,
 		"set":        setVerb,

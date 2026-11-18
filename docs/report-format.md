@@ -1,6 +1,6 @@
 # The rpt report format
 
-A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. Copy [`testdata/fixture`](../testdata/fixture) to start one.
+A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. `rpt new <dir>` starts one: it writes `rpt.yaml` with the defaults spelled out, a `scope.csv` holding only its header row, and an empty `findings/`. It refuses a folder that isn't empty or that lies inside another report. [`testdata/fixture`](../testdata/fixture) is a filled-in example.
 
 ```
 acme-external/
