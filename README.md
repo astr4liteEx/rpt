@@ -108,7 +108,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 **Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`.
 
-**Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`.
+**Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which reports a folder holds, run `rpt ls`.
 
 **Exit codes.** `0` means success, `1` means problems in the report or its input, and `2` means a usage error.
 
