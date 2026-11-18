@@ -42,7 +42,7 @@ rpt never checks or acts on them. `rpt plugins` carries every member of the answ
 
 ## Records
 
-Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `verb` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
+Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `verb`, `location` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
 
 Reading a stream:
 

@@ -51,6 +51,7 @@ func init() {
 		"assemble":   {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}},
 		"delete":     {deleteVerb, sdk.Verb{Summary: "Remove findings; their evidence stays", Usage: "rpt delete <id>...", Output: "records"}},
 		"findings":   {findingsVerb, sdk.Verb{Summary: "List the findings", Usage: "rpt findings [--json] [--report dir]", Output: "records"}},
+		"ls":         {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}},
 		"new":        {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}},
 		"plugins":    {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}},
 		"scope":      {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl", Input: "records", Output: "records"}},

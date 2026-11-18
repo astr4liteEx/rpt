@@ -91,6 +91,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | Command | What it does |
 | --- | --- |
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
+| `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt findings` | Lists findings. |
 | `rpt scope` | Lists scope rows. |
 | `rpt scope match` | Reads finding records on stdin and adds the IDs of the scope rows their `target` matches. `--drop-out-of-scope` drops the findings that match none. |
@@ -191,7 +192,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | --- | --- |
 | [`docs/report-format.md`](docs/report-format.md) | The report folder (`rpt.yaml`, `scope.csv`, finding files) and every `rpt validate` rule. |
 | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) | What a plugin must do: naming, `--describe`, records, output, exit codes and how it works with a report. |
-| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `verb` and `version`. |
+| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `verb`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
 | [`docs/adr/`](docs/adr) | The design decisions and the reasons behind them. |
 

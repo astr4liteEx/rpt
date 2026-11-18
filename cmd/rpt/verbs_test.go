@@ -11,7 +11,7 @@ func TestVerbsVerb(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "add\nassemble\ndelete\nfindings\nnew\nplugins\nscope\nsections\nset\nseverities\nvalidate\nverbs\nversion\n"
+	want := "add\nassemble\ndelete\nfindings\nls\nnew\nplugins\nscope\nsections\nset\nseverities\nvalidate\nverbs\nversion\n"
 	if names != want {
 		t.Errorf("verbs listed\n got: %q\nwant: %q", names, want)
 	}
@@ -40,6 +40,7 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"assemble":   {{"extra"}, {"--no-such-flag"}},
 		"delete":     {{}, {"--no-such-flag"}},
 		"findings":   {{"extra"}, {"--no-such-flag"}},
+		"ls":         {{"a", "b"}, {"--no-such-flag"}},
 		"new":        {{}, {"a", "b"}},
 		"plugins":    {{"extra"}, {"--no-such-flag"}},
 		"scope":      {{"extra"}, {"--no-such-flag"}, {"match", "extra"}, {"match", "--no-such-flag"}},

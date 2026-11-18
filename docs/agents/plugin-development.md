@@ -42,7 +42,7 @@ The [`sdk`](../../sdk) package implements the protocol; use it instead of re-der
 | `main` | `func main() { sdk.Main(plugin) }`, with `plugin` an `sdk.Plugin{Description, Run}` |
 | Tests, `--describe` included | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
 | Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line |
-| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`, `sdk.SeverityLevel`, `sdk.Section`, `sdk.Verb`; unknown members ride in `Extra` |
+| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`, `sdk.SeverityLevel`, `sdk.Section`, `sdk.Verb`, `sdk.Location`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
 | Calling rpt | `exec.Command(sdk.Bin(), "findings", "--json")` |
 

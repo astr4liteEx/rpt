@@ -141,6 +141,19 @@ type PluginInfo struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// Location is one "location" record rpt ls emits: a report found under the
+// folder searched. Format and Findings are nil when its config doesn't
+// parse.
+type Location struct {
+	Kind     string `json:"kind"`
+	Path     string `json:"path"` // absolute path of the report root
+	Format   *int   `json:"format,omitzero"`
+	Findings *int   `json:"findings,omitzero"` // finding files that parse
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // Verb is one "verb" record rpt verbs emits: a built-in verb, described
 // with the members a plugin's --describe answer uses.
 type Verb struct {

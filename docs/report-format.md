@@ -13,7 +13,7 @@ acme-external/
         └── F-003-login.png
 ```
 
-rpt finds the report from `--report <dir>`, else `$RPT_REPORT_DIR`, else the nearest folder at or above the current one that holds `rpt.yaml`.
+rpt finds the report from `--report <dir>`, else `$RPT_REPORT_DIR`, else the nearest folder at or above the current one that holds `rpt.yaml`. `rpt ls [dir]` searches the other way: it lists every report at or under a folder, never looking inside a report for another (reports don't nest), and skipping hidden folders and symlinks.
 
 The report holds the findings, not the engagement: client name, dates and title belong to whatever manages the project, and renderers take them as their own input.
 
