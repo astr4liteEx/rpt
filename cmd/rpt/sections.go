@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/astr4liteEx/rpt/internal/cli"
 )
 
@@ -16,8 +14,7 @@ func sectionsVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt sections [--json]")
-		return cli.ExitUsage
+		return badUsage(e, "sections")
 	}
 	out, err := of.output(e, sectionColumns)
 	if err != nil {

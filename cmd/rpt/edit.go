@@ -40,8 +40,9 @@ func setVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if len(pos) != 3 {
-		fmt.Fprintln(e.stderr, "usage: rpt set <id> <key> <value>   (value is YAML: high, '[S-12, S-14]', \"9.1\")")
-		return cli.ExitUsage
+		code := badUsage(e, "set")
+		fmt.Fprintln(e.stderr, `value is YAML: high, '[S-12, S-14]', "9.1"`)
+		return code
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
@@ -96,8 +97,7 @@ func addVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if len(pos) != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt add < records.jsonl")
-		return cli.ExitUsage
+		return badUsage(e, "add")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
@@ -162,8 +162,7 @@ func deleteVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if len(pos) == 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt delete <id>...")
-		return cli.ExitUsage
+		return badUsage(e, "delete")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {

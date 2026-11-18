@@ -2,8 +2,6 @@ package main
 
 import (
 	"encoding/json/v2"
-	"flag"
-	"fmt"
 	"io"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
@@ -24,8 +22,7 @@ func validateVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt validate [--json] [--report dir]")
-		return cli.ExitUsage
+		return badUsage(e, "validate")
 	}
 	out, err := of.output(e, problemColumns)
 	if err != nil {
@@ -64,15 +61,14 @@ func validateVerb(e *env, args []string) int {
 // line, on a terminal too. It never refuses: whatever it had to leave out
 // is a warning on stderr. Run rpt validate first to gate on problems.
 func assembleVerb(e *env, args []string) int {
-	flags := flag.NewFlagSet("assemble", flag.ContinueOnError)
+	flags := newFlagSet(e, "assemble")
 	flags.SetOutput(e.stderr)
 	reportDir := flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt assemble [--report dir]")
-		return cli.ExitUsage
+		return badUsage(e, "assemble")
 	}
 	r := openReport(e, *reportDir)
 	if r == nil {

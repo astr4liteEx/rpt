@@ -25,6 +25,9 @@ func scopeVerb(e *env, args []string) int {
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	if flags.NArg() != 0 {
+		return badUsage(e, "scope")
+	}
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
@@ -59,6 +62,9 @@ func scopeMatchVerb(e *env, args []string) int {
 	drop := flags.Bool("drop-out-of-scope", false, "drop findings whose target matches no scope row")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
+	}
+	if flags.NArg() != 0 {
+		return badUsage(e, "scope")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {

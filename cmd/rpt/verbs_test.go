@@ -31,3 +31,37 @@ func TestVerbsUsage(t *testing.T) {
 		t.Errorf("exit %d, stderr %q; want exit 2 and usage", code, errOut)
 	}
 }
+
+// TestVerbsPrintTableUsage misuses every built-in and checks it answers
+// with the usage line rpt verbs lists for it, so the two can't drift.
+func TestVerbsPrintTableUsage(t *testing.T) {
+	misuse := map[string][][]string{
+		"add":        {{"extra"}, {"--no-such-flag"}},
+		"assemble":   {{"extra"}, {"--no-such-flag"}},
+		"delete":     {{}, {"--no-such-flag"}},
+		"findings":   {{"extra"}, {"--no-such-flag"}},
+		"new":        {{}, {"a", "b"}},
+		"plugins":    {{"extra"}, {"--no-such-flag"}},
+		"scope":      {{"extra"}, {"--no-such-flag"}, {"match", "extra"}, {"match", "--no-such-flag"}},
+		"sections":   {{"extra"}, {"--no-such-flag"}},
+		"set":        {{}, {"--no-such-flag"}},
+		"severities": {{"extra"}, {"--no-such-flag"}},
+		"validate":   {{"extra"}, {"--no-such-flag"}},
+		"verbs":      {{"extra"}, {"--no-such-flag"}},
+		"version":    {{"extra"}, {"--no-such-flag"}},
+	}
+	for name, b := range builtins {
+		cases, ok := misuse[name]
+		if !ok {
+			t.Errorf("no misuse case for built-in %q; add one", name)
+			continue
+		}
+		want := "usage: " + b.desc.Usage + "\n"
+		for _, args := range cases {
+			code, _, errOut := runIn(t, "", append([]string{name}, args...)...)
+			if code != 2 || !strings.Contains(errOut, want) {
+				t.Errorf("rpt %s %v: exit %d, stderr %q; want exit 2 and %q", name, args, code, errOut, want)
+			}
+		}
+	}
+}

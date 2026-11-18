@@ -2,7 +2,6 @@ package main
 
 import (
 	"cmp"
-	"fmt"
 	"maps"
 	"slices"
 
@@ -39,8 +38,7 @@ func verbsVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt verbs [--json]")
-		return cli.ExitUsage
+		return badUsage(e, "verbs")
 	}
 	out, err := of.output(e, verbColumns)
 	if err != nil {

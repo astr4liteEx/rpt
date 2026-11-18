@@ -90,10 +90,30 @@ type outputFlags struct {
 	report *string
 }
 
-// newFlags returns a FlagSet for verb name with the shared output flags.
-func newFlags(e *env, name string) (*flag.FlagSet, outputFlags) {
+// badUsage prints the usage line the built-ins table gives verb, and
+// returns the usage exit code. It is the only place verbs print their usage,
+// so it never drifts from what rpt verbs lists.
+func badUsage(e *env, verb string) int {
+	fmt.Fprintln(e.stderr, "usage: "+builtins[verb].desc.Usage)
+	return cli.ExitUsage
+}
+
+// newFlagSet returns an empty FlagSet for verb name ("scope match" for a
+// subcommand) that, on a bad flag, prints the verb's usage line from the
+// built-ins table and its flags.
+func newFlagSet(e *env, name string) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(e.stderr)
+	flags.Usage = func() {
+		badUsage(e, strings.Fields(name)[0])
+		flags.PrintDefaults()
+	}
+	return flags
+}
+
+// newFlags returns a FlagSet for verb name with the shared output flags.
+func newFlags(e *env, name string) (*flag.FlagSet, outputFlags) {
+	flags := newFlagSet(e, name)
 	return flags, outputFlags{
 		json:   flags.Bool("json", false, "write JSON Lines even on a terminal"),
 		report: flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)"),

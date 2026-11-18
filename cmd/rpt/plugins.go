@@ -49,8 +49,7 @@ func pluginsVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt plugins [--json]")
-		return cli.ExitUsage
+		return badUsage(e, "plugins")
 	}
 	out, err := of.output(e, pluginColumns)
 	if err != nil {

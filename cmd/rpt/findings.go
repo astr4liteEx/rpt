@@ -13,6 +13,9 @@ func findingsVerb(e *env, args []string) int {
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	if flags.NArg() != 0 {
+		return badUsage(e, "findings")
+	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/sdk"
 )
@@ -17,8 +15,7 @@ func severitiesVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt severities [--json]")
-		return cli.ExitUsage
+		return badUsage(e, "severities")
 	}
 	out, err := of.output(e, severityColumns)
 	if err != nil {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json/v2"
-	"flag"
 	"fmt"
 	"runtime/debug"
 
@@ -18,15 +17,14 @@ var version string
 // versionVerb prints which rpt this is: its version, the record schema
 // version it writes and the report format version it reads.
 func versionVerb(e *env, args []string) int {
-	flags := flag.NewFlagSet("version", flag.ContinueOnError)
+	flags := newFlagSet(e, "version")
 	flags.SetOutput(e.stderr)
 	jsonFlag := flags.Bool("json", false, "write JSON Lines even on a terminal")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		fmt.Fprintln(e.stderr, "usage: rpt version [--json]")
-		return cli.ExitUsage
+		return badUsage(e, "version")
 	}
 	v := sdk.VersionInfo{Kind: "version", Version: versionString(), SchemaVersion: report.SchemaVersion, Format: report.FormatVersion}
 	if isTerminal(e.stdout) && !*jsonFlag {
