@@ -195,7 +195,6 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which Go `sdk` functions to use. |
 | [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `verb`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
-| [`docs/adr/`](docs/adr) | The design decisions and the reasons behind them. |
 
 ## Development
 

@@ -4,5 +4,6 @@ dist/
 .scratch/
 CLAUDE.md
 docs/agents/
+docs/adr/
 prototypes/
 .claude/
