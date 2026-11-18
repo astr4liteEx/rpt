@@ -58,6 +58,16 @@ scripts/install.sh
 
 ## Quick start
 
+`rpt new` creates an empty report. Add scope rows to `scope.csv`, pipe finding records into `rpt add` (or write finding files by hand), and `rpt validate` checks the result:
+
+![rpt new creates a report, two scope rows are added, rpt add imports three findings and rpt validate reports it clean](docs/demo/quick-start.gif)
+
+When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt set` fixes that one line, and `rpt assemble` then counts the findings per severity:
+
+![rpt validate reports S-99 missing from scope.csv, rpt set fixes F-002's scope, and rpt validate passes](docs/demo/validate.gif)
+
+To try it yourself, starting from one bare finding and filling it in by hand:
+
 ```sh
 rpt new acme-external         # rpt.yaml, an empty scope.csv and findings/
 cd acme-external
@@ -108,12 +118,14 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 When a verb isn't built in, `rpt <verb>` runs `rpt-<verb>` from your `PATH` and passes it the arguments unchanged. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
 
+![rpt plugins lists an importer; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt add](docs/demo/pipeline.gif)
+
 ```sh
 set -o pipefail
-rpt parse-nuclei < results.jsonl | rpt scope match --drop-out-of-scope | rpt add
+rpt parse-scan < scan.csv | rpt scope match --drop-out-of-scope | rpt add
 ```
 
-`parse-nuclei` is an example name here; rpt doesn't ship it. For ready-made plugins, see [rpt-plugins](#companion-projects).
+`parse-scan` is a small demo importer from [`docs/demo/setup.sh`](docs/demo/setup.sh); rpt doesn't ship it. For ready-made plugins, see [rpt-plugins](#companion-projects).
 
 Go plugins can use the optional [`sdk`](sdk) package. The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged:
 
@@ -188,4 +200,10 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 ```sh
 go test ./...
 scripts/check.sh   # everything CI runs: vet, staticcheck, race tests, govulncheck and a check of the release binary
+```
+
+The README's GIFs are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes in [`docs/demo/`](docs/demo). To re-record one (`quick-start`, `validate` or `pipeline`):
+
+```sh
+docs/demo/setup.sh && vhs docs/demo/quick-start.tape
 ```
