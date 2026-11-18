@@ -42,6 +42,10 @@ _Avoid_: asset, affected host (in data), endpoint
 One entry of the agreed scope in `scope.csv`: a host, address range or wildcard domain, optionally narrowed by port and protocol.
 _Avoid_: scope item, asset, in-scope host
 
+**Fixed section**:
+One of the three sections rpt knows by key: `description`, `remediation`, `poc`. A report may rename its heading in the report config; records always carry the key.
+_Avoid_: standard section, built-in section
+
 **Required section**:
 A section every finding must have and fill in, listed in the report config; by default description, remediation and proof of concept.
 _Avoid_: mandatory field, template section

@@ -20,7 +20,7 @@ func (r *Report) Delete(id string) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, &FileError{Path: rel, Err: err}
 	}
-	f, err := parseFinding(rel, src)
+	f, err := parseFinding(rel, src, r.headings())
 	if err != nil {
 		return sdk.Finding{}, err
 	}

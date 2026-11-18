@@ -2,11 +2,13 @@ package report
 
 import (
 	"bytes"
+	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"slices"
 	"strings"
@@ -23,12 +25,60 @@ import (
 // markdown file per finding.
 const FindingsDir = "findings"
 
-// sectionKeys maps the fixed section headings to their keys. Any other ##
-// heading is kept under its exact text.
-var sectionKeys = map[string]string{
-	"Description":      "description",
-	"Remediation":      "remediation",
-	"Proof of concept": "poc",
+// FixedSections are the keys of the fixed sections, in the order rpt
+// writes them.
+var FixedSections = []string{"description", "remediation", "poc"}
+
+// defaultHeadings are the fixed sections' headings when the report config
+// doesn't rename them.
+var defaultHeadings = Headings{
+	"description": "Description",
+	"remediation": "Remediation",
+	"poc":         "Proof of concept",
+}
+
+// Headings maps each fixed section key to the heading a report uses for it.
+// A heading matches its fixed key whatever its case; any other ## heading
+// is kept under its exact text.
+type Headings map[string]string
+
+// newHeadings is the default headings with the renames in sections laid
+// over them. Keys that aren't fixed sections and empty headings are left
+// out; validate reports them.
+func newHeadings(sections map[string]string) Headings {
+	h := maps.Clone(defaultHeadings)
+	for k, v := range sections {
+		if _, fixed := h[k]; fixed && strings.TrimSpace(v) != "" {
+			h[k] = strings.TrimSpace(v)
+		}
+	}
+	return h
+}
+
+// key returns the section key for a heading: its fixed key if it names a
+// fixed section, else the heading itself.
+func (h Headings) key(heading string) string {
+	for _, k := range FixedSections {
+		if strings.EqualFold(h[k], heading) {
+			return k
+		}
+	}
+	return heading
+}
+
+// heading returns the heading rpt writes for a section key.
+func (h Headings) heading(key string) string {
+	return cmp.Or(h[key], key)
+}
+
+// headings returns the report's section headings, or the defaults when the
+// report config can't be read: reading findings doesn't depend on it, and
+// validate reports the config's problems.
+func (r *Report) headings() Headings {
+	if cfg, err := r.Config(); err == nil {
+		return cfg.Headings
+	}
+	return defaultHeadings
 }
 
 // frontmatterKeys are the frontmatter keys that map to declared Finding
@@ -50,6 +100,7 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 	var (
 		findings []sdk.Finding
 		errs     []error
+		h        = r.headings()
 	)
 	for _, e := range entries {
 		if !e.Type().IsRegular() || path.Ext(e.Name()) != ".md" {
@@ -61,7 +112,7 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 			errs = append(errs, &FileError{Path: rel, Err: err})
 			continue
 		}
-		f, err := parseFinding(rel, src)
+		f, err := parseFinding(rel, src, h)
 		if err != nil {
 			errs = append(errs, err)
 			continue
@@ -73,7 +124,7 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 
 // parseFinding parses one finding file: YAML frontmatter, then markdown
 // sections under ## headings.
-func parseFinding(rel string, src []byte) (sdk.Finding, error) {
+func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 	src = normaliseNewlines(src)
 	head, body, err := splitFrontmatter(src)
 	if err != nil {
@@ -111,7 +162,7 @@ func parseFinding(rel string, src []byte) (sdk.Finding, error) {
 		Scope:    fm.Scope,
 		Severity: fm.Severity,
 		Path:     rel,
-		Sections: sections(body),
+		Sections: sections(body, h),
 		Evidence: fm.Evidence,
 		Target:   target,
 		Extra:    extra,
@@ -182,13 +233,6 @@ func extraFields(doc *yaml.Node) (map[string]jsontext.Value, error) {
 	return extra, nil
 }
 
-// sectionHeadings maps section keys back to the headings rpt writes.
-var sectionHeadings = map[string]string{
-	"description": "Description",
-	"remediation": "Remediation",
-	"poc":         "Proof of concept",
-}
-
 // span is one ## section of a markdown body: its key, the offset its
 // heading line starts at, the offset its text starts at, and its end.
 type span struct {
@@ -199,29 +243,26 @@ type span struct {
 // sectionSpans finds the top-level ## headings of a markdown body. Headings
 // inside code fences don't count, which is why this parses with goldmark
 // instead of scanning lines.
-func sectionSpans(body []byte) []span {
+func sectionSpans(body []byte, h Headings) []span {
 	doc := goldmark.DefaultParser().Parse(text.NewReader(body))
 	var spans []span
 	for n := doc.FirstChild(); n != nil; n = n.NextSibling() {
-		h, ok := n.(*ast.Heading)
-		if !ok || h.Level != 2 || h.Lines().Len() == 0 {
+		hd, ok := n.(*ast.Heading)
+		if !ok || hd.Level != 2 || hd.Lines().Len() == 0 {
 			continue
 		}
-		first, last := h.Lines().At(0), h.Lines().At(h.Lines().Len()-1)
+		first, last := hd.Lines().At(0), hd.Lines().At(hd.Lines().Len()-1)
 		lineStart := bytes.LastIndexByte(body[:first.Start], '\n') + 1
 		bodyAt := lineEnd(body, last.Stop)
 		if !isATX(body[lineStart:]) {
 			bodyAt = lineEnd(body, bodyAt) // setext: skip the underline
 		}
 		var name strings.Builder
-		for i := range h.Lines().Len() {
-			seg := h.Lines().At(i)
+		for i := range hd.Lines().Len() {
+			seg := hd.Lines().At(i)
 			name.Write(seg.Value(body))
 		}
-		key := strings.TrimSpace(name.String())
-		if k, ok := sectionKeys[key]; ok {
-			key = k
-		}
+		key := h.key(strings.TrimSpace(name.String()))
 		spans = append(spans, span{key: key, lineStart: lineStart, bodyAt: bodyAt})
 	}
 	for i := range spans {
@@ -240,8 +281,8 @@ func sectionText(body []byte, s span) string {
 }
 
 // sections splits a markdown body at its top-level ## headings.
-func sections(body []byte) map[string]string {
-	spans := sectionSpans(body)
+func sections(body []byte, h Headings) map[string]string {
+	spans := sectionSpans(body, h)
 	if len(spans) == 0 {
 		return nil
 	}
@@ -256,14 +297,14 @@ func sections(body []byte) map[string]string {
 // sections first, then the rest by name.
 func sectionOrder(secs map[string]string) []string {
 	var keys []string
-	for _, k := range []string{"description", "remediation", "poc"} {
+	for _, k := range FixedSections {
 		if _, ok := secs[k]; ok {
 			keys = append(keys, k)
 		}
 	}
 	var rest []string
 	for k := range secs {
-		if _, fixed := sectionHeadings[k]; !fixed {
+		if !slices.Contains(FixedSections, k) {
 			rest = append(rest, k)
 		}
 	}
@@ -272,11 +313,7 @@ func sectionOrder(secs map[string]string) []string {
 }
 
 // appendSection adds a ## section to the end of the body.
-func (ff *findingFile) appendSection(key, text string) {
-	heading := key
-	if h, ok := sectionHeadings[key]; ok {
-		heading = h
-	}
+func (ff *findingFile) appendSection(heading, text string) {
 	if len(ff.body) > 0 {
 		if !bytes.HasSuffix(ff.body, []byte("\n")) {
 			ff.body = append(ff.body, '\n')

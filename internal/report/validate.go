@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"path"
 	"slices"
 	"strings"
@@ -118,6 +119,7 @@ func (v *validation) checkConfig() {
 	}
 	checkList("severities", cfg.Severities, bad)
 	checkList("required_sections", cfg.RequiredSections, bad)
+	checkSections(cfg, bad)
 	for _, k := range cfg.UnknownKeys {
 		v.add(ConfigFile, line(k), RuleConfigUnknownKey, sdk.Warning, "unknown key %q is ignored and never reaches the report", k)
 	}
@@ -134,6 +136,26 @@ func checkList[T ~string](key string, items []T, bad func(key, format string, a 
 			bad(key, "%s lists %q twice", key, it)
 		}
 		seen[it] = true
+	}
+}
+
+// checkSections reports renames of keys that aren't fixed sections, empty
+// headings, and fixed sections that would share a heading.
+func checkSections(cfg Config, bad func(key, format string, a ...any)) {
+	for _, k := range slices.Sorted(maps.Keys(cfg.Sections)) {
+		switch {
+		case !slices.Contains(FixedSections, k):
+			bad("sections", "sections renames %q, which is not a fixed section; use one of %s", k, strings.Join(FixedSections, ", "))
+		case strings.TrimSpace(cfg.Sections[k]) == "":
+			bad("sections", "sections gives %q an empty heading", k)
+		}
+	}
+	for i, a := range FixedSections {
+		for _, b := range FixedSections[i+1:] {
+			if strings.EqualFold(cfg.Headings[a], cfg.Headings[b]) {
+				bad("sections", "sections gives %q and %q the same heading %q", a, b, cfg.Headings[a])
+			}
+		}
 	}
 }
 
@@ -216,12 +238,13 @@ func (v *validation) requiredSections(ff findingSrc) {
 	if !v.cfgOK {
 		return
 	}
-	spans := sectionSpans(ff.body)
+	spans := sectionSpans(ff.body, v.cfg.Headings)
 	for _, key := range v.cfg.RequiredSections {
 		if strings.TrimSpace(key) == "" {
 			continue // the config rule reports it
 		}
-		heading := cmp.Or(sectionHeadings[key], key)
+		key := v.cfg.Headings.key(key) // a fixed section may be named by its heading
+		heading := v.cfg.Headings.heading(key)
 		i := slices.IndexFunc(spans, func(s span) bool { return s.key == key })
 		switch {
 		case i < 0:
@@ -247,7 +270,7 @@ func (v *validation) evidence(ff findingSrc) {
 
 func (v *validation) textBeforeHeading(ff findingSrc) {
 	end := len(ff.body)
-	if spans := sectionSpans(ff.body); len(spans) > 0 {
+	if spans := sectionSpans(ff.body, defaultHeadings); len(spans) > 0 {
 		end = spans[0].lineStart
 	}
 	pre := ff.body[:end]
@@ -283,6 +306,7 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 		return nil, fmt.Errorf("read %s: %w", FindingsDir, err)
 	}
 	var out []findingSrc
+	h := r.headings()
 	for _, e := range entries {
 		if !e.Type().IsRegular() || path.Ext(e.Name()) != ".md" {
 			continue
@@ -293,7 +317,7 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 			out = append(out, findingSrc{rel: rel, err: &FileError{Path: rel, Err: err}})
 			continue
 		}
-		f, err := parseFinding(rel, src)
+		f, err := parseFinding(rel, src, h)
 		if err != nil {
 			out = append(out, findingSrc{rel: rel, err: err})
 			continue

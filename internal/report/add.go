@@ -38,11 +38,11 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 		return sdk.Finding{}, fmt.Errorf("add %s: file already exists", rel)
 	}
 
-	out, err := newFindingFile(rec)
+	out, err := newFindingFile(rec, cfg.Headings)
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	f, err := parseFinding(rel, out)
+	f, err := parseFinding(rel, out, cfg.Headings)
 	if err != nil {
 		return sdk.Finding{}, fmt.Errorf("add would write a broken %s: %w", rel, err)
 	}
@@ -79,7 +79,7 @@ func checkRecord(rec sdk.Finding, severities []sdk.Severity) error {
 // newFindingFile renders a record as a finding file: frontmatter in a
 // fixed order starting with id, unknown fields after it by name, then the
 // sections.
-func newFindingFile(rec sdk.Finding) ([]byte, error) {
+func newFindingFile(rec sdk.Finding, h Headings) ([]byte, error) {
 	type field struct {
 		key string
 		val any
@@ -105,7 +105,7 @@ func newFindingFile(rec sdk.Finding) ([]byte, error) {
 		}
 	}
 	for _, key := range sectionOrder(rec.Sections) {
-		ff.appendSection(key, rec.Sections[key])
+		ff.appendSection(h.heading(key), rec.Sections[key])
 	}
 	return ff.bytes(), nil
 }

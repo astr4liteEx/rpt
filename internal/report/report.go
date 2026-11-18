@@ -77,6 +77,14 @@ type Config struct {
 	// the exact heading text for any other.
 	RequiredSections []string
 
+	// Sections is the sections key as written: fixed section key to the
+	// heading this report uses for it. Validate checks it.
+	Sections map[string]string
+
+	// Headings maps every fixed section key to its heading: the one
+	// Sections names, else the default.
+	Headings Headings
+
 	// KeyLines maps each top-level key to its 1-based line in rpt.yaml,
 	// so problems can point at it.
 	KeyLines map[string]int
@@ -95,7 +103,8 @@ func (r *Report) Config() (Config, error) {
 	var raw struct {
 		Format           int `yaml:"format"`
 		Severities       []sdk.Severity
-		RequiredSections []string `yaml:"required_sections"`
+		RequiredSections []string          `yaml:"required_sections"`
+		Sections         map[string]string `yaml:"sections"`
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(normaliseNewlines(src), &doc); err != nil {
@@ -108,6 +117,8 @@ func (r *Report) Config() (Config, error) {
 		Format:           raw.Format,
 		Severities:       raw.Severities,
 		RequiredSections: raw.RequiredSections,
+		Sections:         raw.Sections,
+		Headings:         newHeadings(raw.Sections),
 		KeyLines:         keyLines(&doc),
 	}
 	// Defaults apply only when a key is absent: an explicit empty list
@@ -120,7 +131,7 @@ func (r *Report) Config() (Config, error) {
 	} else if cfg.RequiredSections == nil {
 		cfg.RequiredSections = []string{}
 	}
-	cfg.UnknownKeys = unknownKeys(&doc, "format", "severities", "required_sections")
+	cfg.UnknownKeys = unknownKeys(&doc, "format", "severities", "required_sections", "sections")
 	return cfg, nil
 }
 

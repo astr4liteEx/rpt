@@ -23,13 +23,16 @@ The report holds the findings, not the engagement: client name, dates and title 
 format: 1
 severities: [critical, high, medium, low, info]
 required_sections: [description, remediation, poc]
+sections:
+  remediation: Recommendation
 ```
 
 | Key | Required | Meaning |
 | --- | --- | --- |
 | `format` | yes | Report format version. `1` is the only one. |
 | `severities` | no | The allowed levels, most severe first. It is also the order findings are sorted in. Default: `critical, high, medium, low, info`. Any names work, e.g. `[urgent, normal]`. |
-| `required_sections` | no | Sections every finding must have, non-empty. Default: `description, remediation, poc`. `[]` requires none. A custom heading is listed by its exact text. |
+| `required_sections` | no | Sections every finding must have, non-empty. Default: `description, remediation, poc`. `[]` requires none. A fixed section is listed by its key or its heading; a custom one by its exact text. |
+| `sections` | no | Renames fixed sections: maps `description`, `remediation` or `poc` to the heading this report uses for it. Unnamed ones keep their default heading. Records and renderers still see the fixed key, whatever the heading. |
 
 Other keys are warned about by `rpt validate` and never reach the assembled report.
 
@@ -84,7 +87,7 @@ Use parameterised queries.
 | `target` | Optional: the `host`, `port` and `protocol` it was found on. `rpt scope match` uses it to fill in `scope`. |
 | anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. |
 
-The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`). Any other `##` heading is kept under its own text. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
+The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt add` writes the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
 
 The file name is free. `rpt add` names new files `F-NNN-<title-slug>.md`.
 
@@ -101,7 +104,7 @@ The file name is free. `rpt add` names new files `F-NNN-<title-slug>.md`.
 | `scopeIDsExist` | error | Every scope ID a finding lists is in `scope.csv`. |
 | `requiredSections` | error | Every finding has each required section, and it isn't empty. |
 | `evidence` | error | Every evidence file and linked file stays inside the report, exists, and is a regular file. |
-| `config` | error | `format` is 1; `severities` and `required_sections` have no empty or repeated names, and `severities` isn't empty. |
+| `config` | error | `format` is 1; `severities` and `required_sections` have no empty or repeated names, and `severities` isn't empty; `sections` renames only fixed sections, to non-empty headings, no two alike. |
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
 | `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define. |

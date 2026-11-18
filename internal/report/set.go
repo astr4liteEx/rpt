@@ -89,7 +89,7 @@ func (r *Report) edit(rel string, change func(*findingFile) error) (sdk.Finding,
 		return sdk.Finding{}, &FileError{Path: rel, Err: err}
 	}
 	out := ff.bytes()
-	f, err := parseFinding(rel, out)
+	f, err := parseFinding(rel, out, r.headings())
 	if err != nil {
 		return sdk.Finding{}, fmt.Errorf("edit would break %s: %w", rel, err)
 	}
