@@ -91,7 +91,7 @@ func TestOutputPassThrough(t *testing.T) {
 	}{
 		{name: "JSON Lines writes the original bytes", want: string(raw) + "\n"},
 		{name: "--json on a terminal too", terminal: true, json: true, want: string(raw) + "\n"},
-		{name: "a table leaves foreign records out", terminal: true, want: "ID  SEVERITY  TITLE  SCOPE\n"},
+		{name: "a table leaves foreign records out", terminal: true, want: ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -142,5 +142,19 @@ func TestOutputWriteOwn(t *testing.T) {
 				t.Errorf("output\n got: %q\nwant: %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEmptyTableIsSilent(t *testing.T) {
+	var buf bytes.Buffer
+	out, err := NewOutput(&buf, true, false, findingColumns)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := out.Flush(); err != nil {
+		t.Fatal(err)
+	}
+	if buf.Len() != 0 {
+		t.Errorf("a table with no rows printed %q; want nothing, not a bare header", buf.String())
 	}
 }

@@ -35,6 +35,7 @@ type Output struct {
 	mode    mode
 	columns []Column
 	tw      *tabwriter.Writer
+	rows    int // table rows written; the header goes out with the first
 }
 
 // NewOutput picks the output mode once: JSON Lines when jsonFlag is set or
@@ -47,13 +48,6 @@ func NewOutput(w io.Writer, terminal, jsonFlag bool, columns []Column) (*Output,
 	default:
 		o.mode, o.columns = modeTable, columns
 		o.tw = tabwriter.NewWriter(w, 0, 8, 2, ' ', 0)
-		headers := make([]string, len(columns))
-		for i, c := range columns {
-			headers[i] = c.Header
-		}
-		if _, err := fmt.Fprintln(o.tw, strings.Join(headers, "\t")); err != nil {
-			return nil, err
-		}
 	}
 	return o, nil
 }
@@ -103,8 +97,19 @@ func (o *Output) Flush() error {
 	return nil
 }
 
-// writeRow adds one table row; lists are joined with commas.
+// writeRow adds one table row; lists are joined with commas. The header
+// comes before the first row, so a table with no rows prints nothing.
 func (o *Output) writeRow(rec any) error {
+	if o.rows == 0 {
+		headers := make([]string, len(o.columns))
+		for i, c := range o.columns {
+			headers[i] = c.Header
+		}
+		if _, err := fmt.Fprintln(o.tw, strings.Join(headers, "\t")); err != nil {
+			return err
+		}
+	}
+	o.rows++
 	m, err := jsonMap(rec)
 	if err != nil {
 		return err
