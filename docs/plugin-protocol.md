@@ -42,7 +42,7 @@ rpt never checks or acts on them. `rpt plugins` carries every member of the answ
 
 ## Records
 
-Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
+Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
 
 Reading a stream:
 
@@ -72,7 +72,7 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
 
 ## Working with a report
 
-- **Read** through rpt: `$RPT_BIN findings --json`, `$RPT_BIN scope --json`, `$RPT_BIN severities --json` (the report's levels, most severe first, as `rpt.yaml` maps them or the defaults), `$RPT_BIN assemble` (one `report` record, made for renderers).
+- **Read** through rpt: `$RPT_BIN findings --json`, `$RPT_BIN scope --json`, `$RPT_BIN severities --json` (the report's levels, most severe first, as `rpt.yaml` maps them or the defaults), `$RPT_BIN sections --json` (the fixed sections with this report's headings, then the custom sections it requires; a finding's `sections` are keyed by each record's `key`), `$RPT_BIN assemble` (one `report` record, made for renderers).
 - **Change** a report only through rpt: pipe `finding` records into `$RPT_BIN add` to add findings, use `$RPT_BIN set <id> <key> <value>` to change one value, and `$RPT_BIN delete <id>...` to remove findings (their evidence files stay; a freed highest ID may be given out again, since rpt keeps no history). All three write atomically and keep the author's formatting; editing report files directly is outside the protocol.
 - **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json).
 - A plugin reading `report` records checks that `schema_version` is one it knows. `$RPT_BIN version --json` tells it, before reading, which record schema and report format that rpt uses.

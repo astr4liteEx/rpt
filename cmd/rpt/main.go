@@ -46,6 +46,7 @@ func init() {
 		"new":        newVerb,
 		"plugins":    pluginsVerb,
 		"scope":      scopeVerb,
+		"sections":   sectionsVerb,
 		"set":        setVerb,
 		"severities": severitiesVerb,
 		"validate":   validateVerb,

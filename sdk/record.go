@@ -152,6 +152,20 @@ type VersionInfo struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// Section is one "section" record rpt sections emits: a section of the
+// report's findings, as the report config maps it. Key is the fixed key
+// (description, remediation, poc) or, for a custom section, its heading.
+type Section struct {
+	Kind     string `json:"kind"`
+	Key      string `json:"key"`
+	Heading  string `json:"heading"`
+	Fixed    bool   `json:"fixed"`
+	Required bool   `json:"required"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // SeverityLevel is one "severity" record rpt severities emits: a level the
 // report allows, with its rank (1 is the most severe).
 type SeverityLevel struct {

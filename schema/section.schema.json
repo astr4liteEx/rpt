@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/section.schema.json",
+  "title": "rpt section record",
+  "description": "One section of the report's findings, emitted by rpt sections: the three fixed sections with the headings rpt.yaml gives them, then each custom section required_sections names, in config order.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "section"},
+    "key": {"type": "string", "description": "description, remediation or poc for a fixed section; the heading for a custom one. Findings' sections are keyed by it."},
+    "heading": {"type": "string", "description": "The ## heading finding files use for it."},
+    "fixed": {"type": "boolean", "description": "One of the three fixed sections."},
+    "required": {"type": "boolean", "description": "Every finding must have it, non-empty."}
+  },
+  "required": ["kind", "key", "heading", "fixed", "required"],
+  "additionalProperties": true
+}
