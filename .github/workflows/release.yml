@@ -1,5 +1,5 @@
 # Publishes a GitHub release for each v* tag. scripts/release.sh builds the
-# archives and SHA256SUMS; the release notes are the tag's annotation.
+# archives and SHA256SUMS; the release notes are the tag annotation's body.
 name: release
 on:
   push:
@@ -18,6 +18,11 @@ jobs:
         with:
           go-version-file: go.mod
       - run: scripts/release.sh
-      - run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --notes-from-tag --title "rpt $GITHUB_REF_NAME"
+      # The notes are the tag's body; --notes-from-tag would add its subject line,
+      # which repeats the release title.
+      - run: |
+          gh release create "$GITHUB_REF_NAME" dist/* --verify-tag \
+            --title "rpt $GITHUB_REF_NAME" \
+            --notes "$(git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME")"
         env:
           GH_TOKEN: ${{ github.token }}
