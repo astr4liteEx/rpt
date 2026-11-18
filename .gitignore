@@ -1,7 +1,8 @@
-.claude/worktrees/
 dist/
+
+# Private agent and planning files
 .scratch/
 CLAUDE.md
-docs/agents/issue-tracker.md
-docs/agents/triage-labels.md
-docs/agents/domain.md
+docs/agents/
+prototypes/
+.claude/

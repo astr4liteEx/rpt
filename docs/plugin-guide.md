@@ -1,6 +1,6 @@
 # Building an rpt plugin
 
-Steps for building or changing an rpt plugin, in any language. The rules a plugin follows are in [`docs/plugin-protocol.md`](../plugin-protocol.md); read it first and keep it open, since every step below applies it. Record shapes are in [`schema/`](../../schema).
+Steps for building or changing an rpt plugin, in any language. The rules a plugin follows are in [`docs/plugin-protocol.md`](plugin-protocol.md); read it first and keep it open, since every step below applies it. Record shapes are in [`schema/`](../schema).
 
 ## 1. Place the plugin
 
@@ -35,7 +35,7 @@ Run every check; the plugin is done when all pass:
 
 ## Go plugins
 
-The [`sdk`](../../sdk) package implements the protocol; use it instead of re-deriving the rules:
+The [`sdk`](../sdk) package implements the protocol; use it instead of re-deriving the rules:
 
 | Need | Use |
 | --- | --- |

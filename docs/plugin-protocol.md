@@ -1,6 +1,6 @@
 # rpt plugin protocol
 
-A plugin is any program, in any language, that follows this page. The core runs it as `rpt <verb>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional.
+A plugin is any program, in any language, that follows this page. The core runs it as `rpt <verb>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional. For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
 
 Supported systems: Linux.
 

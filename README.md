@@ -167,7 +167,7 @@ func main() {
 }
 ```
 
-Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt plugins` will list it.
+Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt plugins` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
 > A shell pipeline's exit status is that of its last command. Without `set -o pipefail`, a parser that fails partway through can still leave `rpt add` with a partial import. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt add < out.jsonl`.
@@ -192,6 +192,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | --- | --- |
 | [`docs/report-format.md`](docs/report-format.md) | The report folder (`rpt.yaml`, `scope.csv`, finding files) and every `rpt validate` rule. |
 | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) | What a plugin must do: naming, `--describe`, records, output, exit codes and how it works with a report. |
+| [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which Go `sdk` functions to use. |
 | [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `verb`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
 | [`docs/adr/`](docs/adr) | The design decisions and the reasons behind them. |
