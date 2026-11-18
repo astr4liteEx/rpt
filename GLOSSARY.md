@@ -13,7 +13,7 @@ The top folder of a report, the one that holds `rpt.yaml`.
 _Avoid_: report dir, base dir
 
 **Report config**:
-The `rpt.yaml` file at the report root: format version, severity levels and required sections.
+The `rpt.yaml` file at the report root: format version, severity levels, required sections and the fixed sections' headings.
 _Avoid_: settings, rpt.toml
 
 **Format version**:

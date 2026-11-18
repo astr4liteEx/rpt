@@ -8,7 +8,7 @@ Decide what the plugin is, since that decides which protocol sections bind it:
 
 - **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt.
 - **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
-- **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`.
+- **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from `$RPT_BIN sections --json`.
 - **Checker**: emits `problem` records under its own rule names.
 
 Done when the plugin has a verb name that is not an rpt built-in (`rpt verbs` lists them) and a one-line summary.

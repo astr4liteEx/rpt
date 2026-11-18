@@ -10,7 +10,7 @@ Supported systems: Linux.
 - **Lookup:** `rpt <verb>` runs the built-in verb if there is one (`rpt verbs` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
 - **Arguments:** passed byte for byte, without the verb: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
 - **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
-- **Listing:** `rpt plugins` lists every plugin it finds, with its `--describe` answer.
+- **Listing:** `rpt plugins` lists every plugin it finds, with its `--describe` answer. `rpt verbs` lists the built-ins the same way, as `verb` records.
 
 ## Environment
 
