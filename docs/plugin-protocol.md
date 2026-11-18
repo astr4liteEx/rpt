@@ -7,7 +7,7 @@ Supported systems: Linux.
 ## Finding and running a plugin
 
 - **Name:** an executable regular file named `rpt-<verb>` in a `PATH` folder. `<verb>` is lowercase letters, digits and hyphens.
-- **Lookup:** `rpt <verb>` runs the built-in verb if there is one (`rpt` with no arguments lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
+- **Lookup:** `rpt <verb>` runs the built-in verb if there is one (`rpt verbs` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
 - **Arguments:** passed byte for byte, without the verb: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
 - **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
 - **Listing:** `rpt plugins` lists every plugin it finds, with its `--describe` answer.
@@ -42,7 +42,7 @@ rpt never checks or acts on them. `rpt plugins` carries every member of the answ
 
 ## Records
 
-Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
+Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `verb` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
 
 Reading a stream:
 

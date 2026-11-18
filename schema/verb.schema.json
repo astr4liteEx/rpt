@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/verb.schema.json",
+  "title": "rpt verb record",
+  "description": "One built-in verb, emitted by rpt verbs in name order, described with the members a plugin's --describe answer uses. Plugins are listed by rpt plugins instead.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "verb"},
+    "name": {"type": "string", "description": "The verb, as in rpt <name>."},
+    "summary": {"type": "string", "description": "One line: what the verb does."},
+    "usage": {"type": "string", "description": "One line, e.g. rpt severities [--json]."},
+    "input": {"$ref": "plugin.schema.json#/$defs/dataType", "description": "The data the verb takes. Absent: it takes none."},
+    "output": {"$ref": "plugin.schema.json#/$defs/dataType", "description": "The data the verb gives. Absent: it gives none."}
+  },
+  "required": ["kind", "name", "summary", "usage"],
+  "additionalProperties": true
+}

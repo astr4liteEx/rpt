@@ -107,7 +107,7 @@ func findPlugins() []sdk.PluginInfo {
 		}
 		for _, ent := range entries {
 			name, ok := strings.CutPrefix(ent.Name(), "rpt-")
-			if !ok || name == "" || seen[name] || builtins[name] != nil {
+			if !ok || name == "" || seen[name] || isBuiltin(name) {
 				continue
 			}
 			p := filepath.Join(dir, ent.Name())

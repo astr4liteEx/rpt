@@ -141,6 +141,20 @@ type PluginInfo struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// Verb is one "verb" record rpt verbs emits: a built-in verb, described
+// with the members a plugin's --describe answer uses.
+type Verb struct {
+	Kind    string `json:"kind"`
+	Name    string `json:"name"`
+	Summary string `json:"summary"`
+	Usage   string `json:"usage"`
+	Input   string `json:"input,omitzero"`
+	Output  string `json:"output,omitzero"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // VersionInfo is the "version" record rpt version emits.
 type VersionInfo struct {
 	Kind          string `json:"kind"`

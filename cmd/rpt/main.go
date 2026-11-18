@@ -14,6 +14,7 @@ import (
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/sdk"
 )
 
 func main() {
@@ -32,25 +33,33 @@ type env struct {
 // os.Exit, so deferred calls in verbs always run.
 type verb func(e *env, args []string) int
 
-// builtins maps each built-in verb to its function. A verb is built in only
-// if it defines or enforces the report format; built-ins are checked
-// before plugins, so no plugin can shadow one.
-var builtins map[string]verb
+// A builtin is one built-in verb: its function and the description
+// rpt verbs prints. A verb is built in only if it defines or enforces the
+// report format; built-ins are checked before plugins, so no plugin can
+// shadow one.
+type builtin struct {
+	run  verb
+	desc sdk.Verb // Kind and Name are filled in by rpt verbs
+}
+
+// builtins maps each built-in verb's name to it.
+var builtins map[string]builtin
 
 func init() {
-	builtins = map[string]verb{
-		"add":        addVerb,
-		"assemble":   assembleVerb,
-		"delete":     deleteVerb,
-		"findings":   findingsVerb,
-		"new":        newVerb,
-		"plugins":    pluginsVerb,
-		"scope":      scopeVerb,
-		"sections":   sectionsVerb,
-		"set":        setVerb,
-		"severities": severitiesVerb,
-		"validate":   validateVerb,
-		"version":    versionVerb,
+	builtins = map[string]builtin{
+		"add":        {addVerb, sdk.Verb{Summary: "Add finding records as new finding files", Usage: "rpt add < records.jsonl", Input: "records", Output: "records"}},
+		"assemble":   {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}},
+		"delete":     {deleteVerb, sdk.Verb{Summary: "Remove findings; their evidence stays", Usage: "rpt delete <id>...", Output: "records"}},
+		"findings":   {findingsVerb, sdk.Verb{Summary: "List the findings", Usage: "rpt findings [--json] [--report dir]", Output: "records"}},
+		"new":        {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}},
+		"plugins":    {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}},
+		"scope":      {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl", Input: "records", Output: "records"}},
+		"sections":   {sectionsVerb, sdk.Verb{Summary: "List the report's sections, headings and which are required", Usage: "rpt sections [--json]", Output: "records"}},
+		"set":        {setVerb, sdk.Verb{Summary: "Change one frontmatter value of a finding", Usage: "rpt set <id> <key> <value>", Output: "records"}},
+		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}},
+		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}},
+		"verbs":      {verbsVerb, sdk.Verb{Summary: "List rpt's built-in verbs", Usage: "rpt verbs [--json]", Output: "records"}},
+		"version":    {versionVerb, sdk.Verb{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}},
 	}
 }
 
@@ -60,8 +69,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		fmt.Fprintln(stderr, usage())
 		return cli.ExitUsage
 	}
-	if v, ok := builtins[args[0]]; ok {
-		return v(e, args[1:])
+	if b, ok := builtins[args[0]]; ok {
+		return b.run(e, args[1:])
 	}
 	return dispatch(e, args[0], args[1:])
 }
