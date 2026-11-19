@@ -108,6 +108,16 @@ func unsetVerb(e *env, args []string) int {
 	return cli.ExitOK
 }
 
+// requestErrors are mistakes in what was asked: exit 1, not 2.
+var requestErrors = []error{
+	report.ErrNoFinding, report.ErrRefusedKey, report.ErrRefusedUnset, report.ErrBadValue,
+	report.ErrNoScopeRow, report.ErrCited,
+}
+
+func isRequestError(err error) bool {
+	return slices.ContainsFunc(requestErrors, func(target error) bool { return errors.Is(err, target) })
+}
+
 // logEditError logs an error from editing and returns its exit code. A
 // problem in a report file, or anything wrong with what was asked (an
 // unknown finding, a key that can't be set, a bad value), is exit 1; any
@@ -118,7 +128,7 @@ func logEditError(e *env, err error, line int) int {
 		e.log.Error(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
 		return cli.ExitProblems
 	}
-	if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrRefusedKey) || errors.Is(err, report.ErrRefusedUnset) || errors.Is(err, report.ErrBadValue) {
+	if isRequestError(err) {
 		if line > 0 {
 			e.log.Error(err.Error(), "path", "stdin", "line", line)
 		} else {

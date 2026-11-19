@@ -22,8 +22,16 @@ func TestVerbsVerb(t *testing.T) {
 			t.Errorf("record missing kind, summary or usage: %q", line)
 		}
 	}
-	if !strings.Contains(out, `{"kind":"verb","name":"scope","source":"builtin","summary":"List scope rows; scope match adds matching scope IDs to finding records","usage":"rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl","input":"records","output":"records"}`) {
-		t.Errorf("scope's record, subcommands in its usage, isn't as expected:\n%s", out)
+	// A noun's usage lists each subcommand's after its own.
+	for line := range strings.Lines(out) {
+		if !strings.Contains(line, `"name":"scope","source":"builtin"`) {
+			continue
+		}
+		for _, sub := range []string{"rpt scope [--json] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
+			if !strings.Contains(line, sub) {
+				t.Errorf("scope's usage lacks %q:\n%s", sub, line)
+			}
+		}
 	}
 }
 
@@ -48,6 +56,8 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"new":             {{}, {"a", "b"}},
 		"scope":           {{"extra"}, {"--no-such-flag"}},
 		"scope match":     {{"extra"}, {"--no-such-flag"}},
+		"scope add":       {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},
+		"scope delete":    {{}, {"--no-such-flag"}},
 		"sections":        {{"extra"}, {"--no-such-flag"}},
 		"sections set":    {{}, {"F-001"}, {"F-001", "a", "b"}, {"--no-such-flag"}},
 		"severities":      {{"extra"}, {"--no-such-flag"}},

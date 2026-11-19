@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
+	"flag"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
@@ -145,4 +148,156 @@ func describe(t sdk.Target) string {
 	default:
 		return t.Host
 	}
+}
+
+// colFlags collects repeated --col name=value flags.
+type colFlags map[string]string
+
+func (c colFlags) String() string { return "" }
+
+func (c colFlags) Set(v string) error {
+	k, val, ok := strings.Cut(v, "=")
+	if !ok || k == "" {
+		return fmt.Errorf("want name=value, got %q", v)
+	}
+	c[k] = val
+	return nil
+}
+
+// scopeAddVerb appends scope rows: each scope record on stdin, passing
+// other records through, or one row from its flags.
+func scopeAddVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope add")
+	host := flags.String("host", "", "add one row for this host instead of reading stdin")
+	port := flags.Int("port", 0, "the row's port (with --host)")
+	protocol := flags.String("protocol", "", "the row's protocol, tcp or udp (with --host)")
+	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-N")
+	cols := colFlags{}
+	flags.Var(cols, "col", "another column's value, name=value (with --host; repeatable)")
+	pos, err := parseInterspersed(flags, args)
+	if err != nil {
+		return cli.ExitUsage
+	}
+	fromFlags := false
+	flags.Visit(func(f *flag.Flag) { fromFlags = fromFlags || f.Name != "json" && f.Name != "report" })
+	if len(pos) != 0 || fromFlags && *host == "" {
+		return badUsage(e, "scope add")
+	}
+	out, err := of.output(e, scopeColumns)
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	r := openReport(e, *of.report)
+	if r == nil {
+		return cli.ExitUsage
+	}
+	defer r.Close()
+
+	add := func(row sdk.ScopeRow, line int) int {
+		added, err := r.AddScope(row)
+		if err != nil {
+			return logEditError(e, err, line)
+		}
+		if err := out.Write(added); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+		return cli.ExitOK
+	}
+	finish := func(code int) int {
+		if err := out.Flush(); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+		return code
+	}
+
+	if fromFlags {
+		row := sdk.ScopeRow{Kind: "scope", ID: *id, Host: *host, Port: *port, Protocol: *protocol}
+		for k, v := range cols {
+			b, _ := json.Marshal(v)
+			if row.Extra == nil {
+				row.Extra = map[string]jsontext.Value{}
+			}
+			row.Extra[k] = b
+		}
+		return finish(add(row, 0))
+	}
+
+	code := cli.ExitOK
+	for rec, err := range sdk.Records(e.stdin) {
+		if le, ok := errors.AsType[*sdk.LineError](err); ok {
+			e.log.Error(le.Err.Error(), "path", "stdin", "line", le.Line)
+			code = cli.ExitProblems
+			continue
+		} else if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+		if rec.Kind != "scope" {
+			if err := out.WriteRaw(rec.Raw); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitUsage
+			}
+			continue
+		}
+		var row sdk.ScopeRow
+		if err := json.Unmarshal(rec.Raw, &row); err != nil {
+			e.log.Error("scope: "+err.Error(), "path", "stdin", "line", rec.Line)
+			code = cli.ExitProblems
+			continue
+		}
+		delete(row.Extra, "kind")
+		switch c := add(row, rec.Line); c {
+		case cli.ExitUsage:
+			return c
+		case cli.ExitProblems:
+			code = c
+		}
+	}
+	return finish(code)
+}
+
+// scopeDeleteVerb removes scope rows by ID and prints each as it was. A
+// row a finding cites is refused unless --force; the rest are still
+// deleted (exit 1).
+func scopeDeleteVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope delete")
+	force := flags.Bool("force", false, "delete rows even when findings cite them")
+	pos, err := parseInterspersed(flags, args)
+	if err != nil {
+		return cli.ExitUsage
+	}
+	if len(pos) == 0 {
+		return badUsage(e, "scope delete")
+	}
+	out, err := of.output(e, scopeColumns)
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	r := openReport(e, *of.report)
+	if r == nil {
+		return cli.ExitUsage
+	}
+	defer r.Close()
+
+	code := cli.ExitOK
+	for _, id := range pos {
+		row, err := r.DeleteScope(id, *force)
+		if err != nil {
+			code = max(code, logEditError(e, err, 0))
+			continue
+		}
+		if err := out.Write(row); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+	}
+	if err := out.Flush(); err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	return code
 }
