@@ -68,12 +68,15 @@ func (r *Report) SetSection(id, key, text string) (sdk.Finding, error) {
 			return fmt.Errorf("the %q section is in the file twice; merge them by hand first", h.heading(key))
 		}
 		sp := at[0]
-		repl := "\n"
+		// The heading line, then one blank line before the text and one
+		// before the next heading; an empty section has a single blank
+		// line, or none at the end of the file.
+		repl := ""
 		if text != "" {
-			repl += text + "\n"
+			repl = "\n" + text + "\n"
 		}
 		if sp.end < len(ff.body) {
-			repl += "\n" // a blank line before the next heading
+			repl += "\n"
 		}
 		ff.body = append(append(append([]byte{}, ff.body[:sp.bodyAt]...), repl...), ff.body[sp.end:]...)
 		return nil

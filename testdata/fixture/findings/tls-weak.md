@@ -5,6 +5,7 @@ title: Weak TLS configuration
 scope: [S-99]
 severity: info
 ---
+
 ## Description
 
 TLS 1.0 is still enabled.

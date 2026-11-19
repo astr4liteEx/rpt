@@ -383,16 +383,19 @@ func sectionOrder(secs map[string]string) []string {
 	return append(keys, rest...)
 }
 
-// appendSection adds a ## section to the end of the body.
+// appendSection adds a ## section to the end of the body, after one blank
+// line: blank lines already at the end are dropped first, so none pile up.
+// An empty section is its heading alone; the blank line before whatever
+// comes next is written by that next append. The body then ends with one
+// newline after its last non-blank line, which markdown linters ask for.
 func (ff *findingFile) appendSection(heading, text string) {
+	ff.body = bytes.TrimRight(ff.body, "\n")
 	if len(ff.body) > 0 {
-		if !bytes.HasSuffix(ff.body, []byte("\n")) {
-			ff.body = append(ff.body, '\n')
-		}
 		ff.body = append(ff.body, '\n')
 	}
+	ff.body = append(ff.body, '\n') // a blank line after the frontmatter or the last section
 	if text = strings.TrimSpace(text); text == "" {
-		ff.body = append(ff.body, "## "+heading+"\n\n"...) // a blank line to write in
+		ff.body = append(ff.body, "## "+heading+"\n"...)
 		return
 	}
 	ff.body = append(ff.body, "## "+heading+"\n\n"+text+"\n"...)

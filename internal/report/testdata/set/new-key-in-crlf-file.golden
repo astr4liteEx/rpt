@@ -5,6 +5,7 @@ scope: [S-14]
 severity: medium
 retest: pending
 ---
+
 ## Description
 
 The `q` parameter is reflected unescaped.

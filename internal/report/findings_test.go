@@ -168,20 +168,20 @@ func TestFindingsWithLinesLocatesKeysAndSections(t *testing.T) {
 		"F-003": {
 			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5, "evidence": 6, "cvss": 7},
 			Sections: map[string]sl{
-				"description": {Heading: 9, Text: 11}, "remediation": {Heading: 13, Text: 15}, "poc": {Heading: 17, Text: 19},
+				"description": {Heading: 10, Text: 12}, "remediation": {Heading: 14, Text: 16}, "poc": {Heading: 18, Text: 20},
 			},
 		},
 		"F-002": { // a comment line sits between title and scope
 			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 5, "severity": 6},
 			Sections: map[string]sl{
-				"description": {Heading: 8, Text: 10}, "remediation": {Heading: 12, Text: 14}, "poc": {Heading: 16, Text: 18},
+				"description": {Heading: 9, Text: 11}, "remediation": {Heading: 13, Text: 15}, "poc": {Heading: 17, Text: 19},
 			},
 		},
 		"F-001": { // CRLF line ends
 			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5},
 			Sections: map[string]sl{
-				"description": {Heading: 7, Text: 9}, "remediation": {Heading: 11, Text: 13},
-				"poc": {Heading: 15, Text: 17}, "References": {Heading: 19, Text: 21},
+				"description": {Heading: 8, Text: 10}, "remediation": {Heading: 12, Text: 14},
+				"poc": {Heading: 16, Text: 18}, "References": {Heading: 20, Text: 22},
 			},
 		},
 	}

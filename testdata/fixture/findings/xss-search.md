@@ -4,6 +4,7 @@ title: Reflected XSS in search
 scope: [S-14]
 severity: medium
 ---
+
 ## Description
 
 The `q` parameter is reflected unescaped.

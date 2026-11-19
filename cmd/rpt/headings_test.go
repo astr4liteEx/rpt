@@ -31,7 +31,7 @@ const renamedConfig = "format: 1\nsections:\n  remediation: Recommendation\n  po
 
 func TestRenamedHeadingsRead(t *testing.T) {
 	dir := renamedReport(t, renamedConfig, "---\nid: F-001\ntitle: XSS\nseverity: low\n---\n"+
-		"## Description\n\nd\n\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n\n## Remediation\n\nold\n")
+		"\n## Description\n\nd\n\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n\n## Remediation\n\nold\n")
 
 	code, out, errOut := runIn(t, "", "findings", "--report", dir)
 	if code != 0 || errOut != "" {
@@ -72,7 +72,7 @@ func TestRenamedHeadingsAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "---\nid: F-001\ntitle: XSS\nscope: []\nseverity: low\n---\n" +
-		"## Description\n\nd\n\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n\n## Impact\n\ni\n"
+		"\n## Description\n\nd\n\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n\n## Impact\n\ni\n"
 	if string(got) != want {
 		t.Errorf("finding file\n got: %q\nwant: %q", got, want)
 	}

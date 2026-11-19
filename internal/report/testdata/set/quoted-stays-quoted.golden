@@ -6,6 +6,7 @@ severity: high
 evidence: [evidence/F-003-login.png]
 cvss: "9.4"
 ---
+
 ## Description
 
 The `user` parameter of `/login` is concatenated into a SQL query.

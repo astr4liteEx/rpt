@@ -42,7 +42,7 @@ func TestSectionsVerb(t *testing.T) {
 func TestSectionsSet(t *testing.T) {
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	// xss-search.md is F-001, saved with CRLF line ends.
-	head := "---\nid: F-001\ntitle: Reflected XSS in search\nscope: [S-14]\nseverity: medium\n---\n## Description\n\n" +
+	head := "---\nid: F-001\ntitle: Reflected XSS in search\nscope: [S-14]\nseverity: medium\n---\n\n## Description\n\n" +
 		"The `q` parameter is reflected unescaped.\n\n## Remediation\n\n"
 	tail := "## Proof of concept\n\n`/search?q=<script>alert(1)</script>`\n\n## References\n\n- OWASP XSS Prevention Cheat Sheet\n"
 	tests := []struct {
@@ -50,7 +50,7 @@ func TestSectionsSet(t *testing.T) {
 	}{
 		{"replace by key", "remediation", "\n\nEncode output.\r\nSet a CSP.\n\n", head + "Encode output.\nSet a CSP.\n\n" + tail},
 		{"by heading, any case", "REMEDIATION", "Encode output.", head + "Encode output.\n\n" + tail},
-		{"empty stdin leaves an empty section", "remediation", "", head + "\n" + tail},
+		{"empty stdin leaves an empty section", "remediation", "", head + tail},
 		{"a missing section is appended", "Impact", "Session theft.\n",
 			head + "Encode output.\n\n" + tail + "\n## Impact\n\nSession theft.\n"},
 	}

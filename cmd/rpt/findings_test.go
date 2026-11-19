@@ -31,8 +31,8 @@ func TestFindingsLinesFlag(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	l := findingsOut(t, out)["F-003"].Lines
-	if l == nil || l.Frontmatter["severity"] != 5 || l.Sections["poc"].Heading != 17 || l.Sections["poc"].Text != 19 {
-		t.Errorf("F-003 lines = %+v, want severity on 5 and poc at 17/19", l)
+	if l == nil || l.Frontmatter["severity"] != 5 || l.Sections["poc"].Heading != 18 || l.Sections["poc"].Text != 20 {
+		t.Errorf("F-003 lines = %+v, want severity on 5 and poc at 18/20", l)
 	}
 
 	code, out, _ = runIn(t, "", "findings", "--report", fixture, "--json")
@@ -146,7 +146,7 @@ func TestFindingsAddFromFlagsWritesABlankFinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := "---\nid: F-004\ntitle: SQL injection\nscope: [S-12, S-14]\nseverity: high\n---\n" +
-		"## Description\n\n\n## Remediation\n\n\n## Proof of concept\n\n"
+		"\n## Description\n\n## Remediation\n\n## Proof of concept\n"
 	if string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
 	}
@@ -175,7 +175,7 @@ func TestFindingsAddScaffold(t *testing.T) {
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "findings/F-004-half-done.md"))
 	want := "---\nid: F-004\ntitle: Half done\nscope: []\nseverity: low\n---\n" +
-		"## Description\n\nKnown so far.\n\n## Remediation\n\n\n## Proof of concept\n\n"
+		"\n## Description\n\nKnown so far.\n\n## Remediation\n\n## Proof of concept\n"
 	if string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
 	}

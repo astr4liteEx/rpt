@@ -64,6 +64,7 @@ evidence: [evidence/F-003-login.png]
 target: {host: 10.0.0.5, port: 443, protocol: tcp}
 cvss: "9.1"
 ---
+
 ## Description
 
 The `user` parameter of `/login` is concatenated into a SQL query.
