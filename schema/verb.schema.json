@@ -2,16 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/verb.schema.json",
   "title": "rpt verb record",
-  "description": "One built-in verb, emitted by rpt verbs in name order, described with the members a plugin's --describe answer uses. Plugins are listed by rpt plugins instead.",
+  "description": "One verb rpt <name> can run, emitted by rpt verbs: the built-ins in name order, then the plugins on PATH in name order. Described with the members a --describe answer uses; a plugin's come from its answer, unknown ones included, and are absent when it gave none in time.",
   "type": "object",
   "properties": {
     "kind": {"const": "verb"},
-    "name": {"type": "string", "description": "The verb, as in rpt <name>."},
-    "summary": {"type": "string", "description": "One line: what the verb does."},
-    "usage": {"type": "string", "description": "One line, e.g. rpt severities [--json]."},
-    "input": {"$ref": "plugin.schema.json#/$defs/dataType", "description": "The data the verb takes. Absent: it takes none."},
-    "output": {"$ref": "plugin.schema.json#/$defs/dataType", "description": "The data the verb gives. Absent: it gives none."}
+    "name": {"type": "string", "description": "The verb, as in rpt <name>; for a plugin, its file name without the rpt- prefix."},
+    "source": {"enum": ["builtin", "plugin"]},
+    "path": {"type": "string", "description": "A plugin's absolute path. Absent for built-ins."},
+    "summary": {"type": "string", "description": "One line: what the verb does. Always present for a built-in."},
+    "usage": {"type": "string", "description": "A built-in's usage lists its subcommands separated by ' | '."},
+    "version": {"type": "string", "description": "A plugin's own version."},
+    "input": {"$ref": "#/$defs/dataType", "description": "The data the verb takes. Absent: a built-in takes none; a plugin didn't say."},
+    "output": {"$ref": "#/$defs/dataType", "description": "The data the verb gives. Absent: a built-in gives none; a plugin didn't say."},
+    "shadowed": {"type": "boolean", "description": "True for a plugin that a built-in of the same name hides: rpt <name> never runs it."}
   },
-  "required": ["kind", "name", "summary", "usage"],
-  "additionalProperties": true
+  "required": ["kind", "name", "source"],
+  "additionalProperties": true,
+  "$defs": {
+    "description": {
+      "type": "object",
+      "description": "What a verb prints for --describe: one JSON object on one line, then exit 0. Every plugin and every built-in answers it.",
+      "properties": {
+        "summary": {"type": "string", "description": "One line: what the verb does."},
+        "usage": {"type": "string", "description": "One line, e.g. rpt parse-nuclei < results.jsonl."},
+        "version": {"type": "string", "description": "A plugin's own version."},
+        "input": {"$ref": "#/$defs/dataType", "description": "The data the verb takes. Absent: not said."},
+        "output": {"$ref": "#/$defs/dataType", "description": "The data the verb gives. Absent: not said."}
+      },
+      "required": ["summary"],
+      "additionalProperties": true
+    },
+    "dataType": {
+      "type": "string",
+      "description": "records for an rpt JSON Lines stream; otherwise <format> or <format>/<tool>, lowercase, chosen by the plugin author, e.g. xml/nessus, jsonl/nuclei, pdf.",
+      "pattern": "^[a-z0-9][a-z0-9.+-]*(/[a-z0-9][a-z0-9.+-]*)?$"
+    }
+  }
 }

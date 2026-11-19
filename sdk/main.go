@@ -9,8 +9,9 @@ import (
 )
 
 // Description is what a plugin prints for --describe: one JSON object on
-// one line. rpt plugins shows it; the plugin's name comes from its file
-// name (rpt-parse-nuclei is the verb parse-nuclei), not from here.
+// one line. rpt verbs shows it; the plugin's name comes from its file
+// name (rpt-parse-nuclei is the verb parse-nuclei), not from here. Every
+// built-in answers --describe the same way.
 type Description struct {
 	Summary string `json:"summary"`          // one line: what the plugin does
 	Usage   string `json:"usage,omitzero"`   // one line, e.g. "rpt parse-nuclei < results.jsonl"

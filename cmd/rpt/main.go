@@ -61,16 +61,15 @@ func init() {
 			{"set", setVerb, "rpt findings set <id> <key> <value>"},
 			{"delete", deleteVerb, "rpt findings delete <id>..."},
 		}},
-		"ls":      {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}, nil},
-		"new":     {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
-		"plugins": {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}, nil},
+		"ls":  {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}, nil},
+		"new": {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
 		"scope": {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json]", Input: "records", Output: "records"}, []sub{
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
 		"sections":   {sectionsVerb, sdk.Verb{Summary: "List the report's sections, headings and which are required", Usage: "rpt sections [--json]", Output: "records"}, nil},
 		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
 		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}, nil},
-		"verbs":      {verbsVerb, sdk.Verb{Summary: "List rpt's built-in verbs", Usage: "rpt verbs [--json]", Output: "records"}, nil},
+		"verbs":      {verbsVerb, sdk.Verb{Summary: "List the built-in verbs and the plugins on PATH", Usage: "rpt verbs [--json]", Output: "records"}, nil},
 		"version":    {versionVerb, sdk.Verb{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
 	}
 	for name, b := range builtins {
@@ -102,6 +101,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return cli.ExitUsage
 	}
 	if b, ok := builtins[args[0]]; ok {
+		if len(args) == 2 && args[1] == "--describe" {
+			return describeBuiltin(e, b)
+		}
 		if len(args) > 1 {
 			for _, s := range b.subs {
 				if s.name == args[1] {
@@ -120,7 +122,7 @@ func usage() string {
 		names = append(names, n)
 	}
 	sort.Strings(names)
-	return "usage: rpt <verb> [args]\nverbs: " + strings.Join(names, ", ") + "\nany other verb runs the rpt-<verb> plugin on PATH; rpt plugins lists them"
+	return "usage: rpt <verb> [args]\nverbs: " + strings.Join(names, ", ") + "\nany other verb runs the rpt-<verb> plugin on PATH; rpt verbs lists them all"
 }
 
 // outputFlags are the flags every verb that writes records shares.

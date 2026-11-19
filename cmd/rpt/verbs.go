@@ -2,20 +2,36 @@ package main
 
 import (
 	"cmp"
+	"encoding/json/v2"
+	"fmt"
 	"maps"
 	"slices"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
+	"github.com/astr4liteEx/rpt/sdk"
 )
 
 var verbColumns = []cli.Column{
-	{Header: "NAME", Field: "name"}, {Header: "IO", Value: verbIO}, {Header: "SUMMARY", Field: "summary"},
+	{Header: "NAME", Field: "name"}, {Header: "SOURCE", Value: verbSource}, {Header: "IO", Value: verbIO},
+	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
 }
 
-// verbIO renders a built-in's input and output for the table. Unlike a
-// plugin, a built-in's description is complete, so a missing side is "-",
-// none, not "?", not said.
+// verbSource renders where a verb comes from, flagging a shadowed plugin.
+func verbSource(m map[string]any) string {
+	src, _ := m["source"].(string)
+	if shadowed, _ := m["shadowed"].(bool); shadowed {
+		return src + " (shadowed)"
+	}
+	return src
+}
+
+// verbIO renders a verb's input and output for the table. A built-in's
+// description is complete, so a missing side is "-", none; a plugin's is
+// whatever it said, so a missing side is "?", not said.
 func verbIO(m map[string]any) string {
+	if src, _ := m["source"].(string); src == "plugin" {
+		return pluginIO(m)
+	}
 	in, _ := m["input"].(string)
 	out, _ := m["output"].(string)
 	if in == "" && out == "" {
@@ -30,8 +46,9 @@ func isBuiltin(name string) bool {
 	return ok
 }
 
-// verbsVerb lists rpt's built-in verbs by name, each described the way a
-// plugin describes itself. Plugins are rpt plugins' job.
+// verbsVerb lists everything rpt <name> can run: the built-ins by name,
+// then the plugins on PATH by name, each described the way --describe
+// describes it.
 func verbsVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "verbs")
 	if err := flags.Parse(args); err != nil {
@@ -45,10 +62,14 @@ func verbsVerb(e *env, args []string) int {
 		e.log.Error(err.Error())
 		return cli.ExitUsage
 	}
+	var list []sdk.Verb
 	for _, name := range slices.Sorted(maps.Keys(builtins)) {
 		d := builtins[name].desc
-		d.Kind, d.Name = "verb", name
-		if err := out.Write(d); err != nil {
+		d.Kind, d.Name, d.Source = "verb", name, "builtin"
+		list = append(list, d)
+	}
+	for _, v := range append(list, describePlugins(e)...) {
+		if err := out.Write(v); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitUsage
 		}
@@ -57,5 +78,18 @@ func verbsVerb(e *env, args []string) int {
 		e.log.Error(err.Error())
 		return cli.ExitUsage
 	}
+	return cli.ExitOK
+}
+
+// describeBuiltin prints a built-in's --describe answer: the members a
+// plugin's answer has, on one line.
+func describeBuiltin(e *env, b builtin) int {
+	d := sdk.Description{Summary: b.desc.Summary, Usage: b.desc.Usage, Input: b.desc.Input, Output: b.desc.Output}
+	line, err := json.Marshal(d, json.Deterministic(true))
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	fmt.Fprintf(e.stdout, "%s\n", line)
 	return cli.ExitOK
 }

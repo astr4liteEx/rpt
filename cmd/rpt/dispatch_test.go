@@ -12,6 +12,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/astr4liteEx/rpt/sdk"
 )
 
 var (
@@ -120,7 +122,7 @@ func TestDispatch(t *testing.T) {
 	})
 }
 
-func TestPluginsVerb(t *testing.T) {
+func TestVerbsListsPlugins(t *testing.T) {
 	b := bins(t)
 	t.Setenv("PATH", b)
 	old := describeTimeout
@@ -128,21 +130,34 @@ func TestPluginsVerb(t *testing.T) {
 	t.Cleanup(func() { describeTimeout = old })
 
 	start := time.Now()
-	code, out, errOut := runIn(t, "", "plugins")
+	code, out, errOut := runIn(t, "", "verbs")
 	if took := time.Since(start); took > 2*time.Second {
-		t.Errorf("rpt plugins took %v: it waited on the hanging plugin", took)
+		t.Errorf("rpt verbs took %v: it waited on the hanging plugin", took)
 	}
 	if code != 0 {
 		t.Errorf("exit %d, want 0: the listing worked", code)
 	}
-	want := "plugin broken " + filepath.Join(b, "rpt-broken") + "    \n" +
-		"plugin hang " + filepath.Join(b, "rpt-hang") + "    \n" +
-		"plugin stub " + filepath.Join(b, "rpt-stub") + " Stub plugin for tests records json/stub https://example.com\n"
-	if got := pick(t, out, "kind", "name", "path", "summary", "input", "output", "homepage"); got != want {
-		t.Errorf("listed\n%s\nwant\n%s", got, want)
+	lines := strings.Split(strings.TrimSuffix(pick(t, out, "source", "name", "shadowed", "path", "summary", "input", "output", "homepage"), "\n"), "\n")
+	if len(lines) != len(builtins)+4 {
+		t.Fatalf("got %d verbs, want %d built-ins and 4 plugins:\n%s", len(lines), len(builtins), out)
+	}
+	for _, l := range lines[:len(builtins)] {
+		if !strings.HasPrefix(l, "builtin ") {
+			t.Errorf("built-ins come first; got %q", l)
+		}
+	}
+	stub := "Stub plugin for tests records json/stub https://example.com"
+	want := []string{
+		"plugin broken  " + filepath.Join(b, "rpt-broken") + "    ",
+		"plugin findings true " + filepath.Join(b, "rpt-findings") + " " + stub, // hidden by the built-in, but listed
+		"plugin hang  " + filepath.Join(b, "rpt-hang") + "    ",
+		"plugin stub  " + filepath.Join(b, "rpt-stub") + " " + stub,
+	}
+	if got := lines[len(builtins):]; !reflect.DeepEqual(got, want) {
+		t.Errorf("plugins listed\n%s\nwant\n%s", strings.Join(got, "\n"), strings.Join(want, "\n"))
 	}
 	if strings.Contains(out, "evil") {
-		t.Errorf("a plugin overrode kind, name or path:\n%s", out)
+		t.Errorf("a plugin overrode a member rpt owns:\n%s", out)
 	}
 	for _, w := range []string{
 		"rpt: " + filepath.Join(b, "rpt-broken") + ": warning: --describe failed",
@@ -150,6 +165,20 @@ func TestPluginsVerb(t *testing.T) {
 	} {
 		if !strings.Contains(errOut, w) {
 			t.Errorf("stderr %q\nlacks %q", errOut, w)
+		}
+	}
+}
+
+func TestBuiltinsAnswerDescribe(t *testing.T) {
+	for name, b := range builtins {
+		code, out, errOut := runIn(t, "", name, "--describe")
+		var d sdk.Description
+		if code != 0 || errOut != "" || json.Unmarshal([]byte(out), &d) != nil || strings.Count(out, "\n") != 1 {
+			t.Errorf("rpt %s --describe: exit %d, stdout %q, stderr %q; want one JSON line", name, code, out, errOut)
+			continue
+		}
+		if d.Summary != b.desc.Summary || d.Usage != b.desc.Usage || d.Input != b.desc.Input || d.Output != b.desc.Output {
+			t.Errorf("rpt %s --describe = %+v, want the table's description %+v", name, d, b.desc)
 		}
 	}
 }

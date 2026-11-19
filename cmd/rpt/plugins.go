@@ -14,17 +14,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-// describeTimeout is how long rpt plugins waits for each --describe.
+// describeTimeout is how long rpt verbs waits for each --describe.
 var describeTimeout = 2 * time.Second
-
-var pluginColumns = []cli.Column{
-	{Header: "NAME", Field: "name"}, {Header: "IO", Value: pluginIO},
-	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
-}
 
 // pluginIO renders a plugin's declared input and output for the table,
 // "xml/nessus → records", with "?" for a side not said and nothing when
@@ -38,25 +32,12 @@ func pluginIO(m map[string]any) string {
 	return cmp.Or(in, "?") + " → " + cmp.Or(out, "?")
 }
 
-// pluginsVerb lists the rpt-* programs on PATH that rpt <verb> would run,
-// asking each to --describe itself and carrying every member of its
-// answer into the plugin record. A plugin that doesn't answer in time,
-// fails, or answers with something other than a JSON object is still listed,
-// with a warning; the listing itself exits 0.
-func pluginsVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "plugins")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	if flags.NArg() != 0 {
-		return badUsage(e, "plugins")
-	}
-	out, err := of.output(e, pluginColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitUsage
-	}
-
+// describePlugins finds the plugins on PATH and asks each to --describe
+// itself in parallel, carrying every member of its answer into its verb
+// record except the ones rpt owns. A plugin that doesn't answer in time,
+// fails, or answers with something other than a JSON object is still
+// listed, with a warning.
+func describePlugins(e *env) []sdk.Verb {
 	found := findPlugins()
 	descs := make([]sdk.Description, len(found))
 	errs := make([]error, len(found))
@@ -66,36 +47,28 @@ func pluginsVerb(e *env, args []string) int {
 		wg.Go(func() { descs[i], errs[i] = askDescription(p.Path, env) })
 	}
 	wg.Wait()
-
-	for i, p := range found {
+	for i := range found {
+		p := &found[i]
 		if errs[i] != nil {
 			e.log.Warn(errs[i].Error(), "path", p.Path)
 		}
 		d := descs[i]
 		p.Summary, p.Usage, p.Version, p.Input, p.Output = d.Summary, d.Usage, d.Version, d.Input, d.Output
 		p.Extra = d.Extra
-		for _, own := range []string{"kind", "name", "path"} {
+		for _, own := range []string{"kind", "name", "source", "path", "shadowed"} {
 			delete(p.Extra, own) // the record's own members aren't the plugin's to set
 		}
-		if err := out.Write(p); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitUsage
-		}
 	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitUsage
-	}
-	return cli.ExitOK
+	return found
 }
 
 // findPlugins finds the executable rpt-* files on PATH, sorted by name.
-// The first of a name in PATH order wins, as in a shell; names of built-in
-// verbs are skipped because the built-in always runs. Empty and relative
-// PATH entries are skipped, as exec.LookPath refuses them too.
-func findPlugins() []sdk.PluginInfo {
+// The first of a name in PATH order wins, as in a shell; one named like a
+// built-in is marked shadowed, because the built-in always runs. Empty and
+// relative PATH entries are skipped, as exec.LookPath refuses them too.
+func findPlugins() []sdk.Verb {
 	seen := map[string]bool{}
-	var out []sdk.PluginInfo
+	var out []sdk.Verb
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		if dir == "" || !filepath.IsAbs(dir) {
 			continue
@@ -106,7 +79,7 @@ func findPlugins() []sdk.PluginInfo {
 		}
 		for _, ent := range entries {
 			name, ok := strings.CutPrefix(ent.Name(), "rpt-")
-			if !ok || name == "" || seen[name] || isBuiltin(name) {
+			if !ok || name == "" || seen[name] {
 				continue
 			}
 			p := filepath.Join(dir, ent.Name())
@@ -115,10 +88,10 @@ func findPlugins() []sdk.PluginInfo {
 				continue
 			}
 			seen[name] = true
-			out = append(out, sdk.PluginInfo{Kind: "plugin", Name: name, Path: p})
+			out = append(out, sdk.Verb{Kind: "verb", Name: name, Source: "plugin", Path: p, Shadowed: isBuiltin(name)})
 		}
 	}
-	slices.SortFunc(out, func(a, b sdk.PluginInfo) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(out, func(a, b sdk.Verb) int { return strings.Compare(a.Name, b.Name) })
 	return out
 }
 

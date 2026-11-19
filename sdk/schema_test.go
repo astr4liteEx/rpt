@@ -27,13 +27,12 @@ func TestSchemasMatchTypes(t *testing.T) {
 		{"finding.schema.json", []string{"$defs", "target"}, reflect.TypeFor[Target]()},
 		{"finding.schema.json", []string{"$defs", "lines"}, reflect.TypeFor[Lines]()},
 		{"finding.schema.json", []string{"$defs", "sectionLines"}, reflect.TypeFor[SectionLines]()},
-		{"plugin.schema.json", nil, reflect.TypeFor[PluginInfo]()},
 		{"version.schema.json", nil, reflect.TypeFor[VersionInfo]()},
 		{"severity.schema.json", nil, reflect.TypeFor[SeverityLevel]()},
 		{"section.schema.json", nil, reflect.TypeFor[Section]()},
 		{"verb.schema.json", nil, reflect.TypeFor[Verb]()},
 		{"location.schema.json", nil, reflect.TypeFor[Location]()},
-		{"plugin.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
+		{"verb.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.typ.Name(), func(t *testing.T) {

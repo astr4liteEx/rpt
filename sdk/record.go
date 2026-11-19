@@ -149,23 +149,6 @@ type Target struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// PluginInfo is a "plugin" record: one plugin rpt plugins found. Every
-// member but Kind, Name and Path comes from the plugin's --describe answer,
-// unknown ones in Extra, and is empty when it gave none in time.
-type PluginInfo struct {
-	Kind    string `json:"kind"`
-	Name    string `json:"name"` // the verb: the file name without "rpt-"
-	Path    string `json:"path"` // absolute path of the program
-	Summary string `json:"summary,omitzero"`
-	Usage   string `json:"usage,omitzero"`
-	Version string `json:"version,omitzero"`
-	Input   string `json:"input,omitzero"`
-	Output  string `json:"output,omitzero"`
-
-	// Extra holds any unknown members.
-	Extra map[string]jsontext.Value `json:",embed"`
-}
-
 // Location is one "location" record rpt ls emits: a report found under the
 // folder searched. Format and Findings are nil when its config doesn't
 // parse.
@@ -179,15 +162,21 @@ type Location struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Verb is one "verb" record rpt verbs emits: a built-in verb, described
-// with the members a plugin's --describe answer uses.
+// Verb is one "verb" record rpt verbs emits: something rpt <name> can
+// run, a built-in or a plugin, described with the members a --describe
+// answer uses. A plugin's describe members come from its answer, unknown
+// ones in Extra, and are empty when it gave none in time.
 type Verb struct {
-	Kind    string `json:"kind"`
-	Name    string `json:"name"`
-	Summary string `json:"summary"`
-	Usage   string `json:"usage"`
-	Input   string `json:"input,omitzero"`
-	Output  string `json:"output,omitzero"`
+	Kind     string `json:"kind"`
+	Name     string `json:"name"`
+	Source   string `json:"source"`           // "builtin" or "plugin"
+	Path     string `json:"path,omitzero"`    // a plugin's absolute path
+	Summary  string `json:"summary,omitzero"` // always set for a built-in
+	Usage    string `json:"usage,omitzero"`
+	Version  string `json:"version,omitzero"` // a plugin's own version
+	Input    string `json:"input,omitzero"`
+	Output   string `json:"output,omitzero"`
+	Shadowed bool   `json:"shadowed,omitzero"` // a plugin a built-in of the same name hides
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

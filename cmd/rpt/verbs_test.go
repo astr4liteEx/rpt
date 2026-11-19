@@ -6,12 +6,13 @@ import (
 )
 
 func TestVerbsVerb(t *testing.T) {
+	t.Setenv("PATH", t.TempDir()) // no plugins
 	code, out, errOut := runIn(t, "", "verbs")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nfindings\nls\nnew\nplugins\nscope\nsections\nseverities\nvalidate\nverbs\nversion\n"
+	want := "assemble\nfindings\nls\nnew\nscope\nsections\nseverities\nvalidate\nverbs\nversion\n"
 	if names != want {
 		t.Errorf("verbs listed\n got: %q\nwant: %q", names, want)
 	}
@@ -21,7 +22,7 @@ func TestVerbsVerb(t *testing.T) {
 			t.Errorf("record missing kind, summary or usage: %q", line)
 		}
 	}
-	if !strings.Contains(out, `{"kind":"verb","name":"scope","summary":"List scope rows; scope match adds matching scope IDs to finding records","usage":"rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl","input":"records","output":"records"}`) {
+	if !strings.Contains(out, `{"kind":"verb","name":"scope","source":"builtin","summary":"List scope rows; scope match adds matching scope IDs to finding records","usage":"rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl","input":"records","output":"records"}`) {
 		t.Errorf("scope's record, subcommands in its usage, isn't as expected:\n%s", out)
 	}
 }
@@ -44,7 +45,6 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"findings delete": {{}, {"--no-such-flag"}},
 		"ls":              {{"a", "b"}, {"--no-such-flag"}},
 		"new":             {{}, {"a", "b"}},
-		"plugins":         {{"extra"}, {"--no-such-flag"}},
 		"scope":           {{"extra"}, {"--no-such-flag"}},
 		"scope match":     {{"extra"}, {"--no-such-flag"}},
 		"sections":        {{"extra"}, {"--no-such-flag"}},
