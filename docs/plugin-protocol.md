@@ -38,7 +38,19 @@ Given the single argument `--describe`, print one JSON object on one line and ex
 - Anything else: `<format>` or `<format>/<tool>`, lowercase, e.g. `xml/nessus`, `jsonl/nuclei`, `pdf`. The format alone is the plain answer; the tool tells two files of one format apart. There is no registry: reuse a name another plugin already uses for the same data.
 - Leave a side out when there is nothing to say; absent means "not said", not "none".
 
-rpt never checks or acts on them. `rpt verbs` carries every member of the answer into the plugin's `verb` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
+`roles` names what the plugin is, which `input` and `output` can't say: a checker and an importer both give `records`. A tool on top of rpt reads it from `rpt verbs --json`, say to run every checker from one key. It is an array, since a plugin can hold several roles, and each role is a promise:
+
+- `checker`: emits `problem` records about the report; exits 1 only when one is an error; never changes the report. `rpt validate` is one.
+- `filter`: reads records on stdin and writes records on stdout, such as redaction or `rpt scope match`.
+- `writer`: changes the report, only through `$RPT_BIN` write verbs.
+
+Declare only roles whose promise the plugin keeps every run. Absent means "not said", as for `input` and `output`.
+
+```json
+{"summary":"Lint finding files with rumdl","usage":"rpt lint [file...]","output":"records","roles":["checker"]}
+```
+
+rpt never checks or acts on `input`, `output` or `roles`. `rpt verbs` carries every member of the answer into the plugin's `verb` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
 
 ## Records
 

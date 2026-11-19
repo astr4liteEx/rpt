@@ -1,6 +1,6 @@
 // Command stubplugin is the plugin rpt's dispatch tests run. It prints its
 // arguments and RPT_* environment as JSON and exits with the code given as
-// "exit=N". It declares input, output and extra --describe members.
+// "exit=N". It declares input, output, roles and extra --describe members.
 // Installed as rpt-hang, it never answers --describe.
 package main
 
@@ -24,7 +24,7 @@ func main() {
 	sdk.Main(sdk.Plugin{
 		Description: sdk.Description{
 			Summary: "Stub plugin for tests", Usage: "rpt stub [exit=N]", Version: "0.0.1",
-			Input: "records", Output: "json/stub",
+			Input: "records", Output: "json/stub", Roles: []string{sdk.RoleChecker, sdk.RoleFilter},
 			// An unknown member rpt verbs must carry, and members it must
 			// not let a plugin override.
 			Extra: map[string]jsontext.Value{

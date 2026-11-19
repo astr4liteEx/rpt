@@ -14,6 +14,7 @@
     "version": {"type": "string", "description": "A plugin's own version."},
     "input": {"$ref": "#/$defs/dataType", "description": "The data the verb takes. Absent: a built-in takes none; a plugin didn't say."},
     "output": {"$ref": "#/$defs/dataType", "description": "The data the verb gives. Absent: a built-in gives none; a plugin didn't say."},
+    "roles": {"$ref": "#/$defs/roles", "description": "What the verb is. Absent: a built-in holds none; a plugin didn't say."},
     "shadowed": {"type": "boolean", "description": "True for a plugin that a built-in of the same name hides: rpt <name> never runs it."}
   },
   "required": ["kind", "name", "source"],
@@ -27,10 +28,17 @@
         "usage": {"type": "string", "description": "One line, e.g. rpt parse-nuclei < results.jsonl."},
         "version": {"type": "string", "description": "A plugin's own version."},
         "input": {"$ref": "#/$defs/dataType", "description": "The data the verb takes. Absent: not said."},
-        "output": {"$ref": "#/$defs/dataType", "description": "The data the verb gives. Absent: not said."}
+        "output": {"$ref": "#/$defs/dataType", "description": "The data the verb gives. Absent: not said."},
+        "roles": {"$ref": "#/$defs/roles", "description": "What the verb is. Absent: not said."}
       },
       "required": ["summary"],
       "additionalProperties": true
+    },
+    "roles": {
+      "type": "array",
+      "description": "The roles a verb holds, each a promise: checker emits problem records about the report, exits 1 only when one is an error, and never changes the report; filter reads records on stdin and writes records on stdout; writer changes the report, only through $RPT_BIN write verbs.",
+      "items": {"enum": ["checker", "filter", "writer"]},
+      "uniqueItems": true
     },
     "dataType": {
       "type": "string",

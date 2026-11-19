@@ -77,7 +77,7 @@ func init() {
 			{"set", sectionsSetVerb, "rpt sections set <id> <key> < text.md"},
 		}},
 		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
-		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}, nil},
+		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
 		"verbs":      {verbsVerb, sdk.Verb{Summary: "List the built-in verbs and the plugins on PATH", Usage: "rpt verbs [--json]", Output: "records"}, nil},
 		"version":    {versionVerb, sdk.Verb{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
 	}

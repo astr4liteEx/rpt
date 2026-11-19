@@ -183,16 +183,17 @@ type Location struct {
 // answer uses. A plugin's describe members come from its answer, unknown
 // ones in Extra, and are empty when it gave none in time.
 type Verb struct {
-	Kind     string `json:"kind"`
-	Name     string `json:"name"`
-	Source   string `json:"source"`           // "builtin" or "plugin"
-	Path     string `json:"path,omitzero"`    // a plugin's absolute path
-	Summary  string `json:"summary,omitzero"` // always set for a built-in
-	Usage    string `json:"usage,omitzero"`
-	Version  string `json:"version,omitzero"` // a plugin's own version
-	Input    string `json:"input,omitzero"`
-	Output   string `json:"output,omitzero"`
-	Shadowed bool   `json:"shadowed,omitzero"` // a plugin a built-in of the same name hides
+	Kind     string   `json:"kind"`
+	Name     string   `json:"name"`
+	Source   string   `json:"source"`           // "builtin" or "plugin"
+	Path     string   `json:"path,omitzero"`    // a plugin's absolute path
+	Summary  string   `json:"summary,omitzero"` // always set for a built-in
+	Usage    string   `json:"usage,omitzero"`
+	Version  string   `json:"version,omitzero"` // a plugin's own version
+	Input    string   `json:"input,omitzero"`
+	Output   string   `json:"output,omitzero"`
+	Roles    []string `json:"roles,omitzero"`
+	Shadowed bool     `json:"shadowed,omitzero"` // a plugin a built-in of the same name hides
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

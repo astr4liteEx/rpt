@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -137,7 +138,7 @@ func TestVerbsListsPlugins(t *testing.T) {
 	if code != 0 {
 		t.Errorf("exit %d, want 0: the listing worked", code)
 	}
-	lines := strings.Split(strings.TrimSuffix(pick(t, out, "source", "name", "shadowed", "path", "summary", "input", "output", "homepage"), "\n"), "\n")
+	lines := strings.Split(strings.TrimSuffix(pick(t, out, "source", "name", "shadowed", "path", "summary", "input", "output", "roles", "homepage"), "\n"), "\n")
 	if len(lines) != len(builtins)+4 {
 		t.Fatalf("got %d verbs, want %d built-ins and 4 plugins:\n%s", len(lines), len(builtins), out)
 	}
@@ -146,11 +147,11 @@ func TestVerbsListsPlugins(t *testing.T) {
 			t.Errorf("built-ins come first; got %q", l)
 		}
 	}
-	stub := "Stub plugin for tests records json/stub https://example.com"
+	stub := "Stub plugin for tests records json/stub [checker filter] https://example.com"
 	want := []string{
-		"plugin broken  " + filepath.Join(b, "rpt-broken") + "    ",
+		"plugin broken  " + filepath.Join(b, "rpt-broken") + "     ",
 		"plugin findings true " + filepath.Join(b, "rpt-findings") + " " + stub, // hidden by the built-in, but listed
-		"plugin hang  " + filepath.Join(b, "rpt-hang") + "    ",
+		"plugin hang  " + filepath.Join(b, "rpt-hang") + "     ",
 		"plugin stub  " + filepath.Join(b, "rpt-stub") + " " + stub,
 	}
 	if got := lines[len(builtins):]; !reflect.DeepEqual(got, want) {
@@ -177,8 +178,23 @@ func TestBuiltinsAnswerDescribe(t *testing.T) {
 			t.Errorf("rpt %s --describe: exit %d, stdout %q, stderr %q; want one JSON line", name, code, out, errOut)
 			continue
 		}
-		if d.Summary != b.desc.Summary || d.Usage != b.desc.Usage || d.Input != b.desc.Input || d.Output != b.desc.Output {
+		if d.Summary != b.desc.Summary || d.Usage != b.desc.Usage || d.Input != b.desc.Input || d.Output != b.desc.Output || !slices.Equal(d.Roles, b.desc.Roles) {
 			t.Errorf("rpt %s --describe = %+v, want the table's description %+v", name, d, b.desc)
+		}
+	}
+}
+
+func TestVerbRoles(t *testing.T) {
+	for _, tt := range []struct {
+		m    map[string]any
+		want string
+	}{
+		{map[string]any{"roles": []any{"checker", "filter"}}, "checker,filter"},
+		{map[string]any{"roles": []any{}}, ""},
+		{map[string]any{}, ""},
+	} {
+		if got := verbRoles(tt.m); got != tt.want {
+			t.Errorf("verbRoles(%v) = %q, want %q", tt.m, got, tt.want)
 		}
 	}
 }

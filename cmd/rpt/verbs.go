@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"slices"
+	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/sdk"
@@ -13,6 +14,7 @@ import (
 
 var verbColumns = []cli.Column{
 	{Header: "NAME", Field: "name"}, {Header: "SOURCE", Value: verbSource}, {Header: "IO", Value: verbIO},
+	{Header: "ROLES", Value: verbRoles},
 	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
 }
 
@@ -38,6 +40,19 @@ func verbIO(m map[string]any) string {
 		return ""
 	}
 	return cmp.Or(in, "-") + " → " + cmp.Or(out, "-")
+}
+
+// verbRoles renders a verb's declared roles for the table, "checker,filter",
+// and nothing when it declared none.
+func verbRoles(m map[string]any) string {
+	roles, _ := m["roles"].([]any)
+	var names []string
+	for _, r := range roles {
+		if s, ok := r.(string); ok {
+			names = append(names, s)
+		}
+	}
+	return strings.Join(names, ",")
 }
 
 // isBuiltin reports whether name is a built-in verb.
@@ -84,7 +99,7 @@ func verbsVerb(e *env, args []string) int {
 // describeBuiltin prints a built-in's --describe answer: the members a
 // plugin's answer has, on one line.
 func describeBuiltin(e *env, b builtin) int {
-	d := sdk.Description{Summary: b.desc.Summary, Usage: b.desc.Usage, Input: b.desc.Input, Output: b.desc.Output}
+	d := sdk.Description{Summary: b.desc.Summary, Usage: b.desc.Usage, Input: b.desc.Input, Output: b.desc.Output, Roles: b.desc.Roles}
 	line, err := json.Marshal(d, json.Deterministic(true))
 	if err != nil {
 		e.log.Error(err.Error())

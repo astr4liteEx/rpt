@@ -11,7 +11,7 @@ import (
 func TestRun(t *testing.T) {
 	var gotArgs []string
 	p := Plugin{
-		Description: Description{Summary: "Parse things", Usage: "rpt parse < in", Version: "1.2.3", Input: "xml/nessus", Output: "records"},
+		Description: Description{Summary: "Parse things", Usage: "rpt parse < in", Version: "1.2.3", Input: "xml/nessus", Output: "records", Roles: []string{RoleFilter, RoleChecker}},
 		Run: func(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			gotArgs = args
 			in, _ := io.ReadAll(stdin)
@@ -28,7 +28,7 @@ func TestRun(t *testing.T) {
 		wantRun         bool
 	}{
 		{name: "--describe is answered by the sdk", args: []string{"--describe"},
-			wantOut: `{"summary":"Parse things","usage":"rpt parse < in","version":"1.2.3","input":"xml/nessus","output":"records"}` + "\n"},
+			wantOut: `{"summary":"Parse things","usage":"rpt parse < in","version":"1.2.3","input":"xml/nessus","output":"records","roles":["filter","checker"]}` + "\n"},
 		{name: "anything else runs the plugin", args: []string{"a b", "", "--describe", "ü"}, wantCode: 3,
 			wantOut: "IN\n", wantEr: "note\n", wantRun: true},
 	}

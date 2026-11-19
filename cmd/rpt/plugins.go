@@ -54,6 +54,7 @@ func describePlugins(e *env) []sdk.Verb {
 		}
 		d := descs[i]
 		p.Summary, p.Usage, p.Version, p.Input, p.Output = d.Summary, d.Usage, d.Version, d.Input, d.Output
+		p.Roles = d.Roles
 		p.Extra = d.Extra
 		for _, own := range []string{"kind", "name", "source", "path", "shadowed"} {
 			delete(p.Extra, own) // the record's own members aren't the plugin's to set

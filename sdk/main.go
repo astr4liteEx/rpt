@@ -23,9 +23,26 @@ type Description struct {
 	Input  string `json:"input,omitzero"`
 	Output string `json:"output,omitzero"`
 
+	// Roles names what the plugin is, so a tool on top of rpt can find,
+	// say, every checker: RoleChecker, RoleFilter, RoleWriter. A plugin
+	// can hold several; empty is "not said".
+	Roles []string `json:"roles,omitzero"`
+
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
+
+// The roles a plugin can declare in Description.Roles. Each is a promise
+// the protocol's --describe section spells out.
+const (
+	// RoleChecker emits problem records about the report, exits 1 only
+	// when one is an error, and never changes the report.
+	RoleChecker = "checker"
+	// RoleFilter reads records on stdin and writes records on stdout.
+	RoleFilter = "filter"
+	// RoleWriter changes the report, only through $RPT_BIN write verbs.
+	RoleWriter = "writer"
+)
 
 // Plugin is a plugin program: its description and the function that does
 // its work. Run gets the arguments after the verb and its streams, and
