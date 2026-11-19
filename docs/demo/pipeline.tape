@@ -1,4 +1,7 @@
 Output docs/demo/pipeline.gif
+# rpt verbs lists every built-in before the plugin: a wider, taller frame.
+Set Width 2180
+Set Height 800
 Source docs/demo/common.tape
 
 Hide
@@ -10,11 +13,11 @@ Type "cat ../scan.csv"
 Sleep 300ms
 Enter
 Sleep 2.5s
-Type "rpt plugins"
+Type "rpt verbs"
 Sleep 300ms
 Enter
 Sleep 2.5s
-Type "rpt parse-scan < ../scan.csv | rpt scope match --drop-out-of-scope | rpt add"
+Type "rpt parse-scan < ../scan.csv | rpt scope match --drop-out-of-scope | rpt findings add"
 Sleep 300ms
 Enter
 Sleep 4s

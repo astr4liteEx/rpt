@@ -54,8 +54,8 @@ findings > "$demo/start/findings.jsonl"
 # that doesn't exist.
 "$rpt" new "$demo/validate/acme-external"
 printf '%s\n' "$scope_rows" >> "$demo/validate/acme-external/scope.csv"
-findings | "$rpt" add --report "$demo/validate/acme-external" > /dev/null
-"$rpt" set --report "$demo/validate/acme-external" F-002 scope '[S-99]' > /dev/null
+findings | "$rpt" findings add --report "$demo/validate/acme-external" > /dev/null
+"$rpt" findings set --report "$demo/validate/acme-external" F-002 scope '[S-99]' > /dev/null
 
 # pipeline: a report with scope and no findings, and a scan export beside it
 # (one host, 192.168.9.9, is out of scope).

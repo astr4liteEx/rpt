@@ -30,6 +30,10 @@ _Avoid_: issue, vuln, vulnerability
 A file inside the report that backs a finding, listed in the finding's frontmatter relative to the finding file.
 _Avoid_: asset (that is evidence as an absolute path in an assembled report), attachment
 
+**Orphan evidence**:
+A file in the findings' evidence folder that no finding lists or links to.
+_Avoid_: unused asset, stray file, dangling evidence
+
 **Finding ID**:
 A finding's permanent name, `F-` and a number, cited by clients and retests.
 _Avoid_: finding number, ref

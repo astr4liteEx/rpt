@@ -87,9 +87,11 @@ Use parameterised queries.
 | `target` | Optional: the `host`, `port` and `protocol` it was found on. `rpt scope match` uses it to fill in `scope`. |
 | anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. Not `kind`, `path`, `sections` or `lines`: rpt sets those on finding records, so a file using one is unreadable. |
 
-The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt add` writes the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
+The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt findings add` and `rpt sections set` write the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
 
-The file name is free. `rpt add` names new files `F-NNN-<title-slug>.md`.
+The file name is free. `rpt findings add` names new files `F-NNN-<title-slug>.md`.
+
+Evidence files can sit anywhere inside the report, but `findings/evidence/` is where `rpt evidence add` puts them. It names each copy `<id>-<slug>.<ext>`: the slug is the source file's name without its extension, lowercased, with each run of other characters than `a`–`z` and `0`–`9` turned into one `-`, at most 40 characters, or `evidence` if nothing is left; the extension is lowercased. A name that's taken gets `-2`, `-3` and so on. A file in `findings/evidence/` that no finding lists or links to is an orphan: `rpt validate` warns about it, and `rpt evidence prune` removes it. Hidden files there, such as `.gitkeep`, are left alone.
 
 ## `rpt validate` rules
 
@@ -108,5 +110,6 @@ The file name is free. `rpt add` names new files `F-NNN-<title-slug>.md`.
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
 | `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define. |
+| `evidenceUnlinked` | warning | A file in `findings/evidence/` that no finding lists or links to. Not checked while a finding file is unreadable. |
 
 Plugins can check more by emitting problems under their own rule names.

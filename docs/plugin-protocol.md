@@ -10,7 +10,7 @@ Supported systems: Linux.
 - **Lookup:** `rpt <verb>` runs the built-in verb if there is one (`rpt verbs` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
 - **Arguments:** passed byte for byte, without the verb: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
 - **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
-- **Listing:** `rpt plugins` lists every plugin it finds, with its `--describe` answer. `rpt verbs` lists the built-ins the same way, as `verb` records.
+- **Listing:** `rpt verbs` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `verb` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <verb>` never runs it.
 
 ## Environment
 
@@ -30,15 +30,15 @@ Given the single argument `--describe`, print one JSON object on one line and ex
 {"summary":"Parse nuclei JSON Lines into finding records","usage":"rpt parse-nuclei < results.jsonl","version":"0.3.1","input":"jsonl/nuclei","output":"records"}
 ```
 
-`summary` is required; the shape is `$defs/description` in [`schema/plugin.schema.json`](../schema/plugin.schema.json). A plugin that is slower, fails or prints anything else is still listed by `rpt plugins`, with a warning and no summary.
+`summary` is required; the shape is `$defs/description` in [`schema/verb.schema.json`](../schema/verb.schema.json). A plugin that is slower, fails or prints anything else is still listed by `rpt verbs`, with a warning and no summary. Every built-in answers `--describe` the same way.
 
-`input` and `output` name the data the plugin takes and gives, so a person sees what it does at a glance and another plugin can find, say, the parser for Nessus XML in `rpt plugins --json`:
+`input` and `output` name the data the plugin takes and gives, so a person sees what it does at a glance and another plugin can find, say, the parser for Nessus XML in `rpt verbs --json`:
 
 - `records`: an rpt JSON Lines stream (see Records).
 - Anything else: `<format>` or `<format>/<tool>`, lowercase, e.g. `xml/nessus`, `jsonl/nuclei`, `pdf`. The format alone is the plain answer; the tool tells two files of one format apart. There is no registry: reuse a name another plugin already uses for the same data.
 - Leave a side out when there is nothing to say; absent means "not said", not "none".
 
-rpt never checks or acts on them. `rpt plugins` carries every member of the answer into the `plugin` record, unknown ones too, except `kind`, `name` and `path`, which are rpt's.
+rpt never checks or acts on them. `rpt verbs` carries every member of the answer into the plugin's `verb` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
 
 ## Records
 
@@ -68,12 +68,15 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
 
 - **A hang stalls the whole chain.** Downstream waits for input, upstream blocks once the pipe buffer fills, and nothing times out; only Ctrl-C stops it. Make every wait the plugin does (network, child processes) end on its own.
 - **A crash looks like a short input.** Downstream sees end of input and finishes on the records that arrived; upstream is killed by a broken pipe. Write each record as one complete line, so a crash leaves at most one cut-off line, which readers report as malformed. On any failure, exit non-zero.
-- **Shells hide mid-chain failures.** A pipeline's exit status is its last command's, so `rpt-parse | rpt-x | rpt add` exits 0 even when `rpt-x` died, and `rpt add` has added a partial set. Tell users of the plugin, in its usage or docs, to run chains with `set -o pipefail` (bash, zsh), and to stage an import through a file when a partial import would hurt: `rpt-x < in > out.jsonl && rpt add < out.jsonl`.
+- **Shells hide mid-chain failures.** A pipeline's exit status is its last command's, so `rpt-parse | rpt-x | rpt findings add` exits 0 even when `rpt-x` died, and `rpt findings add` has added a partial set. Tell users of the plugin, in its usage or docs, to run chains with `set -o pipefail` (bash, zsh), and to stage an import through a file when a partial import would hurt: `rpt-x < in > out.jsonl && rpt findings add < out.jsonl`.
 
 ## Working with a report
 
 - **Read** through rpt, never by parsing report files: `$RPT_BIN findings --json` (add `--lines` for each finding file's absolute path, `lines.file`, and where each frontmatter key and section sits in it; to load a whole finding file, open `lines.file`, never `$RPT_REPORT_DIR/<path>`, which is unset when the plugin runs on its own), `$RPT_BIN scope --json`, `$RPT_BIN severities --json` (the report's levels, most severe first, as `rpt.yaml` maps them or the defaults), `$RPT_BIN sections --json` (the fixed sections with this report's headings, then the custom sections it requires; a finding's `sections` are keyed by each record's `key`), `$RPT_BIN assemble` (one `report` record, made for renderers).
-- **Change** a report only through rpt: pipe `finding` records into `$RPT_BIN add` to add findings, use `$RPT_BIN set <id> <key> <value>` to change one value, and `$RPT_BIN delete <id>...` to remove findings (their evidence files stay; a freed highest ID may be given out again, since rpt keeps no history). All three write atomically and keep the author's formatting; editing report files directly is outside the protocol.
+- **Change** a report only through rpt; editing report files directly is outside the protocol. Every write is atomic and keeps the author's formatting:
+  - Findings: pipe `finding` records into `$RPT_BIN findings add`; `$RPT_BIN findings set <id> <key> <value>` changes one frontmatter value and `findings unset <id> <key>...` removes keys; `$RPT_BIN sections set <id> <key>` replaces one section's text with stdin; `$RPT_BIN findings delete <id>...` removes findings (their evidence files stay; a freed highest ID may be given out again, since rpt keeps no history).
+  - Evidence: `$RPT_BIN evidence add <id> <file>...` copies files into `findings/evidence/` and lists them in the finding's evidence; `$RPT_BIN evidence --orphans` and `evidence prune` find and remove files nothing references.
+  - Scope: pipe `scope` records into `$RPT_BIN scope add`, and remove rows with `$RPT_BIN scope delete <id>...`.
 - **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json). To point at a line, take it from `$RPT_BIN findings --json --lines`: line `text + n` of a section is line n+1 of that section's text. A `column` (1-based byte in the line) may follow the line.
 - **Ask, don't re-derive.** rpt is the only parser of report files. A stock plugin (shipped in rpt-plugins) or a community plugin never parses finding files, `rpt.yaml` or `scope.csv` itself. Loading a finding file whole and read-only, at the path rpt gives (for example to lint it or scan it for secrets, or to hand it unchanged to a tool that does), is not parsing it; working out its frontmatter or sections yourself is, so take those from `findings --json --lines`. When it needs something rpt doesn't give and every plugin would want it, that is a feature request for rpt, not code in the plugin. A local plugin, one you keep for yourself, may do whatever works for you.
 - A plugin reading `report` records checks that `schema_version` is one it knows. `$RPT_BIN version --json` tells it, before reading, which record schema and report format that rpt uses.

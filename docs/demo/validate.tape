@@ -1,4 +1,6 @@
 Output docs/demo/validate.gif
+Set Width 1440
+Set Height 560
 Source docs/demo/common.tape
 
 Hide
@@ -10,7 +12,7 @@ Type "rpt validate"
 Sleep 300ms
 Enter
 Sleep 3s
-Type "rpt set F-002 scope '[S-14]'"
+Type "rpt findings set F-002 scope '[S-14]'"
 Sleep 300ms
 Enter
 Sleep 2s

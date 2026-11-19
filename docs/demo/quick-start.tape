@@ -1,4 +1,6 @@
 Output docs/demo/quick-start.gif
+Set Width 1440
+Set Height 560
 Source docs/demo/common.tape
 
 Hide
@@ -10,15 +12,15 @@ Type "rpt new acme-external && cd acme-external && ls"
 Sleep 300ms
 Enter
 Sleep 1.5s
-Type "echo 'S-12,10.0.0.5,443,tcp' >> scope.csv"
+Type "rpt scope add --id S-12 --host 10.0.0.5 --port 443 --protocol tcp"
 Sleep 300ms
 Enter
 Sleep 600ms
-Type "echo 'S-14,10.0.0.6,8443,tcp' >> scope.csv"
+Type "rpt scope add --id S-14 --host 10.0.0.6 --port 8443 --protocol tcp"
 Sleep 300ms
 Enter
 Sleep 800ms
-Type "rpt add < ../findings.jsonl"
+Type "rpt findings add < ../findings.jsonl"
 Sleep 300ms
 Enter
 Sleep 2.5s
