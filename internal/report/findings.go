@@ -90,6 +90,16 @@ var frontmatterKeys = []string{"id", "title", "scope", "severity", "evidence", "
 // the read: the findings that parsed are returned together with a joined
 // error holding one *FileError per bad file.
 func (r *Report) Findings() ([]sdk.Finding, error) {
+	list, err := r.FindingsWithLines()
+	for i := range list {
+		list[i].Lines = nil
+	}
+	return list, err
+}
+
+// FindingsWithLines is Findings with each finding's Lines set: where its
+// frontmatter keys and sections sit in its file.
+func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
 	entries, err := fs.ReadDir(r.root.FS(), FindingsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
@@ -123,7 +133,8 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 }
 
 // parseFinding parses one finding file: YAML frontmatter, then markdown
-// sections under ## headings.
+// sections under ## headings. Lines is set: this is the one place rpt works
+// out where a finding's parts sit.
 func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 	src = normaliseNewlines(src)
 	head, body, err := splitFrontmatter(src)
@@ -150,6 +161,9 @@ func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, &FileError{Path: rel, Err: err}
 	}
+	if err := checkReservedKeys(rel, &doc); err != nil {
+		return sdk.Finding{}, err
+	}
 	extra, err := extraFields(&doc)
 	if err != nil {
 		return sdk.Finding{}, &FileError{Path: rel, Err: err}
@@ -165,8 +179,43 @@ func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 		Sections: sections(body, h),
 		Evidence: fm.Evidence,
 		Target:   target,
+		Lines:    findingLines(&doc, head, body, h),
 		Extra:    extra,
 	}, nil
+}
+
+// bodyFirstLine is the file line a finding's body starts on: after the
+// opening ---, the frontmatter and the closing ---.
+func bodyFirstLine(head []byte) int {
+	return 3 + bytes.Count(head, []byte("\n"))
+}
+
+// bodyLine is the file line of byte offset off in a body starting on file
+// line first.
+func bodyLine(body []byte, first, off int) int {
+	return first + bytes.Count(body[:off], []byte("\n"))
+}
+
+// findingLines is where a finding's frontmatter keys and sections sit in
+// its file. A repeated section is located where its kept text is: the last.
+func findingLines(doc *yaml.Node, head, body []byte, h Headings) *sdk.Lines {
+	l := &sdk.Lines{Frontmatter: keyLines(doc)}
+	for k := range l.Frontmatter {
+		l.Frontmatter[k]++ // frontmatter starts on file line 2
+	}
+	first := bodyFirstLine(head)
+	for _, sp := range sectionSpans(body, h) {
+		if l.Sections == nil {
+			l.Sections = map[string]sdk.SectionLines{}
+		}
+		sl := sdk.SectionLines{Heading: bodyLine(body, first, sp.lineStart)}
+		if sectionText(body, sp) != "" {
+			raw := body[sp.bodyAt:sp.end]
+			sl.Text = bodyLine(body, first, sp.bodyAt+len(raw)-len(bytes.TrimLeft(raw, "\n")))
+		}
+		l.Sections[sp.key] = sl
+	}
+	return l
 }
 
 // decodeTarget converts a frontmatter target, decoded from YAML, into an
@@ -202,6 +251,26 @@ func splitFrontmatter(src []byte) (head, body []byte, err error) {
 		off += len(line) + 1
 	}
 	return nil, nil, errors.New("unterminated frontmatter: no closing --- line")
+}
+
+// recordKeys are the finding record members rpt sets itself. A frontmatter
+// key with one of these names would clash with them in the record.
+var recordKeys = []string{"kind", "path", "sections", "lines"}
+
+// checkReservedKeys refuses a frontmatter key named like a recordKeys member,
+// at its line.
+func checkReservedKeys(rel string, doc *yaml.Node) error {
+	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
+		return nil
+	}
+	m := doc.Content[0].Content
+	for i := 0; i+1 < len(m); i += 2 {
+		if key := m[i].Value; slices.Contains(recordKeys, key) {
+			return &FileError{Path: rel, Line: m[i].Line + 1, // frontmatter starts on file line 2
+				Err: fmt.Errorf("frontmatter key %q is reserved: rpt sets it on finding records; rename the key", key)}
+		}
+	}
+	return nil
 }
 
 // extraFields converts the frontmatter keys rpt doesn't declare into JSON

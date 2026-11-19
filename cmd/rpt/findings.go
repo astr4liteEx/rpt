@@ -7,9 +7,11 @@ var findingColumns = []cli.Column{
 	{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Field: "scope"},
 }
 
-// findingsVerb prints every finding in the report.
+// findingsVerb prints every finding in the report; with --lines, each
+// record also says where its keys and sections sit in its file.
 func findingsVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings")
+	withLines := flags.Bool("lines", false, "add each finding's lines: where its frontmatter keys and sections sit in its file")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -27,7 +29,11 @@ func findingsVerb(e *env, args []string) int {
 	}
 	defer r.Close()
 
-	list, readErr := r.Findings()
+	read := r.Findings
+	if *withLines {
+		read = r.FindingsWithLines
+	}
+	list, readErr := read()
 	for _, f := range list {
 		if err := out.Write(f); err != nil {
 			e.log.Error(err.Error())

@@ -41,6 +41,12 @@ acme-external/
 
 **From a release:** download `rpt_<version>_linux_<arch>.tar.gz` (amd64 or arm64), check it against `SHA256SUMS`, and put `rpt` on your `PATH`.
 
+**With [gah](https://github.com/get-gah/gah):** installs the latest release to `~/.local/bin` (add `--tag=<version>` for a specific one):
+
+```sh
+gah install astr4liteEx/rpt --unattended
+```
+
 **From source** (Go 1.27):
 
 ```sh
@@ -92,7 +98,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | --- | --- |
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
-| `rpt findings` | Lists findings. |
+| `rpt findings [--lines]` | Lists findings. `--lines` adds where each frontmatter key and section sits in its file, for checkers that report problems by line. |
 | `rpt scope` | Lists scope rows. |
 | `rpt scope match` | Reads finding records on stdin and adds the IDs of the scope rows their `target` matches. `--drop-out-of-scope` drops the findings that match none. |
 | `rpt severities` | Lists the report's severity levels, most severe first. |

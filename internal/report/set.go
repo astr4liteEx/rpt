@@ -18,12 +18,13 @@ var (
 )
 
 // refusedKeys can't be set: IDs are permanent, sections are edited by hand,
-// and kind and path aren't stored in the file.
+// and kind, path and lines aren't stored in the file.
 var refusedKeys = map[string]string{
 	"id":       "finding IDs are permanent",
 	"kind":     "kind is not stored in the file",
 	"path":     "path is where the file is",
 	"sections": "edit section text in the file",
+	"lines":    "lines are where the file's parts sit",
 }
 
 // Set changes one top-level frontmatter key of the finding with the given
@@ -98,6 +99,7 @@ func (r *Report) edit(rel string, change func(*findingFile) error) (sdk.Finding,
 			return sdk.Finding{}, err
 		}
 	}
+	f.Lines = nil
 	return f, nil
 }
 

@@ -59,7 +59,7 @@ Filtering a stream (stdin to stdout):
 ## Output and exit codes
 
 - stdout carries records only: JSON Lines when stdout is a pipe or file. A table or other human form is allowed on a terminal.
-- stderr carries messages, one per line: `<program>: <path>:<line>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known.
+- stderr carries messages, one per line: `<program>: <path>:<line>:<column>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known (most messages have no column).
 - Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could); `2` usage error. `126` belongs to rpt (the plugin couldn't start).
 
 ## In a pipeline
@@ -72,8 +72,9 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
 
 ## Working with a report
 
-- **Read** through rpt: `$RPT_BIN findings --json`, `$RPT_BIN scope --json`, `$RPT_BIN severities --json` (the report's levels, most severe first, as `rpt.yaml` maps them or the defaults), `$RPT_BIN sections --json` (the fixed sections with this report's headings, then the custom sections it requires; a finding's `sections` are keyed by each record's `key`), `$RPT_BIN assemble` (one `report` record, made for renderers).
+- **Read** through rpt, never by parsing report files: `$RPT_BIN findings --json` (add `--lines` for where each frontmatter key and section sits in its file), `$RPT_BIN scope --json`, `$RPT_BIN severities --json` (the report's levels, most severe first, as `rpt.yaml` maps them or the defaults), `$RPT_BIN sections --json` (the fixed sections with this report's headings, then the custom sections it requires; a finding's `sections` are keyed by each record's `key`), `$RPT_BIN assemble` (one `report` record, made for renderers).
 - **Change** a report only through rpt: pipe `finding` records into `$RPT_BIN add` to add findings, use `$RPT_BIN set <id> <key> <value>` to change one value, and `$RPT_BIN delete <id>...` to remove findings (their evidence files stay; a freed highest ID may be given out again, since rpt keeps no history). All three write atomically and keep the author's formatting; editing report files directly is outside the protocol.
-- **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json).
+- **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json). To point at a line, take it from `$RPT_BIN findings --json --lines`: line `text + n` of a section is line n+1 of that section's text. A `column` (1-based byte in the line) may follow the line.
+- **Ask, don't re-derive.** rpt is the only parser of report files. A stock plugin (shipped in rpt-plugins) or a community plugin never parses finding files, `rpt.yaml` or `scope.csv` itself. When it needs something rpt doesn't give and every plugin would want it, that is a feature request for rpt, not code in the plugin. A local plugin, one you keep for yourself, may do whatever works for you.
 - A plugin reading `report` records checks that `schema_version` is one it knows. `$RPT_BIN version --json` tells it, before reading, which record schema and report format that rpt uses.
 - A report holds no engagement details: no client, title or dates. A renderer takes them from its own input (flags, environment, its own file), as in `rpt assemble | rpt-render-pdf --client Acme --period 2026-11-02..2026-11-06`.

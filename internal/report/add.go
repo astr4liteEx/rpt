@@ -52,6 +52,7 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 	if err := writeAtomic(r.root, rel, out); err != nil {
 		return sdk.Finding{}, err
 	}
+	f.Lines = nil
 	return f, nil
 }
 

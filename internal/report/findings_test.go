@@ -157,3 +157,76 @@ func TestFindingsMissingFolder(t *testing.T) {
 		t.Errorf("missing findings/ = %v, %v; want no findings, no error", got, err)
 	}
 }
+
+func TestFindingsWithLinesLocatesKeysAndSections(t *testing.T) {
+	got, err := openFixture(t).FindingsWithLines()
+	if err != nil {
+		t.Fatal(err)
+	}
+	type sl = sdk.SectionLines
+	want := map[string]*sdk.Lines{
+		"F-003": {
+			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5, "evidence": 6, "cvss": 7},
+			Sections: map[string]sl{
+				"description": {Heading: 9, Text: 11}, "remediation": {Heading: 13, Text: 15}, "poc": {Heading: 17, Text: 19},
+			},
+		},
+		"F-002": { // a comment line sits between title and scope
+			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 5, "severity": 6},
+			Sections: map[string]sl{
+				"description": {Heading: 8, Text: 10}, "remediation": {Heading: 12, Text: 14}, "poc": {Heading: 16, Text: 18},
+			},
+		},
+		"F-001": { // CRLF line ends
+			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5},
+			Sections: map[string]sl{
+				"description": {Heading: 7, Text: 9}, "remediation": {Heading: 11, Text: 13},
+				"poc": {Heading: 15, Text: 17}, "References": {Heading: 19, Text: 21},
+			},
+		},
+	}
+	for _, f := range got {
+		if !reflect.DeepEqual(f.Lines, want[f.ID]) {
+			t.Errorf("%s lines\n got: %+v\nwant: %+v", f.ID, f.Lines, want[f.ID])
+		}
+	}
+}
+
+func TestFindingsWithLinesEdgeCases(t *testing.T) {
+	dir := copyFixture(t)
+	writeFile(t, dir, "findings/zz-edge.md", "---\nid: F-009\n---\nintro\n\nCustom\n------\n\n\n  indented text\n\n"+
+		"## Remediation\n\n## Description\nx\n")
+	r, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer r.Close()
+	list, err := r.FindingsWithLines()
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := list[len(list)-1].Lines
+	want := &sdk.Lines{
+		Frontmatter: map[string]int{"id": 2},
+		Sections: map[string]sdk.SectionLines{
+			"Custom":      {Heading: 6, Text: 10}, // setext heading; text keeps its indent
+			"remediation": {Heading: 12},          // empty: no text line
+			"description": {Heading: 14, Text: 15},
+		},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("lines\n got: %+v\nwant: %+v", got, want)
+	}
+}
+
+func TestFindingsLeavesLinesOut(t *testing.T) {
+	list, err := openFixture(t).Findings()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range list {
+		if f.Lines != nil {
+			t.Errorf("%s: Findings set Lines; only FindingsWithLines does", f.ID)
+		}
+	}
+}

@@ -71,3 +71,23 @@ _Avoid_: engine (alone), server
 **Plugin**:
 A separate `rpt-<verb>` program, in any language, that follows the plugin protocol and does anything beyond the format: parsing, rendering, knowledge base, detection.
 _Avoid_: extension, addon, module
+
+**Stock plugin**:
+A plugin shipped in rpt-plugins. It reads the report only through the core and never parses report files itself.
+_Avoid_: official plugin, built-in plugin (built-ins are verbs)
+
+**Community plugin**:
+A third-party plugin vouched for as trusted, held to the same rules as a stock plugin.
+_Avoid_: external plugin, contrib
+
+**Local plugin**:
+A plugin a user keeps for themselves; the protocol binds it, but it may read report files any way it likes.
+_Avoid_: private plugin, custom plugin
+
+**Checker**:
+A plugin that emits problems under its own rule names, located at file lines the core gives it.
+_Avoid_: linter, validator (that is `rpt validate`)
+
+**Finding lines**:
+Where a finding's frontmatter keys and sections sit in its file, as the core reports them.
+_Avoid_: positions, offsets, source map

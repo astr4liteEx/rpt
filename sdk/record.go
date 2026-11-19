@@ -27,9 +27,31 @@ type Finding struct {
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
 	Target   *Target           `json:"target,omitzero"`   // what was hit; set by parser plugins
+	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt add ignores it
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Lines is where a finding's parts sit in its file, as rpt findings
+// --lines gives them: 1-based lines of the file as stored, so a checker can
+// locate a problem without parsing the file itself.
+type Lines struct {
+	Frontmatter map[string]int          `json:"frontmatter"`       // top-level key -> its line
+	Sections    map[string]SectionLines `json:"sections,omitzero"` // keyed like Finding.Sections
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// SectionLines is where one section sits in a finding file. Line Text+n is
+// line n+1 of the section's text in Finding.Sections.
+type SectionLines struct {
+	Heading int `json:"heading"`
+	Text    int `json:"text,omitzero"` // first line of the text; absent when the section is empty
+
+	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
@@ -57,11 +79,13 @@ const (
 	Warning Level = "warning"
 )
 
-// Problem is a "problem" record: one broken rule that rpt validate found.
+// Problem is a "problem" record: one broken rule that rpt validate or a
+// checker plugin found.
 type Problem struct {
 	Kind    string `json:"kind"`
-	Path    string `json:"path"`          // relative to the report root
-	Line    int    `json:"line,omitzero"` // 1-based; absent when the problem has no line
+	Path    string `json:"path"`            // relative to the report root
+	Line    int    `json:"line,omitzero"`   // 1-based; absent when the problem has no line
+	Column  int    `json:"column,omitzero"` // 1-based byte in the line; only with Line
 	Rule    string `json:"rule"`
 	Level   Level  `json:"level"`
 	Message string `json:"message"`

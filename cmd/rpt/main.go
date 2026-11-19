@@ -50,7 +50,7 @@ func init() {
 		"add":        {addVerb, sdk.Verb{Summary: "Add finding records as new finding files", Usage: "rpt add < records.jsonl", Input: "records", Output: "records"}},
 		"assemble":   {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}},
 		"delete":     {deleteVerb, sdk.Verb{Summary: "Remove findings; their evidence stays", Usage: "rpt delete <id>...", Output: "records"}},
-		"findings":   {findingsVerb, sdk.Verb{Summary: "List the findings", Usage: "rpt findings [--json] [--report dir]", Output: "records"}},
+		"findings":   {findingsVerb, sdk.Verb{Summary: "List the findings", Usage: "rpt findings [--lines] [--json] [--report dir]", Output: "records"}},
 		"ls":         {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}},
 		"new":        {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}},
 		"plugins":    {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}},

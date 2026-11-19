@@ -13,11 +13,32 @@
     "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
-    "target": {"$ref": "#/$defs/target"}
+    "target": {"$ref": "#/$defs/target"},
+    "lines": {"$ref": "#/$defs/lines"}
   },
   "required": ["kind", "title", "scope", "severity"],
   "additionalProperties": true,
   "$defs": {
+    "lines": {
+      "type": "object",
+      "description": "Where the finding's parts sit in its file: 1-based lines of the file as stored. Given by rpt findings --lines; rpt add ignores it.",
+      "properties": {
+        "frontmatter": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}, "description": "Line of each top-level frontmatter key, unknown keys included."},
+        "sections": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sectionLines"}, "description": "Keyed like sections."}
+      },
+      "required": ["frontmatter"],
+      "additionalProperties": true
+    },
+    "sectionLines": {
+      "type": "object",
+      "description": "Where one section sits. Line text+n is line n+1 of the section's text.",
+      "properties": {
+        "heading": {"type": "integer", "minimum": 1, "description": "Line of the ## heading."},
+        "text": {"type": "integer", "minimum": 1, "description": "First line of the section's text, surrounding blank lines left out; absent when the section is empty."}
+      },
+      "required": ["heading"],
+      "additionalProperties": true
+    },
     "target": {
       "type": "object",
       "description": "What the finding was found on. Set by parser plugins; read by rpt scope match, never rewritten.",

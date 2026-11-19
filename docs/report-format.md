@@ -85,7 +85,7 @@ Use parameterised queries.
 | `severity` | One of the config's `severities`. |
 | `evidence` | Files backing the finding, relative to the finding file. They must stay inside the report. |
 | `target` | Optional: the `host`, `port` and `protocol` it was found on. `rpt scope match` uses it to fill in `scope`. |
-| anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. |
+| anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. Not `kind`, `path`, `sections` or `lines`: rpt sets those on finding records, so a file using one is unreadable. |
 
 The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt add` writes the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
 
@@ -97,7 +97,7 @@ The file name is free. `rpt add` names new files `F-NNN-<title-slug>.md`.
 
 | Rule | Level | Checks |
 | --- | --- | --- |
-| `readable` | error | Each file parses: valid YAML frontmatter, valid CSV. |
+| `readable` | error | Each file parses: valid YAML frontmatter with no reserved key, valid CSV. |
 | `findingID` | error | Every finding has an `id` of the form `F-NNN`, and no two share one. The message names the next free ID. |
 | `title` | error | Every finding has a title. |
 | `knownSeverity` | error | Every severity is one of the config's `severities`. |

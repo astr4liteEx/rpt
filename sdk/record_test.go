@@ -34,6 +34,18 @@ func TestRecordsRoundTrip(t *testing.T) {
 			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"target":{"host":"10.0.0.5","port":443,"protocol":"tcp","vhost":"login.acme.com"},"cvss":"9.1","source":{"kb":"sqli"}}`,
 		},
 		{
+			name: "finding lines are a declared member, before unknown ones",
+			run:  roundTrip[Finding],
+			in:   `{"kind":"finding","title":"t","scope":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true}}`,
+			want: `{"kind":"finding","title":"t","scope":[],"severity":"low","lines":{"frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
+		},
+		{
+			name: "problem column",
+			run:  roundTrip[Problem],
+			in:   `{"kind":"problem","path":"findings/a.md","line":12,"column":7,"rule":"houseStyle","level":"warning","message":"m"}`,
+			want: `{"kind":"problem","path":"findings/a.md","line":12,"column":7,"rule":"houseStyle","level":"warning","message":"m"}`,
+		},
+		{
 			name: "scope row keeps extra CSV columns",
 			run:  roundTrip[ScopeRow],
 			in:   `{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"protocol":"tcp","env":"prod"}`,

@@ -11,8 +11,6 @@ import (
 	"slices"
 	"strings"
 
-	"go.yaml.in/yaml/v3"
-
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
@@ -293,7 +291,7 @@ type findingSrc struct {
 
 // bodyLine is the file line of byte offset off in the body.
 func (ff findingSrc) bodyLine(off int) int {
-	return ff.first + bytes.Count(ff.body[:off], []byte("\n"))
+	return bodyLine(ff.body, ff.first, off)
 }
 
 // findingFiles reads every finding file in name order.
@@ -322,15 +320,10 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 			out = append(out, findingSrc{rel: rel, err: err})
 			continue
 		}
-		head, body, _ := splitFrontmatter(normaliseNewlines(src))
-		var doc yaml.Node
-		_ = yaml.Unmarshal(head, &doc) // parseFinding already succeeded on it
-		lines := keyLines(&doc)
-		for k := range lines {
-			lines[k]++ // frontmatter starts on file line 2
-		}
-		out = append(out, findingSrc{rel: rel, f: f, keyLines: lines, body: body,
-			first: 2 + bytes.Count(head, []byte("\n")) + 1})
+		head, body, _ := splitFrontmatter(normaliseNewlines(src)) // parseFinding already succeeded on it
+		lines := f.Lines.Frontmatter
+		f.Lines = nil
+		out = append(out, findingSrc{rel: rel, f: f, keyLines: lines, body: body, first: bodyFirstLine(head)})
 	}
 	return out, nil
 }
