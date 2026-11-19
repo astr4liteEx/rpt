@@ -107,7 +107,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt findings delete <id>...` | Removes findings. Their evidence files stay. |
 | `rpt sections` | Lists the report's sections: the fixed ones with their headings, then the custom ones it requires. |
 | `rpt sections set <id> <key>` | Replaces one section's text in a finding with stdin, adding the section if it's missing. |
-| `rpt scope` | Lists scope rows. |
+| `rpt scope` | Lists scope rows. `--lines` adds the line of `scope.csv` each row starts on. |
 | `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-N`. |
 | `rpt scope delete <id>...` | Removes scope rows. A row a finding cites is refused unless you pass `--force`. |
 | `rpt scope match` | Reads finding records on stdin and adds the IDs of the scope rows their `target` matches. `--drop-out-of-scope` drops the findings that match none. |

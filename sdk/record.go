@@ -81,8 +81,19 @@ type ScopeRow struct {
 	Port int    `json:"port,omitzero"` // absent: every port
 	// Protocol is "tcp" or "udp"; absent: any protocol.
 	Protocol string `json:"protocol,omitzero"`
+	// Lines is where the row sits in scope.csv, set by rpt scope --lines.
+	Lines *ScopeLines `json:"lines,omitzero"`
 
 	// Extra holds the row's other CSV columns and any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// ScopeLines is where a scope row sits in scope.csv.
+type ScopeLines struct {
+	Row  int    `json:"row"`           // 1-based line the row starts on
+	File string `json:"file,omitzero"` // scope.csv's absolute path, symlinks kept
+
+	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 

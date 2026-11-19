@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"slices"
 	"strconv"
 
@@ -23,6 +24,20 @@ const ScopeFile = "scope.csv"
 // earlier row has. A bad row doesn't stop the read: good rows are returned
 // together with a joined error holding one *FileError per bad row.
 func (r *Report) Scope() ([]sdk.ScopeRow, error) {
+	rows, err := r.ScopeWithLines()
+	for i := range rows {
+		rows[i].Lines = nil
+	}
+	return rows, err
+}
+
+// scopeColumnsReserved are the record members rpt sets on scope records,
+// so no scope.csv column may be named like one.
+var scopeColumnsReserved = []string{"kind", "lines"}
+
+// ScopeWithLines is Scope with each row's Lines set: scope.csv's absolute
+// path and the line the row starts on.
+func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
 	src, err := r.root.ReadFile(ScopeFile)
 	if err != nil {
 		return nil, fmt.Errorf("read scope: %w", err)
@@ -37,6 +52,12 @@ func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 			return nil, &FileError{Path: ScopeFile, Line: 1, Err: fmt.Errorf("header has no %q column", need)}
 		}
 	}
+	for _, col := range scopeColumnsReserved {
+		if slices.Contains(header, col) {
+			return nil, &FileError{Path: ScopeFile, Line: 1, Err: fmt.Errorf("column %q is reserved: rpt sets it on scope records; rename the column", col)}
+		}
+	}
+	file := filepath.Join(r.abs, ScopeFile)
 
 	var (
 		rows []sdk.ScopeRow
@@ -65,6 +86,7 @@ func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 			continue
 		}
 		seen[row.ID] = line
+		row.Lines = &sdk.ScopeLines{Row: line, File: file}
 		rows = append(rows, row)
 	}
 	return rows, errors.Join(errs...)

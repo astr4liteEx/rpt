@@ -68,7 +68,7 @@ func init() {
 		}},
 		"ls":  {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
 		"new": {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
-		"scope": {scopeVerb, sdk.Verb{Summary: "List scope rows; add and delete change them, match adds matching scope IDs to finding records", Usage: "rpt scope [--json]", Input: "records", Output: "records"}, []sub{
+		"scope": {scopeVerb, sdk.Verb{Summary: "List scope rows; add and delete change them, match adds matching scope IDs to finding records", Usage: "rpt scope [--lines] [--json]", Input: "records", Output: "records"}, []sub{
 			{"add", scopeAddVerb, "rpt scope add < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-N] [--col name=value]..."},
 			{"delete", scopeDeleteVerb, "rpt scope delete [--force] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},

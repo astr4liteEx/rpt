@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -48,6 +49,36 @@ func TestScopeAddRefusesWhatTheHeaderLacks(t *testing.T) {
 	dir := reportCopy(t)
 	if code, _, errOut := runIn(t, "", "scope", "add", "--report", dir, "--port", "22"); code != 2 || !strings.Contains(errOut, "usage: rpt scope add") {
 		t.Errorf("no --host: exit %d, stderr %q; want 2 and usage", code, errOut)
+	}
+}
+
+// TestScopeLines checks that --lines gives the line each row starts on,
+// counting a quoted field that spans lines and skipped blank lines, and
+// that scope add ignores lines when its output is fed back in.
+func TestScopeLines(t *testing.T) {
+	dir := reportCopy(t)
+	csv := "id,host,port,env\nS-1,a,80,\"two\nlines\"\n\nS-2,b,,prod\n"
+	if err := os.WriteFile(filepath.Join(dir, "scope.csv"), []byte(csv), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := runIn(t, "", "scope", "--lines", "--json", "--report", dir)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	file := filepath.Join(dir, "scope.csv")
+	want := `{"kind":"scope","id":"S-1","host":"a","port":80,"lines":{"row":2,"file":` + strconv.Quote(file) + `},"env":"two\nlines"}` + "\n" +
+		`{"kind":"scope","id":"S-2","host":"b","lines":{"row":5,"file":` + strconv.Quote(file) + `},"env":"prod"}` + "\n"
+	if out != want {
+		t.Errorf("stdout\n%s\nwant\n%s", out, want)
+	}
+	if _, out, _ := runIn(t, "", "scope", "--json", "--report", dir); strings.Contains(out, `"lines":`) {
+		t.Errorf("without --lines, records carry lines:\n%s", out)
+	}
+
+	in := strings.ReplaceAll(strings.SplitAfter(out, "\n")[1], `"S-2"`, `"S-3"`)
+	code, out, errOut = runIn(t, in, "scope", "add", "--report", dir)
+	if code != 0 || strings.Contains(out, `"lines":`) || !strings.HasSuffix(readScope(t, dir), "S-3,b,,prod\n") {
+		t.Errorf("scope add of a --lines record: exit %d, stdout %q, stderr %q, scope.csv %q", code, out, errOut, readScope(t, dir))
 	}
 }
 

@@ -27,7 +27,7 @@ func TestVerbsVerb(t *testing.T) {
 		if !strings.Contains(line, `"name":"scope","source":"builtin"`) {
 			continue
 		}
-		for _, sub := range []string{"rpt scope [--json] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
+		for _, sub := range []string{"rpt scope [--lines] [--json] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
 			if !strings.Contains(line, sub) {
 				t.Errorf("scope's usage lacks %q:\n%s", sub, line)
 			}

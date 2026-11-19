@@ -19,9 +19,11 @@ var scopeColumns = []cli.Column{
 	{Header: "PORT", Field: "port"}, {Header: "PROTOCOL", Field: "protocol"},
 }
 
-// scopeVerb prints the report's scope rows; `rpt scope match` is its filter.
+// scopeVerb prints the report's scope rows; with --lines, each record
+// also says which line of scope.csv it starts on.
 func scopeVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope")
+	withLines := flags.Bool("lines", false, "add each row's lines: scope.csv's absolute path and the line the row starts on")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -39,7 +41,11 @@ func scopeVerb(e *env, args []string) int {
 	}
 	defer r.Close()
 
-	rows, readErr := r.Scope()
+	read := r.Scope
+	if *withLines {
+		read = r.ScopeWithLines
+	}
+	rows, readErr := read()
 	for _, row := range rows {
 		if err := out.Write(row); err != nil {
 			e.log.Error(err.Error())

@@ -26,6 +26,7 @@ func TestSchemasMatchTypes(t *testing.T) {
 		{"report.schema.json", []string{"$defs", "reportFinding"}, reflect.TypeFor[ReportFinding]()},
 		{"finding.schema.json", []string{"$defs", "target"}, reflect.TypeFor[Target]()},
 		{"finding.schema.json", []string{"$defs", "lines"}, reflect.TypeFor[Lines]()},
+		{"scope.schema.json", []string{"$defs", "lines"}, reflect.TypeFor[ScopeLines]()},
 		{"finding.schema.json", []string{"$defs", "sectionLines"}, reflect.TypeFor[SectionLines]()},
 		{"version.schema.json", nil, reflect.TypeFor[VersionInfo]()},
 		{"severity.schema.json", nil, reflect.TypeFor[SeverityLevel]()},

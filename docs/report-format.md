@@ -45,7 +45,7 @@ S-20,10.0.1.0/24,,,staging
 S-30,*.acme.com,,,prod
 ```
 
-- The header row must name `id` and `host`. `port` and `protocol` (`tcp` or `udp`) are optional. Any other column is kept and passed to renderers.
+- The header row must name `id` and `host`. `port` and `protocol` (`tcp` or `udp`) are optional. Any other column is kept and passed to renderers, except that no column may be named `kind` or `lines`: rpt sets those on scope records, so a `scope.csv` using one is unreadable.
 - Every row needs an id and a host; ids don't repeat.
 - `host` is an address, a name, a CIDR range, or `*.domain` for any subdomain.
 - A report with no scope has a `scope.csv` holding only its header row.
