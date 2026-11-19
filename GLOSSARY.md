@@ -89,5 +89,5 @@ A plugin that emits problems under its own rule names, located at file lines the
 _Avoid_: linter, validator (that is `rpt validate`)
 
 **Finding lines**:
-Where a finding's frontmatter keys and sections sit in its file, as the core reports them.
+Where a finding sits on disk, as the core reports it: its file's absolute path, and the lines its frontmatter keys and sections are on.
 _Avoid_: positions, offsets, source map

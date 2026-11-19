@@ -23,6 +23,7 @@
       "type": "object",
       "description": "Where the finding's parts sit in its file: 1-based lines of the file as stored. Given by rpt findings --lines; rpt add ignores it.",
       "properties": {
+        "file": {"type": "string", "description": "Absolute path of the finding file, in the form rpt opened the report by, symlinks not resolved. Use it to load the whole file."},
         "frontmatter": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 1}, "description": "Line of each top-level frontmatter key, unknown keys included."},
         "sections": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sectionLines"}, "description": "Keyed like sections."}
       },

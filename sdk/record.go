@@ -38,6 +38,7 @@ type Finding struct {
 // --lines gives them: 1-based lines of the file as stored, so a checker can
 // locate a problem without parsing the file itself.
 type Lines struct {
+	File        string                  `json:"file,omitzero"`     // the finding file's absolute path, symlinks kept
 	Frontmatter map[string]int          `json:"frontmatter"`       // top-level key -> its line
 	Sections    map[string]SectionLines `json:"sections,omitzero"` // keyed like Finding.Sections
 

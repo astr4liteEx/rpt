@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"maps"
 	"path"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -97,8 +98,8 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 	return list, err
 }
 
-// FindingsWithLines is Findings with each finding's Lines set: where its
-// frontmatter keys and sections sit in its file.
+// FindingsWithLines is Findings with each finding's Lines set: its file's
+// absolute path and where its frontmatter keys and sections sit in it.
 func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
 	entries, err := fs.ReadDir(r.root.FS(), FindingsDir)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -127,6 +128,7 @@ func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
 			errs = append(errs, err)
 			continue
 		}
+		f.Lines.File = filepath.Join(r.abs, filepath.FromSlash(rel))
 		findings = append(findings, f)
 	}
 	return findings, errors.Join(errs...)

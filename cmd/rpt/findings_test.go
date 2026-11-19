@@ -70,3 +70,62 @@ func TestSetRefusesLinesAndPrintsNone(t *testing.T) {
 		t.Errorf("set: exit %d, output carries lines: %s", code, out)
 	}
 }
+
+// linesFiles runs rpt findings --json --lines in dir with args and returns
+// each finding's lines.file.
+func linesFiles(t *testing.T, dir string, args ...string) []string {
+	t.Helper()
+	t.Chdir(dir)
+	code, out, errOut := runIn(t, "", append([]string{"findings", "--json", "--lines"}, args...)...)
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	var files []string
+	for _, f := range findingsOut(t, out) {
+		files = append(files, f.Lines.File)
+	}
+	return files
+}
+
+func TestLinesFileIsAbsolute(t *testing.T) {
+	t.Setenv("RPT_REPORT_DIR", "")
+	base := t.TempDir()
+	report := filepath.Join(base, "acme")
+	if err := os.CopyFS(report, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	other := filepath.Join(base, "other")
+	if err := os.CopyFS(other, os.DirFS(fixture)); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(base, "via-link")
+	if err := os.Symlink(report, link); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name, dir string
+		args      []string
+		wantIn    string // folder every file must sit in
+	}{
+		{"found from a report subfolder", filepath.Join(report, "findings", "evidence"), nil, filepath.Join(report, "findings")},
+		{"relative --report", report, []string{"--report", "../other"}, filepath.Join(other, "findings")},
+		{"symlinked report keeps the link", link, nil, filepath.Join(link, "findings")},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			files := linesFiles(t, tt.dir, tt.args...)
+			if len(files) != 3 {
+				t.Fatalf("got %d files, want 3", len(files))
+			}
+			for _, f := range files {
+				if filepath.Dir(f) != tt.wantIn {
+					t.Errorf("file %q is not in %s", f, tt.wantIn)
+				}
+				if info, err := os.Stat(f); err != nil || !info.Mode().IsRegular() {
+					t.Errorf("file %q: not a regular file (%v)", f, err)
+				}
+			}
+		})
+	}
+}

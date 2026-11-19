@@ -11,7 +11,7 @@ var findingColumns = []cli.Column{
 // record also says where its keys and sections sit in its file.
 func findingsVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings")
-	withLines := flags.Bool("lines", false, "add each finding's lines: where its frontmatter keys and sections sit in its file")
+	withLines := flags.Bool("lines", false, "add each finding's lines: its file's absolute path and where its frontmatter keys and sections sit in it")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}

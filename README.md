@@ -98,7 +98,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | --- | --- |
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
-| `rpt findings [--lines]` | Lists findings. `--lines` adds where each frontmatter key and section sits in its file, for checkers that report problems by line. |
+| `rpt findings [--lines]` | Lists findings. `--lines` adds each finding file's absolute path and where each frontmatter key and section sits in it, for checkers that load files or report problems by line. |
 | `rpt scope` | Lists scope rows. |
 | `rpt scope match` | Reads finding records on stdin and adds the IDs of the scope rows their `target` matches. `--drop-out-of-scope` drops the findings that match none. |
 | `rpt severities` | Lists the report's severity levels, most severe first. |

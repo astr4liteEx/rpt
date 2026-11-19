@@ -185,7 +185,17 @@ func TestFindingsWithLinesLocatesKeysAndSections(t *testing.T) {
 			},
 		},
 	}
+	abs, err := filepath.Abs(fixture) // fixture is a relative path
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, f := range got {
+		// file is the finding file's absolute path, even though the report
+		// was opened by a relative one.
+		if wantFile := filepath.Join(abs, filepath.FromSlash(f.Path)); f.Lines.File != wantFile {
+			t.Errorf("%s file = %q, want %q", f.ID, f.Lines.File, wantFile)
+		}
+		f.Lines.File = ""
 		if !reflect.DeepEqual(f.Lines, want[f.ID]) {
 			t.Errorf("%s lines\n got: %+v\nwant: %+v", f.ID, f.Lines, want[f.ID])
 		}
@@ -206,6 +216,7 @@ func TestFindingsWithLinesEdgeCases(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := list[len(list)-1].Lines
+	got.File = "" // checked in TestFindingsWithLinesLocatesKeysAndSections
 	want := &sdk.Lines{
 		Frontmatter: map[string]int{"id": 2},
 		Sections: map[string]sdk.SectionLines{
