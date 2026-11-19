@@ -112,9 +112,9 @@ func TestRun(t *testing.T) {
 			wantCode: 2, wantOut: exactly(""), wantInErr: "flag provided but not defined: -nope",
 		},
 		{
-			name:     "no report anywhere exits 2",
+			name:     "no report anywhere exits 1",
 			args:     []string{"findings"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "rpt: no report",
+			wantCode: 1, wantOut: exactly(""), wantInErr: "rpt: no report",
 		},
 	}
 	for _, tt := range tests {

@@ -2,9 +2,11 @@ package main
 
 import (
 	"errors"
+	"flag"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/sdk"
 )
 
 var locationColumns = []cli.Column{
@@ -12,28 +14,44 @@ var locationColumns = []cli.Column{
 }
 
 // lsVerb lists the reports at or under a folder, the current one by
-// default. Problems reading a report are warnings: the listing exits 0,
-// and rpt validate is the check.
+// default. With --current it prints the one report every other verb would
+// act on instead. Problems reading a report are warnings: the listing
+// exits 0, and rpt validate is the check.
 func lsVerb(e *env, args []string) int {
-	flags := newFlagSet(e, "ls")
-	json := flags.Bool("json", false, "write JSON Lines even on a terminal")
+	flags, of := newFlags(e, "ls")
+	current := flags.Bool("current", false, "print the report other verbs would act on from here")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
-	if flags.NArg() > 1 {
+	reportSet := false
+	flags.Visit(func(f *flag.Flag) { reportSet = reportSet || f.Name == "report" })
+	if flags.NArg() > 1 || *current && flags.NArg() > 0 || reportSet && !*current {
 		return badUsage(e, "ls")
 	}
 	dir := "."
 	if flags.NArg() == 1 {
 		dir = flags.Arg(0)
 	}
-	out, err := cli.NewOutput(e.stdout, isTerminal(e.stdout), *json, locationColumns)
+	out, err := of.output(e, locationColumns)
 	if err != nil {
 		e.log.Error(err.Error())
 		return cli.ExitUsage
 	}
-	found, errs := report.Find(dir)
-	if found == nil && len(errs) == 1 {
+	var (
+		found []sdk.Location
+		errs  []error
+	)
+	if *current {
+		loc, locErrs, err := report.Current(*of.report)
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		found, errs = []sdk.Location{loc}, locErrs
+	} else {
+		found, errs = report.Find(dir)
+	}
+	if !*current && found == nil && len(errs) == 1 {
 		if _, ok := errors.AsType[*report.FileError](errs[0]); !ok {
 			e.log.Error(errs[0].Error())
 			return cli.ExitUsage

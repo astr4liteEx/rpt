@@ -44,7 +44,7 @@ func evidenceVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 	list, readErr := r.Evidence(*orphans)
@@ -69,7 +69,7 @@ func evidencePruneVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 	gone, err := r.PruneEvidence(*dryRun)
@@ -95,7 +95,7 @@ func evidenceAddVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 

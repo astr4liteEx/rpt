@@ -99,6 +99,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | --- | --- |
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
+| `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
 | `rpt findings [--lines]` | Lists findings. `--lines` adds each finding file's absolute path and where each frontmatter key and section sits in it, for checkers that load files or report problems by line. |
 | `rpt findings add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--scope`, `--id`), writes one blank finding with an empty heading for each required section; `--scaffold` adds those headings to stdin records too. |
 | `rpt findings set <id> <key> <value>` | Changes one frontmatter value, given as YAML. Only that line of the file changes. |
@@ -121,7 +122,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 **Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`.
 
-**Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which reports a folder holds, run `rpt ls`.
+**Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which one that is, run `rpt ls --current`. To see which reports a folder holds, run `rpt ls`.
 
 **Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file. `2` means a usage error: wrong flags or arguments.
 

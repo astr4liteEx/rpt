@@ -53,7 +53,7 @@ func setVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -89,7 +89,7 @@ func unsetVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -170,7 +170,7 @@ func addVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -259,7 +259,7 @@ func deleteVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 

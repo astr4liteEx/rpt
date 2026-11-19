@@ -35,7 +35,7 @@ func scopeVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -73,7 +73,7 @@ func scopeMatchVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 	rows, err := r.Scope()
@@ -190,7 +190,7 @@ func scopeAddVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -279,7 +279,7 @@ func scopeDeleteVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 

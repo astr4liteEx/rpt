@@ -31,7 +31,7 @@ func validateVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -72,7 +72,7 @@ func assembleVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *reportDir)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 

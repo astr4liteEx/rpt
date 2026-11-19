@@ -25,7 +25,7 @@ func sectionsVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 
@@ -68,7 +68,7 @@ func sectionsSetVerb(e *env, args []string) int {
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	defer r.Close()
 

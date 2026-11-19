@@ -82,3 +82,30 @@ func locate(dir string) (sdk.Location, []error) {
 	}
 	return loc, errs
 }
+
+// ErrNotReport means the folder rpt was pointed at has no rpt.yaml.
+var ErrNotReport = errors.New("not a report: no " + ConfigFile)
+
+// Current describes the report every verb would act on, found by Root from
+// flag (the value of --report). The error is why there is no such report:
+// none found, a folder that can't be opened, or one without rpt.yaml.
+// Problems reading the report itself come back in the slice, as Find
+// gives them, next to a location without its format or finding count.
+func Current(flag string) (sdk.Location, []error, error) {
+	dir, err := Root(flag)
+	if err != nil {
+		return sdk.Location{}, nil, err
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return sdk.Location{}, nil, fmt.Errorf("open report %s: %w", dir, err)
+	}
+	if _, err := os.Stat(abs); err != nil {
+		return sdk.Location{}, nil, fmt.Errorf("open report %s: %w", dir, err)
+	}
+	if info, err := os.Stat(filepath.Join(abs, ConfigFile)); err != nil || !info.Mode().IsRegular() {
+		return sdk.Location{}, nil, fmt.Errorf("%s: %w", abs, ErrNotReport)
+	}
+	loc, errs := locate(abs)
+	return loc, errs, nil
+}
