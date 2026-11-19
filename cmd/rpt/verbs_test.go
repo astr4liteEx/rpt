@@ -49,6 +49,7 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"scope":           {{"extra"}, {"--no-such-flag"}},
 		"scope match":     {{"extra"}, {"--no-such-flag"}},
 		"sections":        {{"extra"}, {"--no-such-flag"}},
+		"sections set":    {{}, {"F-001"}, {"F-001", "a", "b"}, {"--no-such-flag"}},
 		"severities":      {{"extra"}, {"--no-such-flag"}},
 		"validate":        {{"extra"}, {"--no-such-flag"}},
 		"verbs":           {{"extra"}, {"--no-such-flag"}},

@@ -67,7 +67,9 @@ func init() {
 		"scope": {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json]", Input: "records", Output: "records"}, []sub{
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
-		"sections":   {sectionsVerb, sdk.Verb{Summary: "List the report's sections, headings and which are required", Usage: "rpt sections [--json]", Output: "records"}, nil},
+		"sections": {sectionsVerb, sdk.Verb{Summary: "List the report's sections; sections set changes one in a finding", Usage: "rpt sections [--json]", Input: "text", Output: "records"}, []sub{
+			{"set", sectionsSetVerb, "rpt sections set <id> <key> < text.md"},
+		}},
 		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
 		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}, nil},
 		"verbs":      {verbsVerb, sdk.Verb{Summary: "List the built-in verbs and the plugins on PATH", Usage: "rpt verbs [--json]", Output: "records"}, nil},

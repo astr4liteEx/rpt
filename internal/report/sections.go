@@ -1,6 +1,7 @@
 package report
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -31,4 +32,50 @@ func (c Config) SectionList() []sdk.Section {
 		out = append(out, sdk.Section{Kind: "section", Key: k, Heading: k, Required: true})
 	}
 	return out
+}
+
+// SetSection replaces the text of one section of the finding with the given
+// ID, and returns the finding as now stored. key is a section key or a
+// fixed section's heading. A section the finding lacks is appended after
+// its others, under the report's heading. Every other byte of the file is
+// kept. Text holding a ## heading of its own, which would split the
+// section, is refused, as is a finding with the section twice.
+func (r *Report) SetSection(id, key, text string) (sdk.Finding, error) {
+	h := r.headings()
+	key = h.key(strings.TrimSpace(key))
+	text = strings.TrimRight(strings.TrimLeft(string(normaliseNewlines([]byte(text))), "\n"), " \t\n")
+	if n := len(sectionSpans([]byte(text), h)); n > 0 {
+		return sdk.Finding{}, fmt.Errorf("%w: %s: the text has a ## heading of its own, which would start another section", ErrBadValue, key)
+	}
+	rel, err := r.locate(id)
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	return r.edit(rel, func(ff *findingFile) error {
+		spans := sectionSpans(ff.body, h)
+		var at []span
+		for _, sp := range spans {
+			if sp.key == key {
+				at = append(at, sp)
+			}
+		}
+		switch len(at) {
+		case 0:
+			ff.appendSection(h.heading(key), text)
+			return nil
+		case 1:
+		default:
+			return fmt.Errorf("the %q section is in the file twice; merge them by hand first", h.heading(key))
+		}
+		sp := at[0]
+		repl := "\n"
+		if text != "" {
+			repl += text + "\n"
+		}
+		if sp.end < len(ff.body) {
+			repl += "\n" // a blank line before the next heading
+		}
+		ff.body = append(append(append([]byte{}, ff.body[:sp.bodyAt]...), repl...), ff.body[sp.end:]...)
+		return nil
+	})
 }
