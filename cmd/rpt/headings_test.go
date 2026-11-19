@@ -64,7 +64,7 @@ func sectionsOf(t *testing.T, jsonl string) map[string]string {
 func TestRenamedHeadingsAdd(t *testing.T) {
 	dir := renamedReport(t, renamedConfig, "")
 	in := `{"kind":"finding","title":"XSS","severity":"low","sections":{"description":"d","remediation":"r","poc":"p","Impact":"i"}}` + "\n"
-	if code, _, errOut := runIn(t, in, "add", "--report", dir); code != 0 {
+	if code, _, errOut := runIn(t, in, "findings", "add", "--report", dir); code != 0 {
 		t.Fatalf("add: exit %d, stderr %q", code, errOut)
 	}
 	got, err := os.ReadFile(filepath.Join(dir, "findings", "F-001-xss.md"))

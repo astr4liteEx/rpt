@@ -43,7 +43,7 @@ func TestFindingsLinesFlag(t *testing.T) {
 func TestAddNeverWritesLines(t *testing.T) {
 	dir := reportCopy(t)
 	in := `{"kind":"finding","title":"Copied","scope":[],"severity":"low","lines":{"frontmatter":{"id":2}},"sections":{"description":"d"}}` + "\n"
-	code, out, errOut := runIn(t, in, "add", "--report", dir, "--json")
+	code, out, errOut := runIn(t, in, "findings", "add", "--report", dir, "--json")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -61,11 +61,11 @@ func TestAddNeverWritesLines(t *testing.T) {
 
 func TestSetRefusesLinesAndPrintsNone(t *testing.T) {
 	dir := reportCopy(t)
-	code, _, errOut := runIn(t, "", "set", "--report", dir, "F-003", "lines", "{}")
-	if code != 2 || !strings.Contains(errOut, "key can't be set: lines") {
+	code, _, errOut := runIn(t, "", "findings", "set", "--report", dir, "F-003", "lines", "{}")
+	if code != 1 || !strings.Contains(errOut, "key can't be set: lines") {
 		t.Errorf("set lines: exit %d, stderr %q", code, errOut)
 	}
-	code, out, _ := runIn(t, "", "set", "--report", dir, "--json", "F-003", "severity", "low")
+	code, out, _ := runIn(t, "", "findings", "set", "--report", dir, "--json", "F-003", "severity", "low")
 	if code != 0 || strings.Contains(out, `"lines"`) {
 		t.Errorf("set: exit %d, output carries lines: %s", code, out)
 	}

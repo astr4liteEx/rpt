@@ -43,7 +43,7 @@ func TestSetChangesOneValue(t *testing.T) {
 	dir := reportCopy(t)
 	before, _ := os.ReadFile(filepath.Join(dir, "findings/sqli-login.md"))
 	// Flags after the positional arguments work too.
-	code, out, errOut := runIn(t, "", "set", "F-003", "severity", "critical", "--report", dir)
+	code, out, errOut := runIn(t, "", "findings", "set", "F-003", "severity", "critical", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -70,20 +70,22 @@ func TestSetUsageErrors(t *testing.T) {
 	tests := []struct {
 		name      string
 		args      []string
+		wantCode  int
 		wantInErr string
 	}{
-		{"unknown ID", []string{"F-404", "severity", "high"}, "no such finding: F-404"},
-		{"refused key", []string{"F-003", "id", "F-010"}, "key can't be set: id: finding IDs are permanent"},
-		{"bad severity", []string{"F-003", "severity", "urgent"}, `bad value: severity: "urgent" is not one of`},
-		{"missing value", []string{"F-003", "severity"}, "usage: rpt set <id> <key> <value>"},
+		// What was asked is wrong: exit 1. Bad syntax: exit 2.
+		{"unknown ID", []string{"F-404", "severity", "high"}, 1, "no such finding: F-404"},
+		{"refused key", []string{"F-003", "id", "F-010"}, 1, "key can't be set: id: finding IDs are permanent"},
+		{"bad severity", []string{"F-003", "severity", "urgent"}, 1, `bad value: severity: "urgent" is not one of`},
+		{"missing value", []string{"F-003", "severity"}, 2, "usage: rpt findings set <id> <key> <value>"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := reportCopy(t)
 			before := folderState(t, dir)
-			code, out, errOut := runIn(t, "", append([]string{"set", "--report", dir}, tt.args...)...)
-			if code != 2 || out != "" {
-				t.Errorf("exit %d, stdout %q; want 2 and nothing", code, out)
+			code, out, errOut := runIn(t, "", append([]string{"findings", "set", "--report", dir}, tt.args...)...)
+			if code != tt.wantCode || out != "" {
+				t.Errorf("exit %d, stdout %q; want %d and nothing", code, out, tt.wantCode)
 			}
 			if !strings.Contains(errOut, tt.wantInErr) {
 				t.Errorf("stderr = %q, want %q", errOut, tt.wantInErr)
@@ -97,7 +99,7 @@ func TestSetUsageErrors(t *testing.T) {
 
 func TestSetValueStartingWithDash(t *testing.T) {
 	dir := reportCopy(t)
-	code, out, errOut := runIn(t, "", "set", "--report", dir, "F-003", "offset", "--", "-1")
+	code, out, errOut := runIn(t, "", "findings", "set", "--report", dir, "F-003", "offset", "--", "-1")
 	if code != 0 || pick(t, out, "offset") != "-1\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
@@ -112,7 +114,7 @@ func TestAdd(t *testing.T) {
 		`{"kind":"finding","title":"No severity","scope":[]}`, // 3: refused
 		`{"kind":"finding","title":"Weak password policy","scope":[],"severity":"medium"}`,
 	}, "\n") + "\n"
-	code, out, errOut := runIn(t, in, "add", "--report", dir)
+	code, out, errOut := runIn(t, in, "findings", "add", "--report", dir)
 	if code != 1 {
 		t.Errorf("exit %d, want 1 for the refused record", code)
 	}

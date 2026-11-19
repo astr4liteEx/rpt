@@ -27,7 +27,7 @@ type Finding struct {
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
 	Target   *Target           `json:"target,omitzero"`   // what was hit; set by parser plugins
-	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt add ignores it
+	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt findings add ignores it
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.

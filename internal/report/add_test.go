@@ -12,7 +12,7 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-// record decodes a finding record the way rpt add receives it.
+// record decodes a finding record the way rpt findings add receives it.
 func record(t *testing.T, line string) sdk.Finding {
 	t.Helper()
 	var f sdk.Finding

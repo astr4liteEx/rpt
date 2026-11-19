@@ -9,7 +9,7 @@ import (
 
 func TestDeleteVerb(t *testing.T) {
 	dir := reportCopy(t)
-	code, out, errOut := runIn(t, "", "delete", "F-003", "F-404", "F-001", "--report", dir)
+	code, out, errOut := runIn(t, "", "findings", "delete", "F-003", "F-404", "F-001", "--report", dir)
 	if code != 1 {
 		t.Errorf("exit %d, want 1 for the unknown ID", code)
 	}
@@ -27,8 +27,8 @@ func TestDeleteVerb(t *testing.T) {
 
 func TestDeleteUsage(t *testing.T) {
 	dir := reportCopy(t)
-	code, _, errOut := runIn(t, "", "delete", "--report", dir)
-	if code != 2 || !strings.Contains(errOut, "usage: rpt delete <id>...") {
+	code, _, errOut := runIn(t, "", "findings", "delete", "--report", dir)
+	if code != 2 || !strings.Contains(errOut, "usage: rpt findings delete <id>...") {
 		t.Errorf("exit %d, stderr %q; want 2 and usage", code, errOut)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "findings/sqli-login.md")); err != nil {

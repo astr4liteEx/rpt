@@ -12,7 +12,7 @@ import (
 )
 
 // parseInterspersed parses flags wherever they appear among the arguments,
-// so `rpt set F-003 severity high --report dir` works, and returns the
+// so `rpt findings set F-003 severity high --report dir` works, and returns the
 // positional arguments. "--" ends flag parsing.
 func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 	var pos []string
@@ -34,13 +34,13 @@ func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
 
 // setVerb changes one frontmatter value of one finding.
 func setVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "set")
+	flags, of := newFlags(e, "findings set")
 	pos, err := parseInterspersed(flags, args)
 	if err != nil {
 		return cli.ExitUsage
 	}
 	if len(pos) != 3 {
-		code := badUsage(e, "set")
+		code := badUsage(e, "findings set")
 		fmt.Fprintln(e.stderr, `value is YAML: high, '[S-12, S-14]', "9.1"`)
 		return code
 	}
@@ -70,17 +70,22 @@ func setVerb(e *env, args []string) int {
 	return cli.ExitOK
 }
 
-// logEditError logs an error from editing and returns its exit code: a
-// problem in a report file or (for rpt add) in one input record is exit 1;
-// a bad request or a failure to write is exit 2. line > 0 locates the
+// logEditError logs an error from editing and returns its exit code. A
+// problem in a report file, or anything wrong with what was asked (an
+// unknown finding, a key that can't be set, a bad value), is exit 1; any
+// other failure, such as a failed write, is exit 2. line > 0 locates the
 // record on stdin.
 func logEditError(e *env, err error, line int) int {
 	if fe, ok := errors.AsType[*report.FileError](err); ok {
 		e.log.Error(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
 		return cli.ExitProblems
 	}
-	if line > 0 && errors.Is(err, report.ErrBadValue) {
-		e.log.Error(err.Error(), "path", "stdin", "line", line)
+	if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrRefusedKey) || errors.Is(err, report.ErrBadValue) {
+		if line > 0 {
+			e.log.Error(err.Error(), "path", "stdin", "line", line)
+		} else {
+			e.log.Error(err.Error())
+		}
 		return cli.ExitProblems
 	}
 	e.log.Error(err.Error())
@@ -91,13 +96,13 @@ func logEditError(e *env, err error, line int) int {
 // finding file and prints the finding as stored. Other records pass
 // through untouched.
 func addVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "add")
+	flags, of := newFlags(e, "findings add")
 	pos, err := parseInterspersed(flags, args)
 	if err != nil {
 		return cli.ExitUsage
 	}
 	if len(pos) != 0 {
-		return badUsage(e, "add")
+		return badUsage(e, "findings add")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
@@ -156,13 +161,13 @@ func addVerb(e *env, args []string) int {
 // deleteVerb removes each named finding's file and prints the finding as it
 // was. An unknown ID is logged and the rest are still deleted (exit 1).
 func deleteVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "delete")
+	flags, of := newFlags(e, "findings delete")
 	pos, err := parseInterspersed(flags, args)
 	if err != nil {
 		return cli.ExitUsage
 	}
 	if len(pos) == 0 {
-		return badUsage(e, "delete")
+		return badUsage(e, "findings delete")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
@@ -179,12 +184,7 @@ func deleteVerb(e *env, args []string) int {
 	for _, id := range pos {
 		f, err := r.Delete(id)
 		if err != nil {
-			if errors.Is(err, report.ErrNoFinding) {
-				e.log.Error(err.Error())
-				code = max(code, cli.ExitProblems)
-			} else {
-				code = max(code, logEditError(e, err, 0))
-			}
+			code = max(code, logEditError(e, err, 0))
 			continue
 		}
 		if err := out.Write(f); err != nil {

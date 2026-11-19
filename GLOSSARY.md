@@ -88,6 +88,10 @@ _Avoid_: private plugin, custom plugin
 A plugin that emits problems under its own rule names, located at file lines the core gives it.
 _Avoid_: linter, validator (that is `rpt validate`)
 
+**Backend**:
+An existing program a plugin runs to do its work, such as a markdown linter or a secret scanner. It knows nothing of rpt; the plugin translates between it and rpt.
+_Avoid_: engine (that is the core), plugin (that is the `rpt-<verb>` program), dependency
+
 **Finding lines**:
 Where a finding sits on disk, as the core reports it: its file's absolute path, and the lines its frontmatter keys and sections are on.
 _Avoid_: positions, offsets, source map

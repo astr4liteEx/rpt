@@ -22,7 +22,7 @@ func lsTree(t *testing.T) string {
 	newReport("acme-external")
 	internal := newReport("2026/acme-internal")
 	in := `{"kind":"finding","title":"A","severity":"low"}` + "\n" + `{"kind":"finding","title":"B","severity":"high"}` + "\n"
-	if code, _, errOut := runIn(t, in, "add", "--report", internal); code != 0 {
+	if code, _, errOut := runIn(t, in, "findings", "add", "--report", internal); code != 0 {
 		t.Fatalf("add: exit %d, stderr %q", code, errOut)
 	}
 	newReport(".archive/old")                                                 // hidden: skipped

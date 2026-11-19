@@ -39,7 +39,15 @@ type verb func(e *env, args []string) int
 // shadow one.
 type builtin struct {
 	run  verb
-	desc sdk.Verb // Kind and Name are filled in by rpt verbs
+	desc sdk.Verb // Kind and Name are filled in by rpt verbs; Usage gains each sub's usage
+	subs []sub    // subcommands, in the order usage lists them
+}
+
+// A sub is a subcommand of a built-in: rpt <verb> <name> [args].
+type sub struct {
+	name  string
+	run   verb
+	usage string
 }
 
 // builtins maps each built-in verb's name to it.
@@ -47,21 +55,44 @@ var builtins map[string]builtin
 
 func init() {
 	builtins = map[string]builtin{
-		"add":        {addVerb, sdk.Verb{Summary: "Add finding records as new finding files", Usage: "rpt add < records.jsonl", Input: "records", Output: "records"}},
-		"assemble":   {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}},
-		"delete":     {deleteVerb, sdk.Verb{Summary: "Remove findings; their evidence stays", Usage: "rpt delete <id>...", Output: "records"}},
-		"findings":   {findingsVerb, sdk.Verb{Summary: "List the findings", Usage: "rpt findings [--lines] [--json] [--report dir]", Output: "records"}},
-		"ls":         {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}},
-		"new":        {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}},
-		"plugins":    {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}},
-		"scope":      {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json] | rpt scope match [--drop-out-of-scope] < records.jsonl", Input: "records", Output: "records"}},
-		"sections":   {sectionsVerb, sdk.Verb{Summary: "List the report's sections, headings and which are required", Usage: "rpt sections [--json]", Output: "records"}},
-		"set":        {setVerb, sdk.Verb{Summary: "Change one frontmatter value of a finding", Usage: "rpt set <id> <key> <value>", Output: "records"}},
-		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}},
-		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}},
-		"verbs":      {verbsVerb, sdk.Verb{Summary: "List rpt's built-in verbs", Usage: "rpt verbs [--json]", Output: "records"}},
-		"version":    {versionVerb, sdk.Verb{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}},
+		"assemble": {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
+		"findings": {findingsVerb, sdk.Verb{Summary: "List findings; add, set and delete change them", Usage: "rpt findings [--lines] [--json] [--report dir]", Input: "records", Output: "records"}, []sub{
+			{"add", addVerb, "rpt findings add < records.jsonl"},
+			{"set", setVerb, "rpt findings set <id> <key> <value>"},
+			{"delete", deleteVerb, "rpt findings delete <id>..."},
+		}},
+		"ls":      {lsVerb, sdk.Verb{Summary: "List the reports at or under a folder", Usage: "rpt ls [--json] [dir]", Output: "records"}, nil},
+		"new":     {newVerb, sdk.Verb{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
+		"plugins": {pluginsVerb, sdk.Verb{Summary: "List the plugins on PATH", Usage: "rpt plugins [--json]", Output: "records"}, nil},
+		"scope": {scopeVerb, sdk.Verb{Summary: "List scope rows; scope match adds matching scope IDs to finding records", Usage: "rpt scope [--json]", Input: "records", Output: "records"}, []sub{
+			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
+		}},
+		"sections":   {sectionsVerb, sdk.Verb{Summary: "List the report's sections, headings and which are required", Usage: "rpt sections [--json]", Output: "records"}, nil},
+		"severities": {severitiesVerb, sdk.Verb{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
+		"validate":   {validateVerb, sdk.Verb{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records"}, nil},
+		"verbs":      {verbsVerb, sdk.Verb{Summary: "List rpt's built-in verbs", Usage: "rpt verbs [--json]", Output: "records"}, nil},
+		"version":    {versionVerb, sdk.Verb{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
 	}
+	for name, b := range builtins {
+		for _, s := range b.subs {
+			b.desc.Usage += " | " + s.usage
+		}
+		builtins[name] = b
+	}
+}
+
+// usageOf returns the usage line for a verb or "verb sub" name.
+func usageOf(name string) string {
+	f := strings.Fields(name)
+	b := builtins[f[0]]
+	if len(f) > 1 {
+		for _, s := range b.subs {
+			if s.name == f[1] {
+				return s.usage
+			}
+		}
+	}
+	return b.desc.Usage
 }
 
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
@@ -71,6 +102,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		return cli.ExitUsage
 	}
 	if b, ok := builtins[args[0]]; ok {
+		if len(args) > 1 {
+			for _, s := range b.subs {
+				if s.name == args[1] {
+					return s.run(e, args[2:])
+				}
+			}
+		}
 		return b.run(e, args[1:])
 	}
 	return dispatch(e, args[0], args[1:])
@@ -91,11 +129,11 @@ type outputFlags struct {
 	report *string
 }
 
-// badUsage prints the usage line the built-ins table gives verb, and
-// returns the usage exit code. It is the only place verbs print their usage,
-// so it never drifts from what rpt verbs lists.
+// badUsage prints the usage line the built-ins table gives verb (or
+// "verb sub"), and returns the usage exit code. It is the only place verbs
+// print their usage, so it never drifts from what rpt verbs lists.
 func badUsage(e *env, verb string) int {
-	fmt.Fprintln(e.stderr, "usage: "+builtins[verb].desc.Usage)
+	fmt.Fprintln(e.stderr, "usage: "+usageOf(verb))
 	return cli.ExitUsage
 }
 
@@ -106,7 +144,7 @@ func newFlagSet(e *env, name string) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
 	flags.SetOutput(e.stderr)
 	flags.Usage = func() {
-		badUsage(e, strings.Fields(name)[0])
+		badUsage(e, name)
 		flags.PrintDefaults()
 	}
 	return flags

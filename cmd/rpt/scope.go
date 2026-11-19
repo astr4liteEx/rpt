@@ -18,9 +18,6 @@ var scopeColumns = []cli.Column{
 
 // scopeVerb prints the report's scope rows; `rpt scope match` is its filter.
 func scopeVerb(e *env, args []string) int {
-	if len(args) > 0 && args[0] == "match" {
-		return scopeMatchVerb(e, args[1:])
-	}
 	flags, of := newFlags(e, "scope")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
@@ -64,7 +61,7 @@ func scopeMatchVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
-		return badUsage(e, "scope")
+		return badUsage(e, "scope match")
 	}
 	out, err := of.output(e, findingColumns)
 	if err != nil {
