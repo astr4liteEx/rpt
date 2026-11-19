@@ -56,6 +56,30 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 	return f, nil
 }
 
+// Scaffold returns rec with an empty section for every required section it
+// lacks, so the finding file gets a heading to fill in for each.
+func (r *Report) Scaffold(rec sdk.Finding) (sdk.Finding, error) {
+	cfg, err := r.Config()
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	secs := maps.Clone(rec.Sections)
+	for _, name := range cfg.RequiredSections {
+		if strings.TrimSpace(name) == "" {
+			continue // the config rule reports it
+		}
+		key := cfg.Headings.key(name) // a fixed section may be named by its heading
+		if _, ok := secs[key]; !ok {
+			if secs == nil {
+				secs = map[string]string{}
+			}
+			secs[key] = ""
+		}
+	}
+	rec.Sections = secs
+	return rec, nil
+}
+
 // checkRecord checks a record before anything is written.
 func checkRecord(rec sdk.Finding, severities []sdk.Severity) error {
 	bad := func(format string, a ...any) error {

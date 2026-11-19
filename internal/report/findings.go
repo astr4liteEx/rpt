@@ -391,7 +391,11 @@ func (ff *findingFile) appendSection(heading, text string) {
 		}
 		ff.body = append(ff.body, '\n')
 	}
-	ff.body = append(ff.body, "## "+heading+"\n\n"+strings.TrimSpace(text)+"\n"...)
+	if text = strings.TrimSpace(text); text == "" {
+		ff.body = append(ff.body, "## "+heading+"\n\n"...) // a blank line to write in
+		return
+	}
+	ff.body = append(ff.body, "## "+heading+"\n\n"+text+"\n"...)
 }
 
 // lineEnd returns the offset just past the newline that ends the line

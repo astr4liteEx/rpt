@@ -5,6 +5,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"slices"
+	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
@@ -94,14 +96,25 @@ func logEditError(e *env, err error, line int) int {
 
 // addVerb writes each finding record on stdin into the report as a new
 // finding file and prints the finding as stored. Other records pass
-// through untouched.
+// through untouched. With --title and --severity it writes one blank
+// finding from its flags instead, with a heading for every required
+// section, and doesn't read stdin.
 func addVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings add")
+	title := flags.String("title", "", "write one finding with this title instead of reading stdin")
+	severity := flags.String("severity", "", "the finding's severity (with --title)")
+	scope := flags.String("scope", "", "comma-separated scope IDs (with --title)")
+	id := flags.String("id", "", "the finding's ID (with --title); default: the next free one")
+	scaffold := flags.Bool("scaffold", false, "give stdin records an empty heading for each required section they lack")
 	pos, err := parseInterspersed(flags, args)
 	if err != nil {
 		return cli.ExitUsage
 	}
-	if len(pos) != 0 {
+	fromFlags := false
+	flags.Visit(func(f *flag.Flag) {
+		fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "scope", "id"}, f.Name)
+	})
+	if len(pos) != 0 || fromFlags && (*title == "" || *severity == "") {
 		return badUsage(e, "findings add")
 	}
 	out, err := of.output(e, findingColumns)
@@ -114,6 +127,40 @@ func addVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	defer r.Close()
+
+	add := func(f sdk.Finding, line int, scaffold bool) int {
+		if scaffold {
+			if f, err = r.Scaffold(f); err != nil {
+				return logEditError(e, err, line)
+			}
+		}
+		added, err := r.Add(f)
+		if err != nil {
+			return logEditError(e, err, line)
+		}
+		if err := out.Write(added); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+		return cli.ExitOK
+	}
+	finish := func(code int) int {
+		if err := out.Flush(); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitUsage
+		}
+		return code
+	}
+
+	if fromFlags {
+		f := sdk.Finding{Kind: "finding", ID: *id, Title: *title, Severity: sdk.Severity(*severity), Scope: []string{}}
+		for s := range strings.SplitSeq(*scope, ",") {
+			if s = strings.TrimSpace(s); s != "" {
+				f.Scope = append(f.Scope, s)
+			}
+		}
+		return finish(add(f, 0, true))
+	}
 
 	code := cli.ExitOK
 	for rec, err := range sdk.Records(e.stdin) {
@@ -138,24 +185,14 @@ func addVerb(e *env, args []string) int {
 			code = cli.ExitProblems
 			continue
 		}
-		added, err := r.Add(f)
-		if err != nil {
-			if c := logEditError(e, err, rec.Line); c == cli.ExitUsage {
-				return c
-			}
-			code = cli.ExitProblems
-			continue
-		}
-		if err := out.Write(added); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitUsage
+		switch c := add(f, rec.Line, *scaffold); c {
+		case cli.ExitUsage:
+			return c
+		case cli.ExitProblems:
+			code = c
 		}
 	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitUsage
-	}
-	return code
+	return finish(code)
 }
 
 // deleteVerb removes each named finding's file and prints the finding as it

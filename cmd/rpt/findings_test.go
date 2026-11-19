@@ -129,3 +129,53 @@ func TestLinesFileIsAbsolute(t *testing.T) {
 		})
 	}
 }
+
+func TestFindingsAddFromFlagsWritesABlankFinding(t *testing.T) {
+	dir := reportCopy(t)
+	code, out, errOut := runIn(t, `{"kind":"finding","title":"ignored","severity":"low"}`+"\n",
+		"findings", "add", "--report", dir, "--title", "SQL injection", "--severity", "high", "--scope", "S-12,S-14")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if got := pick(t, out, "id", "path"); got != "F-004 findings/F-004-sql-injection.md\n" {
+		t.Errorf("stdout = %q, want one finding from the flags (stdin unread)", got)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "findings/F-004-sql-injection.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "---\nid: F-004\ntitle: SQL injection\nscope: [S-12, S-14]\nseverity: high\n---\n" +
+		"## Description\n\n\n## Remediation\n\n\n## Proof of concept\n\n"
+	if string(b) != want {
+		t.Errorf("file\n%q\nwant\n%q", b, want)
+	}
+}
+
+func TestFindingsAddFlagsNeedTitleAndSeverity(t *testing.T) {
+	dir := reportCopy(t)
+	for _, args := range [][]string{{"--title", "T"}, {"--severity", "high"}, {"--scope", "S-12"}} {
+		code, _, errOut := runIn(t, "", append([]string{"findings", "add", "--report", dir}, args...)...)
+		if code != 2 || !strings.Contains(errOut, "usage: rpt findings add") {
+			t.Errorf("%v: exit %d, stderr %q; want 2 and usage", args, code, errOut)
+		}
+	}
+	if code, _, errOut := runIn(t, "", "findings", "add", "--report", dir, "--title", "T", "--severity", "high", "--id", "F-010"); code != 0 {
+		t.Errorf("--id: exit %d, stderr %q", code, errOut)
+	} else if _, err := os.Stat(filepath.Join(dir, "findings/F-010-t.md")); err != nil {
+		t.Error(err)
+	}
+}
+
+func TestFindingsAddScaffold(t *testing.T) {
+	dir := reportCopy(t)
+	in := `{"kind":"finding","title":"Half done","scope":[],"severity":"low","sections":{"description":"Known so far."}}` + "\n"
+	if code, _, errOut := runIn(t, in, "findings", "add", "--scaffold", "--report", dir); code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "findings/F-004-half-done.md"))
+	want := "---\nid: F-004\ntitle: Half done\nscope: []\nseverity: low\n---\n" +
+		"## Description\n\nKnown so far.\n\n## Remediation\n\n\n## Proof of concept\n\n"
+	if string(b) != want {
+		t.Errorf("file\n%q\nwant\n%q", b, want)
+	}
+}
