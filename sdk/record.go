@@ -56,6 +56,22 @@ type SectionLines struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// Evidence is an "evidence" record rpt evidence emits: one reference a
+// finding makes to an evidence file, or, with --orphans, a file under
+// findings/evidence/ that nothing references (no Finding, Ref or Source).
+type Evidence struct {
+	Kind    string `json:"kind"`
+	Finding string `json:"finding,omitzero"` // the referencing finding's ID
+	Ref     string `json:"ref,omitzero"`     // as written in the finding, relative to its file
+	Source  string `json:"source,omitzero"`  // "frontmatter" (the evidence list) or "body" (a link)
+	Path    string `json:"path,omitzero"`    // relative to the report root; absent when Ref leaves the report
+	File    string `json:"file,omitzero"`    // absolute, symlinks kept; absent when Ref leaves the report
+	Exists  bool   `json:"exists"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // ScopeRow is a "scope" record: one in-scope asset, a row of the report's
 // scope.csv.
 type ScopeRow struct {

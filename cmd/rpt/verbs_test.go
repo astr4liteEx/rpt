@@ -12,7 +12,7 @@ func TestVerbsVerb(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nfindings\nls\nnew\nscope\nsections\nseverities\nvalidate\nverbs\nversion\n"
+	want := "assemble\nevidence\nfindings\nls\nnew\nscope\nsections\nseverities\nvalidate\nverbs\nversion\n"
 	if names != want {
 		t.Errorf("verbs listed\n got: %q\nwant: %q", names, want)
 	}
@@ -47,6 +47,9 @@ func TestVerbsUsage(t *testing.T) {
 func TestVerbsPrintTableUsage(t *testing.T) {
 	misuse := map[string][][]string{
 		"assemble":        {{"extra"}, {"--no-such-flag"}},
+		"evidence":        {{"extra"}, {"--no-such-flag"}},
+		"evidence add":    {{}, {"F-001"}, {"--no-such-flag"}},
+		"evidence prune":  {{"extra"}, {"--no-such-flag"}},
 		"findings":        {{"extra"}, {"--no-such-flag"}},
 		"findings add":    {{"extra"}, {"--no-such-flag"}},
 		"findings set":    {{}, {"--no-such-flag"}},

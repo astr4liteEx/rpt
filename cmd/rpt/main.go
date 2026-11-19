@@ -56,6 +56,10 @@ var builtins map[string]builtin
 func init() {
 	builtins = map[string]builtin{
 		"assemble": {assembleVerb, sdk.Verb{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
+		"evidence": {evidenceVerb, sdk.Verb{Summary: "List the findings' evidence files; add copies files in, prune removes unreferenced ones", Usage: "rpt evidence [--orphans] [--json] [--report dir]", Output: "records"}, []sub{
+			{"add", evidenceAddVerb, "rpt evidence add [--as name] <id> <file>..."},
+			{"prune", evidencePruneVerb, "rpt evidence prune [--dry-run]"},
+		}},
 		"findings": {findingsVerb, sdk.Verb{Summary: "List findings; add, set, unset and delete change them", Usage: "rpt findings [--lines] [--json] [--report dir]", Input: "records", Output: "records"}, []sub{
 			{"add", addVerb, "rpt findings add [--scaffold] < records.jsonl, or rpt findings add --title t --severity s [--scope a,b] [--id F-NNN]"},
 			{"set", setVerb, "rpt findings set <id> <key> <value>"},

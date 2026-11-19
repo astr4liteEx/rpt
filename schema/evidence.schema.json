@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/evidence.schema.json",
+  "title": "rpt evidence record",
+  "description": "One reference a finding makes to an evidence file, from its evidence list or a link in its body, as rpt evidence emits it; with --orphans, also each file under findings/evidence/ that nothing references, which has no finding, ref or source. Schema version 1.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "evidence"},
+    "finding": {"type": "string", "description": "ID of the finding that makes the reference."},
+    "ref": {"type": "string", "description": "The path as the finding writes it, relative to the finding file."},
+    "source": {"enum": ["frontmatter", "body"], "description": "frontmatter: the evidence list; body: an image or link in a section."},
+    "path": {"type": "string", "description": "Relative to the report root. Absent when ref leaves the report."},
+    "file": {"type": "string", "description": "Absolute path, symlinks not resolved; use it to open the file. Absent when ref leaves the report."},
+    "exists": {"type": "boolean", "description": "Whether a file is there."}
+  },
+  "required": ["kind", "exists"],
+  "additionalProperties": true
+}

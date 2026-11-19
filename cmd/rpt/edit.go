@@ -111,7 +111,7 @@ func unsetVerb(e *env, args []string) int {
 // requestErrors are mistakes in what was asked: exit 1, not 2.
 var requestErrors = []error{
 	report.ErrNoFinding, report.ErrRefusedKey, report.ErrRefusedUnset, report.ErrBadValue,
-	report.ErrNoScopeRow, report.ErrCited,
+	report.ErrNoScopeRow, report.ErrCited, report.ErrBadSource,
 }
 
 func isRequestError(err error) bool {

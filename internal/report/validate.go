@@ -25,6 +25,7 @@ const (
 	RuleScopeIDsExist     = "scopeIDsExist"
 	RuleRequiredSections  = "requiredSections"
 	RuleEvidence          = "evidence"
+	RuleEvidenceUnlinked  = "evidenceUnlinked"  // warning
 	RuleTextBeforeHeading = "textBeforeHeading" // warning
 	RuleConfig            = "config"
 	RuleConfigUnknownKey  = "configUnknownKey" // warning
@@ -56,6 +57,10 @@ func (r *Report) Validate() ([]sdk.Problem, error) {
 		v.requiredSections(ff)
 		v.evidence(ff)
 		v.textBeforeHeading(ff)
+	}
+	// Orphans are only knowable when every finding's references are.
+	if !slices.ContainsFunc(files, func(ff findingSrc) bool { return ff.err != nil }) {
+		v.evidenceUnlinked()
 	}
 	slices.SortStableFunc(v.problems, func(a, b sdk.Problem) int {
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line),
@@ -262,6 +267,20 @@ func (v *validation) evidence(ff findingSrc) {
 	for _, l := range relLinks(ff.body) {
 		if _, msg := v.r.checkEvidence(ff.f, l.path); msg != "" {
 			v.add(ff.rel, ff.bodyLine(l.off), RuleEvidence, sdk.Error, "%s", msg)
+		}
+	}
+}
+
+func (v *validation) evidenceUnlinked() {
+	all, err := v.r.Evidence(true)
+	if err != nil {
+		v.add(EvidenceDir, 0, RuleEvidenceUnlinked, sdk.Warning, "%v", err)
+		return
+	}
+	for _, e := range all {
+		if e.Finding == "" {
+			v.add(e.Path, 0, RuleEvidenceUnlinked, sdk.Warning,
+				"no finding lists or links to this file; link it, or remove it with rpt evidence prune")
 		}
 	}
 }
