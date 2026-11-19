@@ -35,7 +35,7 @@ func TestSet(t *testing.T) {
 		name, id, key, value, file string
 	}{
 		{"severity", "F-003", "severity", "critical", "findings/sqli-login.md"},
-		{"scope-keeps-comment-spacing", "F-003", "scope", "[S-12, S-20]", "findings/sqli-login.md"},
+		{"targets-keeps-comment-spacing", "F-003", "targets", "[{scope: S-12}, {scope: S-20, host: 10.0.1.5}]", "findings/sqli-login.md"},
 		{"quoted-stays-quoted", "F-003", "cvss", "9.4", "findings/sqli-login.md"},
 		{"new-key-in-crlf-file", "F-001", "retest", "pending", "findings/xss-search.md"},
 		{"unchanged-value-is-a-no-op", "F-003", "severity", "high", "findings/sqli-login.md"},
@@ -75,11 +75,15 @@ func TestSetRefuses(t *testing.T) {
 		{"kind", "F-003", "kind", "scope", ErrRefusedKey},
 		{"path", "F-003", "path", "x.md", ErrRefusedKey},
 		{"unknown severity", "F-003", "severity", "urgent", ErrBadValue},
-		{"scope must be a list", "F-003", "scope", "S-12", ErrBadValue},
+		{"targets must be a list", "F-003", "targets", "S-12", ErrBadValue},
+		{"targets items are maps", "F-003", "targets", "[S-12]", ErrBadValue},
+		{"scope is format 1", "F-003", "scope", "[S-12]", ErrRefusedKey},
+		{"target is format 1", "F-003", "target", "{host: a}", ErrRefusedKey},
 		{"title must be text", "F-003", "title", "[a, b]", ErrBadValue},
 		{"empty title", "F-003", "title", "", ErrBadValue},
-		{"target needs a host", "F-003", "target", "{port: 22}", ErrBadValue},
-		{"target protocol", "F-003", "target", "{host: a, protocol: icmp}", ErrBadValue},
+		{"a target needs a scope ID", "F-003", "targets", "[{port: 22}]", ErrBadValue},
+		{"a host is no scope ID", "F-003", "targets", "[{host: 10.0.0.5}]", ErrBadValue},
+		{"target protocol", "F-003", "targets", "[{scope: S-12, protocol: icmp}]", ErrBadValue},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

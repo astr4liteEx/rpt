@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
@@ -140,6 +139,20 @@ func logEditError(e *env, err error, line int) int {
 	return cli.ExitUsage
 }
 
+// targetFlags collects repeated --target flags.
+type targetFlags []sdk.Target
+
+func (t *targetFlags) String() string { return "" }
+
+func (t *targetFlags) Set(v string) error {
+	target, err := report.ParseTarget(v)
+	if err != nil {
+		return err
+	}
+	*t = append(*t, target)
+	return nil
+}
+
 // addVerb writes each finding record on stdin into the report as a new
 // finding file and prints the finding as stored. Other records pass
 // through untouched. With --title and --severity it writes one blank
@@ -149,7 +162,8 @@ func addVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings add")
 	title := flags.String("title", "", "write one finding with this title instead of reading stdin")
 	severity := flags.String("severity", "", "the finding's severity (with --title)")
-	scope := flags.String("scope", "", "comma-separated scope IDs (with --title)")
+	var targets targetFlags
+	flags.Var(&targets, "target", "a target: a scope ID, or a map like '{scope: S-20, host: 10.0.1.5, port: 22}' (with --title; repeatable)")
 	id := flags.String("id", "", "the finding's ID (with --title); default: the next free one")
 	scaffold := flags.Bool("scaffold", false, "give stdin records an empty heading for each required section they lack")
 	pos, err := parseInterspersed(flags, args)
@@ -158,7 +172,7 @@ func addVerb(e *env, args []string) int {
 	}
 	fromFlags := false
 	flags.Visit(func(f *flag.Flag) {
-		fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "scope", "id"}, f.Name)
+		fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "target", "id"}, f.Name)
 	})
 	if len(pos) != 0 || fromFlags && (*title == "" || *severity == "") {
 		return badUsage(e, "findings add")
@@ -199,12 +213,7 @@ func addVerb(e *env, args []string) int {
 	}
 
 	if fromFlags {
-		f := sdk.Finding{Kind: "finding", ID: *id, Title: *title, Severity: sdk.Severity(*severity), Scope: []string{}}
-		for s := range strings.SplitSeq(*scope, ",") {
-			if s = strings.TrimSpace(s); s != "" {
-				f.Scope = append(f.Scope, s)
-			}
-		}
+		f := sdk.Finding{Kind: "finding", ID: *id, Title: *title, Severity: sdk.Severity(*severity), Targets: targets}
 		return finish(add(f, 0, true))
 	}
 

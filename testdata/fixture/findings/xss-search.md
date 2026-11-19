@@ -1,7 +1,7 @@
 ---
 id: F-001
 title: Reflected XSS in search
-scope: [S-14]
+targets: [{scope: S-14, port: 8443, protocol: tcp}]
 severity: medium
 ---
 

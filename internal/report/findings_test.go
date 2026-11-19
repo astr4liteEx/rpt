@@ -20,7 +20,7 @@ func TestFindingsReadsFixture(t *testing.T) {
 	want := []sdk.Finding{
 		{
 			Kind: "finding", ID: "F-003", Title: "SQL injection in login",
-			Scope: []string{"S-12", "S-14"}, Severity: "high", Path: "findings/sqli-login.md",
+			Targets: []sdk.Target{{Scope: "S-12"}, {Scope: "S-14"}}, Severity: "high", Path: "findings/sqli-login.md",
 			Sections: map[string]string{
 				"description": "The `user` parameter of `/login` is concatenated into a SQL query.",
 				"remediation": "Use parameterised queries.",
@@ -33,7 +33,7 @@ func TestFindingsReadsFixture(t *testing.T) {
 		},
 		{
 			Kind: "finding", ID: "F-002", Title: "Weak TLS configuration",
-			Scope: []string{"S-99"}, Severity: "info", Path: "findings/tls-weak.md",
+			Targets: []sdk.Target{{Scope: "S-99"}}, Severity: "info", Path: "findings/tls-weak.md",
 			Sections: map[string]string{
 				"description": "TLS 1.0 is still enabled.",
 				"remediation": "Disable TLS 1.0 and 1.1.",
@@ -43,7 +43,7 @@ func TestFindingsReadsFixture(t *testing.T) {
 		{
 			// Saved with CRLF line endings.
 			Kind: "finding", ID: "F-001", Title: "Reflected XSS in search",
-			Scope: []string{"S-14"}, Severity: "medium", Path: "findings/xss-search.md",
+			Targets: []sdk.Target{{Scope: "S-14", Port: 8443, Protocol: "tcp"}}, Severity: "medium", Path: "findings/xss-search.md",
 			Sections: map[string]string{
 				"description": "The `q` parameter is reflected unescaped.",
 				"remediation": "Encode output.",
@@ -113,10 +113,10 @@ func TestFindingsEdgeCases(t *testing.T) {
 	}
 }
 
-func TestFindingsReadsTarget(t *testing.T) {
+func TestFindingsReadsTargets(t *testing.T) {
 	dir := copyFixture(t)
-	writeFile(t, dir, "findings/ssh.md", "---\nid: F-004\ntitle: SSH weak ciphers\nscope: [S-20]\nseverity: medium\n"+
-		"target: {host: 10.0.1.5, port: 22, protocol: tcp, vhost: ssh.acme.com}\nsource: {plugin: nuclei}\n---\n")
+	writeFile(t, dir, "findings/ssh.md", "---\nid: F-004\ntitle: SSH weak ciphers\nseverity: medium\ntargets:\n"+
+		"  - {scope: S-20, host: 10.0.1.5, port: 22, protocol: tcp, vhost: ssh.acme.com}\n  - {scope: S-12}\nsource: {plugin: nuclei}\n---\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -131,12 +131,15 @@ func TestFindingsReadsTarget(t *testing.T) {
 		t.Fatal("F-004 not read")
 	}
 	f := list[i]
-	if f.Target == nil || f.Target.Host != "10.0.1.5" || f.Target.Port != 22 || f.Target.Protocol != "tcp" ||
-		string(f.Target.Extra["vhost"]) != `"ssh.acme.com"` {
-		t.Errorf("target = %+v, want 10.0.1.5 tcp/22 with vhost kept", f.Target)
+	want := []sdk.Target{
+		{Scope: "S-20", Host: "10.0.1.5", Port: 22, Protocol: "tcp", Extra: map[string]jsontext.Value{"vhost": jsontext.Value(`"ssh.acme.com"`)}},
+		{Scope: "S-12"},
 	}
-	if _, ok := f.Extra["target"]; ok {
-		t.Error("target also left in Extra")
+	if !reflect.DeepEqual(f.Targets, want) {
+		t.Errorf("targets = %+v, want %+v", f.Targets, want)
+	}
+	if _, ok := f.Extra["targets"]; ok {
+		t.Error("targets also left in Extra")
 	}
 	if string(f.Extra["source"]) != `{"plugin":"nuclei"}` {
 		t.Errorf("source = %s, want it passed through", f.Extra["source"])
@@ -166,19 +169,19 @@ func TestFindingsWithLinesLocatesKeysAndSections(t *testing.T) {
 	type sl = sdk.SectionLines
 	want := map[string]*sdk.Lines{
 		"F-003": {
-			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5, "evidence": 6, "cvss": 7},
+			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 4, "severity": 5, "evidence": 6, "cvss": 7},
 			Sections: map[string]sl{
 				"description": {Heading: 10, Text: 12}, "remediation": {Heading: 14, Text: 16}, "poc": {Heading: 18, Text: 20},
 			},
 		},
-		"F-002": { // a comment line sits between title and scope
-			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 5, "severity": 6},
+		"F-002": { // a comment line sits between title and targets
+			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 5, "severity": 6},
 			Sections: map[string]sl{
 				"description": {Heading: 9, Text: 11}, "remediation": {Heading: 13, Text: 15}, "poc": {Heading: 17, Text: 19},
 			},
 		},
 		"F-001": { // CRLF line ends
-			Frontmatter: map[string]int{"id": 2, "title": 3, "scope": 4, "severity": 5},
+			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 4, "severity": 5},
 			Sections: map[string]sl{
 				"description": {Heading: 8, Text: 10}, "remediation": {Heading: 12, Text: 14},
 				"poc": {Heading: 16, Text: 18}, "References": {Heading: 20, Text: 22},

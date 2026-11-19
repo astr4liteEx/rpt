@@ -30,14 +30,14 @@ func TestRecordsRoundTrip(t *testing.T) {
 		{
 			name: "finding keeps known and unknown fields",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","target":{"host":"10.0.0.5","port":443,"protocol":"tcp","vhost":"login.acme.com"},"source":{"kb":"sqli"}}`,
-			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","scope":["S-12","S-14"],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"target":{"host":"10.0.0.5","port":443,"protocol":"tcp","vhost":"login.acme.com"},"cvss":"9.1","source":{"kb":"sqli"}}`,
+			in:   `{"kind":"finding","id":"F-003","title":"SQL injection in login","severity":"high","targets":[{"host":"login.acme.com","vhost":"v","scope":"S-30"},{"scope":"S-14","port":8443,"protocol":"tcp"}],"path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}`,
+			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","targets":[{"scope":"S-30","host":"login.acme.com","vhost":"v"},{"scope":"S-14","port":8443,"protocol":"tcp"}],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}`,
 		},
 		{
 			name: "finding lines are a declared member, before unknown ones",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","title":"t","scope":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/findings/a.md"}}`,
-			want: `{"kind":"finding","title":"t","scope":[],"severity":"low","lines":{"file":"/r/findings/a.md","frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
+			in:   `{"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/findings/a.md"}}`,
+			want: `{"kind":"finding","title":"t","targets":[],"severity":"low","lines":{"file":"/r/findings/a.md","frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
 		},
 		{
 			name: "problem column",
@@ -70,25 +70,25 @@ func TestRecordsRoundTrip(t *testing.T) {
 			want: `{"kind":"problem","path":"scope.csv","rule":"scopeIDsExist","level":"warning","message":"m"}`,
 		},
 		{
-			name: "report nests full scope rows in findings and keeps unknown fields at every level",
+			name: "report nests full scope rows in targets and keeps unknown fields at every level",
 			run:  roundTrip[Report],
 			in: `{"kind":"report","schema_version":1,` +
 				`"report":{"severities":["critical","high","medium","low","info"],"renderer":"typst"},` +
 				`"summary":{"high":1,"critical":0,"medium":1,"low":0,"info":2},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
-				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"}],` +
+				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
 				`"sections":{"description":"d","remediation":"r","poc":"p"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1","target":{"host":"10.0.0.5","port":443}}],` +
+				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
 				`"generator":"rpt 0.1.0"}`,
 			want: `{"kind":"report","schema_version":1,` +
 				`"report":{"severities":["critical","high","medium","low","info"],"renderer":"typst"},` +
 				`"summary":{"critical":0,"high":1,"info":2,"low":0,"medium":1},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
 				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
-				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"}],` +
+				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
 				`"sections":{"description":"d","poc":"p","remediation":"r"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"target":{"host":"10.0.0.5","port":443},"cvss":"9.1"}],` +
+				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
 				`"generator":"rpt 0.1.0"}`,
 		},
 	}

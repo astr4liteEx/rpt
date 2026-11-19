@@ -11,12 +11,12 @@ import (
 )
 
 // finding is a valid finding file with predictable lines: 2 id, 3 title,
-// 4 scope, 5 severity, 7 ## Description, 9 its text, 11 ## Remediation,
+// 4 targets, 5 severity, 7 ## Description, 9 its text, 11 ## Remediation,
 // 13 its text, 15 ## Proof of concept, 17 its text.
-const finding = "---\nid: F-050\ntitle: T\nscope: [S-12]\nseverity: low\n---\n" +
+const finding = "---\nid: F-050\ntitle: T\ntargets: [{scope: S-12}]\nseverity: low\n---\n" +
 	"## Description\n\nd\n\n## Remediation\n\nr\n\n## Proof of concept\n\np\n"
 
-const config = "format: 1\n"
+const config = "format: 2\n"
 
 type want struct {
 	path  string
@@ -53,10 +53,32 @@ func TestValidate(t *testing.T) {
 			want: []want{{"findings/x.md", 3, "title", E, "no title"}}},
 		{name: "knownSeverity", files: map[string]string{"findings/x.md": f("severity: low", "severity: urgent")},
 			want: []want{{"findings/x.md", 5, "knownSeverity", E, `"urgent" is not one of critical, high, medium, low, info`}}},
-		{name: "scopeIDsExist; an empty list is fine", files: map[string]string{
-			"findings/x.md": f("[S-12]", "[S-12, S-77]"),
-			"findings/y.md": strings.NewReplacer("F-050", "F-051", "[S-12]", "[]").Replace(finding)},
+		{name: "scopeIDsExist", files: map[string]string{"findings/x.md": f("{scope: S-12}", "{scope: S-12}, {scope: S-77}")},
 			want: []want{{"findings/x.md", 4, "scopeIDsExist", E, "S-77 is not in scope.csv"}}},
+		{name: "targets: none", files: map[string]string{
+			"findings/x.md": f("[{scope: S-12}]", "[]"),
+			"findings/y.md": strings.NewReplacer("F-050", "F-051", "targets: [{scope: S-12}]\n", "").Replace(finding)},
+			want: []want{
+				{"findings/x.md", 4, "targets", E, "no targets: a finding must be attributed to scope"},
+				{"findings/y.md", 0, "targets", E, "no targets"},
+			}},
+		{name: "targets: each names a row and fits it", files: map[string]string{
+			"findings/x.md": f("[{scope: S-12}]", "[{host: 10.0.0.5}, {scope: S-12, host: 10.0.0.5}, {scope: S-12, port: 80}, {scope: S-20, host: 10.0.2.1}, {scope: S-20, host: 10.0.1.7, port: 22, protocol: udp}]")},
+			want: []want{
+				{"findings/x.md", 4, "targets", E, "10.0.0.5 has no scope ID"},
+				{"findings/x.md", 4, "targets", E, "S-12 is one asset (10.0.0.5), so a target on it takes no host"},
+				{"findings/x.md", 4, "targets", E, "host 10.0.2.1 is not inside S-20 (10.0.1.0/24)"},
+				{"findings/x.md", 4, "targets", E, "port 80 is not S-12's port 443"},
+			}},
+		{name: "readable: format 1 scope and target", files: map[string]string{
+			"findings/x.md": f("targets: [{scope: S-12}]", "scope: [S-12]"),
+			"findings/y.md": strings.NewReplacer("F-050", "F-051", "targets: [{scope: S-12}]", "targets: []\ntarget: {host: a}").Replace(finding)},
+			want: []want{
+				{"findings/x.md", 4, "readable", E, `frontmatter key "scope" is from report format 1; it is now targets`},
+				{"findings/y.md", 5, "readable", E, `frontmatter key "target" is from report format 1`},
+			}},
+		{name: "config: format 1 says what changed", files: map[string]string{"rpt.yaml": "format: 1\n"},
+			want: []want{{"rpt.yaml", 1, "config", E, "replace each finding's scope and target with targets"}}},
 		{name: "requiredSections: missing and blank", files: map[string]string{
 			"findings/x.md": f("## Remediation\n\nr\n\n", ""),
 			"findings/y.md": strings.NewReplacer("F-050", "F-051", "\nd\n", "\n \n").Replace(finding)},
@@ -82,8 +104,8 @@ func TestValidate(t *testing.T) {
 			}},
 		{name: "textBeforeHeading", files: map[string]string{"findings/x.md": f("---\n## Description", "---\n\nstray text\n\n## Description")},
 			want: []want{{"findings/x.md", 8, "textBeforeHeading", W, "text before the first ## heading is not part of any section"}}},
-		{name: "config: format", files: map[string]string{"rpt.yaml": strings.Replace(config, "format: 1", "format: 2", 1)},
-			want: []want{{"rpt.yaml", 1, "config", E, "format 2 is not 1"}}},
+		{name: "config: format", files: map[string]string{"rpt.yaml": strings.Replace(config, "format: 2", "format: 3", 1)},
+			want: []want{{"rpt.yaml", 1, "config", E, "format 3 is not 2"}}},
 		{name: "config: lists", files: map[string]string{"rpt.yaml": config +
 			"severities: [critical, high, medium, low, info, low]\nrequired_sections: [poc, '']\n"},
 			want: []want{
@@ -108,7 +130,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := copyFixture(t)
-			fixed := strings.Replace(readFile(t, dir, "findings/tls-weak.md"), "[S-99]", "[S-12]", 1)
+			fixed := strings.Replace(readFile(t, dir, "findings/tls-weak.md"), "{scope: S-99}", "{scope: S-12}", 1)
 			writeFile(t, dir, "findings/tls-weak.md", fixed)
 			for rel, content := range tt.files {
 				if rel == "scope.csv" && content == "" {

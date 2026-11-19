@@ -23,6 +23,7 @@ const (
 	RuleTitle             = "title"
 	RuleKnownSeverity     = "knownSeverity"
 	RuleScopeIDsExist     = "scopeIDsExist"
+	RuleTargets           = "targets"
 	RuleRequiredSections  = "requiredSections"
 	RuleEvidence          = "evidence"
 	RuleEvidenceUnlinked  = "evidenceUnlinked"  // warning
@@ -54,6 +55,7 @@ func (r *Report) Validate() ([]sdk.Problem, error) {
 		v.title(ff)
 		v.knownSeverity(ff)
 		v.scopeIDsExist(ff)
+		v.targets(ff)
 		v.requiredSections(ff)
 		v.evidence(ff)
 		v.textBeforeHeading(ff)
@@ -76,8 +78,8 @@ type validation struct {
 	cfg   Config
 	cfgOK bool // the config parsed; rules that need it run
 
-	scope   map[string]bool
-	scopeOK bool // scope.csv could be read at all; scopeIDsExist runs
+	scope   map[string]sdk.ScopeRow // by ID
+	scopeOK bool                    // scope.csv could be read at all; scopeIDsExist runs
 
 	next string // next free finding ID, for messages
 }
@@ -113,7 +115,9 @@ func (v *validation) checkConfig() {
 	bad := func(key, format string, a ...any) { v.add(ConfigFile, line(key), RuleConfig, sdk.Error, format, a...) }
 
 	if _, ok := cfg.KeyLines["format"]; !ok {
-		bad("format", "no format; add format: 1")
+		bad("format", "no format; add format: %d", FormatVersion)
+	} else if cfg.Format == 1 {
+		bad("format", "format 1 is not %d, the only format this rpt reads: replace each finding's scope and target with targets, then set format: %d", FormatVersion, FormatVersion)
 	} else if cfg.Format != FormatVersion {
 		bad("format", "format %d is not %d, the only format this rpt reads", cfg.Format, FormatVersion)
 	}
@@ -165,9 +169,9 @@ func checkSections(cfg Config, bad func(key, format string, a ...any)) {
 // checkScope runs the scope rule and collects the scope IDs.
 func (v *validation) checkScope() {
 	rows, err := v.r.Scope()
-	v.scope = map[string]bool{}
+	v.scope = map[string]sdk.ScopeRow{}
 	for _, row := range rows {
-		v.scope[row.ID] = true
+		v.scope[row.ID] = row
 	}
 	v.scopeOK = err == nil || len(rows) > 0
 	if err == nil {
@@ -230,9 +234,30 @@ func (v *validation) scopeIDsExist(ff findingSrc) {
 	if !v.scopeOK {
 		return
 	}
-	for _, id := range ff.f.Scope {
-		if !v.scope[id] {
-			v.add(ff.rel, ff.keyLines["scope"], RuleScopeIDsExist, sdk.Error, "%s is not in scope.csv", id)
+	for _, t := range ff.f.Targets {
+		if _, ok := v.scope[t.Scope]; t.Scope != "" && !ok {
+			v.add(ff.rel, ff.keyLines["targets"], RuleScopeIDsExist, sdk.Error, "%s is not in scope.csv", t.Scope)
+		}
+	}
+}
+
+// targets checks that a finding is attributed to scope: it has at least
+// one target, each names a scope row, and each fits its row.
+func (v *validation) targets(ff findingSrc) {
+	line := ff.keyLines["targets"]
+	if len(ff.f.Targets) == 0 {
+		v.add(ff.rel, line, RuleTargets, sdk.Error, "no targets: a finding must be attributed to scope, like targets: [{scope: S-12}]")
+		return
+	}
+	for _, t := range ff.f.Targets {
+		if err := checkTarget(t); err != nil {
+			v.add(ff.rel, line, RuleTargets, sdk.Error, "%v", err)
+			continue
+		}
+		if row, ok := v.scope[t.Scope]; ok {
+			if err := TargetFits(t, row); err != nil {
+				v.add(ff.rel, line, RuleTargets, sdk.Error, "%v", err)
+			}
 		}
 	}
 }

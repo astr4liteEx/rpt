@@ -24,25 +24,42 @@ func TestScopeVerb(t *testing.T) {
 	}
 }
 
+func TestScopeByID(t *testing.T) {
+	code, out, errOut := runIn(t, "", "scope", "--report", fixture, "S-20", "S-12")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if got := pick(t, out, "id", "host"); got != "S-20 10.0.1.0/24\nS-12 10.0.0.5\n" {
+		t.Errorf("stdout = %q, want S-20 then S-12, in the order asked", got)
+	}
+	code, out, errOut = runIn(t, "", "scope", "--report", fixture, "S-12", "S-99")
+	if code != 1 || pick(t, out, "id") != "S-12\n" || !strings.Contains(errOut, "S-99: no such scope row") {
+		t.Errorf("unknown ID: exit %d, stdout %q, stderr %q; want 1, S-12 printed, S-99 named", code, out, errOut)
+	}
+}
+
 func TestScopeMatch(t *testing.T) {
 	foreign := `{"kind":"scope",  "id":"S-1","z":1,"a":2}` // odd spacing and order: must survive
-	noTarget := `{"kind":"finding","title":"Weak password policy", "scope":[]}`
+	noTarget := `{"kind":"finding","title":"Weak password policy", "targets":[]}`
+	already := `{"kind":"finding","title":"Already","targets":[{"scope":"S-20","host":"10.0.1.9"}]}`
 	in := strings.Join([]string{
-		`{"kind":"finding","title":"SSH weak ciphers","target":{"host":"10.0.1.5","port":22,"protocol":"tcp"}}`, // 1: CIDR S-20
-		`{"kind":"finding","title":"TLS","scope":["S-14"],"target":{"host":"10.0.0.5","port":443}}`,             // 2: merged with S-12
+		`{"kind":"finding","title":"SSH weak ciphers","targets":[{"host":"10.0.1.5","port":22,"protocol":"tcp","vhost":"ssh.acme.com"}],"cvss":"5.3"}`, // 1: CIDR S-20
+		`{"kind":"finding","title":"TLS","targets":[{"scope":"S-14"},{"host":"10.0.0.5","port":443}]}`,                                                 // 2: one asset S-12
 		foreign + "\r", // 3: CRLF
 		"",             // 4: blank
-		`{"kind":"finding","title":"Telnet","target":{"host":"10.9.9.9","port":23,"protocol":"tcp"}}`, // 5: out of scope
+		`{"kind":"finding","title":"Telnet","targets":[{"host":"10.9.9.9","port":23,"protocol":"tcp"}]}`, // 5: out of scope
 		noTarget,  // 6: nothing to match
 		"garbage", // 7: malformed
-		`{"kind":"finding","title":"Already","scope":["S-20"],"target":{"host":"10.0.1.9"}}`, // 8: unchanged
+		already,   // 8: unchanged
+		`{"kind":"finding","title":"Mixed","targets":[{"host":"10.0.0.6","port":8443},{"host":"10.9.9.9"}]}`, // 9: half in scope
 	}, "\n") + "\n"
 
-	// Only the scope member changes; every other member keeps its bytes and place.
-	matched1 := `{"kind":"finding","title":"SSH weak ciphers","target":{"host":"10.0.1.5","port":22,"protocol":"tcp"},"scope":["S-20"]}`
-	matched2 := `{"kind":"finding","title":"TLS","scope":["S-12","S-14"],"target":{"host":"10.0.0.5","port":443}}`
-	telnet := `{"kind":"finding","title":"Telnet","target":{"host":"10.9.9.9","port":23,"protocol":"tcp"}}`
-	already := `{"kind":"finding","title":"Already","scope":["S-20"],"target":{"host":"10.0.1.9"}}`
+	// Only the targets member changes; every other member keeps its bytes and place.
+	ssh := `{"kind":"finding","title":"SSH weak ciphers","targets":[{"scope":"S-20","host":"10.0.1.5","port":22,"protocol":"tcp","vhost":"ssh.acme.com"}],"cvss":"5.3"}`
+	tls := `{"kind":"finding","title":"TLS","targets":[{"scope":"S-14"},{"scope":"S-12","port":443}]}`
+	telnet := `{"kind":"finding","title":"Telnet","targets":[{"host":"10.9.9.9","port":23,"protocol":"tcp"}]}`
+	mixed := `{"kind":"finding","title":"Mixed","targets":[{"scope":"S-14","port":8443},{"host":"10.9.9.9"}]}`
+	mixedDropped := `{"kind":"finding","title":"Mixed","targets":[{"scope":"S-14","port":8443}]}`
 
 	tests := []struct {
 		name    string
@@ -51,18 +68,19 @@ func TestScopeMatch(t *testing.T) {
 		wantErr []string
 	}{
 		{
-			name:    "matches, merges, passes through, keeps out-of-scope",
+			name:    "attributes, passes through, keeps out-of-scope targets",
 			args:    []string{"scope", "match", "--report", fixture},
-			wantOut: []string{matched1, matched2, foreign, telnet, noTarget, already},
+			wantOut: []string{ssh, tls, foreign, telnet, noTarget, already, mixed},
 			wantErr: []string{"rpt: stdin:7: not a JSON object"},
 		},
 		{
 			name:    "--drop-out-of-scope drops and says so",
 			args:    []string{"scope", "match", "--report", fixture, "--drop-out-of-scope"},
-			wantOut: []string{matched1, matched2, foreign, noTarget, already},
+			wantOut: []string{ssh, tls, foreign, noTarget, already, mixedDropped},
 			wantErr: []string{
 				`rpt: stdin:5: dropped "Telnet": 10.9.9.9 tcp/23 is out of scope`,
 				"rpt: stdin:7: not a JSON object",
+				`rpt: stdin:9: dropped a target of "Mixed": 10.9.9.9 is out of scope`,
 			},
 		},
 	}
@@ -93,7 +111,7 @@ func TestFindingsThroughScopeMatch(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("scope match exit %d, stderr %q", code, errOut)
 	}
-	// Fixture findings have no target: nothing to match, so every byte passes through.
+	// Fixture findings are attributed already: nothing to match, so every byte passes through.
 	if want := findings + big + "\n"; out != want {
 		t.Errorf("output differs from input (%d vs %d bytes)", len(out), len(want))
 	}

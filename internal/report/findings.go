@@ -84,7 +84,14 @@ func (r *Report) headings() Headings {
 
 // frontmatterKeys are the frontmatter keys that map to declared Finding
 // fields; every other key is kept in Finding.Extra.
-var frontmatterKeys = []string{"id", "title", "scope", "severity", "evidence", "target"}
+var frontmatterKeys = []string{"id", "title", "targets", "severity", "evidence"}
+
+// formerKeys are frontmatter keys an older report format had, with what
+// replaced each. A file using one is unreadable, so it can't be half read.
+var formerKeys = map[string]string{
+	"scope":  "targets, a list like [{scope: S-12}] (format 2)",
+	"target": "targets, a list like [{scope: S-20, host: 10.0.1.5, port: 443}] (format 2)",
+}
 
 // Findings reads every finding file in the findings folder, in file-name
 // order. A missing folder holds no findings. A malformed file doesn't stop
@@ -151,20 +158,23 @@ func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 	var fm struct {
 		ID       string `yaml:"id"`
 		Title    string
-		Scope    []string
+		Targets  any
 		Severity sdk.Severity
 		Evidence []string
-		Target   any
 	}
 	if err := doc.Decode(&fm); err != nil {
 		return sdk.Finding{}, yamlFileError(rel, 1, err)
 	}
-	target, err := decodeTarget(fm.Target)
-	if err != nil {
-		return sdk.Finding{}, &FileError{Path: rel, Err: err}
-	}
 	if err := checkReservedKeys(rel, &doc); err != nil {
 		return sdk.Finding{}, err
+	}
+	targets, err := decodeTargets(fm.Targets)
+	if err != nil {
+		line := keyLines(&doc)["targets"]
+		if line > 0 {
+			line++ // frontmatter starts on file line 2
+		}
+		return sdk.Finding{}, &FileError{Path: rel, Line: line, Err: err}
 	}
 	extra, err := extraFields(&doc)
 	if err != nil {
@@ -175,12 +185,11 @@ func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
 		Kind:     "finding",
 		ID:       fm.ID,
 		Title:    fm.Title,
-		Scope:    fm.Scope,
+		Targets:  targets,
 		Severity: fm.Severity,
 		Path:     rel,
 		Sections: sections(body, h),
 		Evidence: fm.Evidence,
-		Target:   target,
 		Lines:    findingLines(&doc, head, body, h),
 		Extra:    extra,
 	}, nil
@@ -220,21 +229,25 @@ func findingLines(doc *yaml.Node, head, body []byte, h Headings) *sdk.Lines {
 	return l
 }
 
-// decodeTarget converts a frontmatter target, decoded from YAML, into an
-// sdk.Target by way of JSON, so its unknown members land in Target.Extra.
-func decodeTarget(v any) (*sdk.Target, error) {
+// decodeTargets converts frontmatter targets, decoded from YAML, into
+// sdk.Targets by way of JSON, so their unknown members land in
+// Target.Extra. Absent targets are an empty list.
+func decodeTargets(v any) ([]sdk.Target, error) {
 	if v == nil {
-		return nil, nil
+		return []sdk.Target{}, nil
+	}
+	if _, ok := v.([]any); !ok {
+		return nil, errors.New("targets must be a list, like [{scope: S-12}]")
 	}
 	b, err := json.Marshal(v, json.Deterministic(true))
 	if err != nil {
-		return nil, fmt.Errorf("frontmatter key \"target\": %w", err)
+		return nil, fmt.Errorf("targets: %w", err)
 	}
-	var t sdk.Target
-	if err := json.Unmarshal(b, &t); err != nil {
-		return nil, fmt.Errorf("frontmatter key \"target\": %w", err)
+	var ts []sdk.Target
+	if err := json.Unmarshal(b, &ts); err != nil {
+		return nil, fmt.Errorf("targets: every item must be a map, like {scope: S-12, port: 443}: %w", err)
 	}
-	return &t, nil
+	return ts, nil
 }
 
 // splitFrontmatter cuts src (LF line endings) into the YAML between the
@@ -259,17 +272,22 @@ func splitFrontmatter(src []byte) (head, body []byte, err error) {
 // key with one of these names would clash with them in the record.
 var recordKeys = []string{"kind", "path", "sections", "lines"}
 
-// checkReservedKeys refuses a frontmatter key named like a recordKeys member,
-// at its line.
+// checkReservedKeys refuses a frontmatter key named like a recordKeys member
+// or one of the formerKeys, at its line.
 func checkReservedKeys(rel string, doc *yaml.Node) error {
 	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return nil
 	}
 	m := doc.Content[0].Content
 	for i := 0; i+1 < len(m); i += 2 {
-		if key := m[i].Value; slices.Contains(recordKeys, key) {
+		key := m[i].Value
+		if slices.Contains(recordKeys, key) {
 			return &FileError{Path: rel, Line: m[i].Line + 1, // frontmatter starts on file line 2
 				Err: fmt.Errorf("frontmatter key %q is reserved: rpt sets it on finding records; rename the key", key)}
+		}
+		if now, ok := formerKeys[key]; ok {
+			return &FileError{Path: rel, Line: m[i].Line + 1,
+				Err: fmt.Errorf("frontmatter key %q is from report format 1; it is now %s", key, now)}
 		}
 	}
 	return nil

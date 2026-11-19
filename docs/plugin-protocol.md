@@ -20,7 +20,7 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 | --- | --- | --- |
 | `RPT_BIN` | Absolute path of the rpt that started the plugin. Call back into rpt through it, so the plugin and the core agree on the format | `rpt` from `PATH` |
 | `RPT_REPORT_DIR` | Absolute path of the report folder, found from `$RPT_REPORT_DIR` or the nearest folder holding `rpt.yaml`. Unset when there is no report, and when the plugin runs on its own: to open a finding file, use `lines.file` from `$RPT_BIN findings --json --lines` | The plugin's own `--report` flag, or none |
-| `RPT_SCHEMA_VERSION` | Version of the record schemas this rpt writes, now `1` | `schema_version` in the records read |
+| `RPT_SCHEMA_VERSION` | Version of the record schemas this rpt writes, now `2` | `schema_version` in the records read |
 
 ## `--describe`
 

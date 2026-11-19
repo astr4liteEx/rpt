@@ -24,7 +24,7 @@ func TestAssembleFixture(t *testing.T) {
 		t.Fatal(err)
 	}
 	checkProblems(t, warnings, []want{
-		{"findings/tls-weak.md", 5, "scopeIDsExist", sdk.Warning, "S-99 is not in scope.csv; left out of the finding's scope"},
+		{"findings/tls-weak.md", 5, "scopeIDsExist", sdk.Warning, `"S-99" is not in scope.csv; target left out of the finding`},
 	})
 
 	got, err := json.Marshal(rep, json.Deterministic(true), jsontext.WithIndent("  "))
@@ -93,8 +93,8 @@ func checkRequired(t *testing.T, golden []byte) {
 func TestAssembleLeavesOutWhatItCannotUse(t *testing.T) {
 	dir := copyFixture(t)
 	writeFile(t, dir, "findings/broken.md", "---\nid: F-009\ntitle: : bad\n---\n")
-	writeFile(t, dir, "findings/x.md", strings.Replace(finding, "severity: low\n",
-		"severity: low\nevidence: [../../outside.png]\n", 1)+"\n![gone](nope.png)\n")
+	writeFile(t, dir, "findings/x.md", strings.NewReplacer("severity: low\n", "severity: low\nevidence: [../../outside.png]\n",
+		"[{scope: S-12}]", "[{scope: S-12}, {scope: S-12, port: 80}, {port: 22}]").Replace(finding)+"\n![gone](nope.png)\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -107,6 +107,8 @@ func TestAssembleLeavesOutWhatItCannotUse(t *testing.T) {
 	checkProblems(t, warnings, []want{
 		{"findings/broken.md", 3, "readable", sdk.Warning, "left out of the report"},
 		{"findings/tls-weak.md", 5, "scopeIDsExist", sdk.Warning, "S-99"},
+		{"findings/x.md", 4, "targets", sdk.Warning, "port 80 is not S-12's port 443; target left out of the finding"},
+		{"findings/x.md", 4, "targets", sdk.Warning, "scope is required: the ID of the scope row it falls in; target left out of the finding"},
 		{"findings/x.md", 6, "evidence", sdk.Warning, `evidence "../../outside.png" leaves the report; left out`},
 		{"findings/x.md", 20, "evidence", sdk.Warning, `evidence "nope.png" does not exist; left out`},
 	})
@@ -114,6 +116,9 @@ func TestAssembleLeavesOutWhatItCannotUse(t *testing.T) {
 		t.Errorf("got %d findings, want the 4 readable ones", len(rep.Findings))
 	}
 	for _, f := range rep.Findings {
+		if f.ID == "F-050" && len(f.Targets) != 1 {
+			t.Errorf("F-050 targets = %+v, want only the one that fits", f.Targets)
+		}
 		if f.ID == "F-050" && (len(f.Assets) != 0 || !strings.Contains(f.Sections["poc"], "](nope.png)")) {
 			t.Errorf("F-050 assets %v, poc %q: a bad link stays as written and is no asset", f.Assets, f.Sections["poc"])
 		}

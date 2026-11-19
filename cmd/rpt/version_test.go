@@ -14,9 +14,9 @@ func TestVersionVerb(t *testing.T) {
 		want     string
 	}{
 		{"a release build reports its tag", "v0.1.0", []string{"version", "--json"}, 0,
-			`{"kind":"version","version":"v0.1.0","schema_version":1,"format":1}` + "\n"},
+			`{"kind":"version","version":"v0.1.0","schema_version":2,"format":2}` + "\n"},
 		{"a local build reports dev", "", []string{"version"}, 0,
-			`{"kind":"version","version":"dev","schema_version":1,"format":1}` + "\n"},
+			`{"kind":"version","version":"dev","schema_version":2,"format":2}` + "\n"},
 		{"arguments are a usage error", "v0.1.0", []string{"version", "extra"}, 2, ""},
 	}
 	for _, tt := range tests {

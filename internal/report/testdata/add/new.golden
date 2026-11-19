@@ -1,9 +1,10 @@
 ---
 id: F-004
 title: 'Telnet enabled: plaintext logins (port 23)!'
-scope: [S-20]
+targets:
+  - {scope: S-20, host: 10.0.1.9, port: 23, protocol: tcp}
+  - {scope: S-12}
 severity: high
-target: {host: 10.0.1.9, port: 23, protocol: tcp}
 source: {plugin: nuclei, template: telnet-detect}
 ---
 

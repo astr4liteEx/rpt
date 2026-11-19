@@ -15,7 +15,7 @@ func TestNewVerb(t *testing.T) {
 		t.Fatalf("new: exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
 
-	wantConfig := "format: 1\n" +
+	wantConfig := "format: 2\n" +
 		"severities: [critical, high, medium, low, info]\n" +
 		"required_sections: [description, remediation, poc]\n"
 	if got, err := os.ReadFile(filepath.Join(dir, "rpt.yaml")); err != nil || string(got) != wantConfig {

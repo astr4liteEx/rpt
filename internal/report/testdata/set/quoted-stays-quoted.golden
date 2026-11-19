@@ -1,7 +1,7 @@
 ---
 id: F-003
 title: SQL injection in login
-scope: [S-12, S-14]   # both login front-ends
+targets: [{scope: S-12}, {scope: S-14}]   # both login front-ends
 severity: high
 evidence: [evidence/F-003-login.png]
 cvss: "9.4"

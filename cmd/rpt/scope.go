@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
@@ -19,17 +20,16 @@ var scopeColumns = []cli.Column{
 	{Header: "PORT", Field: "port"}, {Header: "PROTOCOL", Field: "protocol"},
 }
 
-// scopeVerb prints the report's scope rows; with --lines, each record
-// also says which line of scope.csv it starts on.
+// scopeVerb prints the report's scope rows, or with IDs only those rows in
+// the order given; with --lines, each record also says which line of
+// scope.csv it starts on.
 func scopeVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope")
 	withLines := flags.Bool("lines", false, "add each row's lines: scope.csv's absolute path and the line the row starts on")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
-	if flags.NArg() != 0 {
-		return badUsage(e, "scope")
-	}
+	ids := flags.Args()
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
@@ -46,6 +46,20 @@ func scopeVerb(e *env, args []string) int {
 		read = r.ScopeWithLines
 	}
 	rows, readErr := read()
+	missing := false
+	if len(ids) > 0 {
+		var picked []sdk.ScopeRow
+		for _, id := range slices.Compact(ids) {
+			i := slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return r.ID == id })
+			if i < 0 {
+				e.log.Error(fmt.Sprintf("%s: %v", id, report.ErrNoScopeRow), "path", report.ScopeFile)
+				missing = true
+				continue
+			}
+			picked = append(picked, rows[i])
+		}
+		rows = picked
+	}
 	for _, row := range rows {
 		if err := out.Write(row); err != nil {
 			e.log.Error(err.Error())
@@ -56,16 +70,20 @@ func scopeVerb(e *env, args []string) int {
 		e.log.Error(err.Error())
 		return cli.ExitUsage
 	}
-	return logReportErrors(e.log, readErr)
+	if code := logReportErrors(e.log, readErr); code != cli.ExitOK || !missing {
+		return code
+	}
+	return cli.ExitProblems
 }
 
-// scopeMatchVerb reads JSON Lines and adds to each finding the IDs of the
-// scope rows its target falls in. It never rewrites a target; a finding
-// whose scope changes has only its scope member replaced, and every other
-// record passes through byte for byte.
+// scopeMatchVerb reads JSON Lines and attributes each finding's targets to
+// scope: a target with a host and no scope ID gets the ID of the most
+// specific row it falls in, losing the host when that row is one asset.
+// A finding whose targets change has only its targets member replaced, and
+// every other record passes through byte for byte.
 func scopeMatchVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope match")
-	drop := flags.Bool("drop-out-of-scope", false, "drop findings whose target matches no scope row")
+	drop := flags.Bool("drop-out-of-scope", false, "drop targets that fall in no scope row, and findings left with none")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -114,45 +132,68 @@ func scopeMatchVerb(e *env, args []string) int {
 	return code
 }
 
-// matchFinding writes one finding record with its matched scope IDs added,
-// or drops it when it is out of scope and drop is set.
+// matchFinding writes one finding record with its targets attributed to
+// scope rows; with drop, it leaves out the targets no row covers, and the
+// finding when none is left.
 func matchFinding(e *env, out *cli.Output, rec sdk.Rec, rows []sdk.ScopeRow, drop bool) error {
 	var f sdk.Finding
 	if err := json.Unmarshal(rec.Raw, &f); err != nil {
 		return fmt.Errorf("finding: %w", err)
 	}
-	if f.Target == nil {
+	if len(f.Targets) == 0 {
 		return out.WriteOwn(f, rec.Raw)
 	}
-	matched := report.MatchScope(*f.Target, rows)
-	if len(matched) == 0 {
-		if drop {
-			e.log.Info(fmt.Sprintf("dropped %q: %s is out of scope", f.Title, describe(*f.Target)), "path", "stdin", "line", rec.Line)
-			return nil
+	info := func(format string, a ...any) {
+		e.log.Info(fmt.Sprintf(format, a...), "path", "stdin", "line", rec.Line)
+	}
+	kept := make([]sdk.Target, 0, len(f.Targets))
+	var dropped []string
+	changed := false
+	for _, t := range f.Targets {
+		at, ok := report.Attribute(t, rows)
+		switch {
+		case !ok && drop:
+			dropped = append(dropped, describe(t))
+			changed = true
+		case !ok:
+			kept = append(kept, t)
+		default:
+			changed = changed || at.Scope != t.Scope || at.Host != t.Host
+			kept = append(kept, at)
 		}
+	}
+	switch {
+	case len(kept) == 0 && len(dropped) == 1:
+		info("dropped %q: %s is out of scope", f.Title, dropped[0])
+		return nil
+	case len(kept) == 0:
+		info("dropped %q: none of its targets is in scope (%s)", f.Title, strings.Join(dropped, ", "))
+		return nil
+	}
+	for _, d := range dropped {
+		info("dropped a target of %q: %s is out of scope", f.Title, d)
+	}
+	if !changed {
 		return out.WriteOwn(f, rec.Raw)
 	}
-	ids := slices.Compact(slices.Sorted(slices.Values(append(slices.Clone(f.Scope), matched...))))
-	if slices.Equal(ids, f.Scope) {
-		return out.WriteOwn(f, rec.Raw)
-	}
-	raw, err := sdk.SetMember(rec.Raw, "scope", ids)
+	raw, err := sdk.SetMember(rec.Raw, "targets", kept)
 	if err != nil {
 		return err
 	}
-	f.Scope = ids
+	f.Targets = kept
 	return out.WriteOwn(f, raw)
 }
 
 // describe renders a target for a message, e.g. "10.9.9.9 tcp/23".
 func describe(t sdk.Target) string {
+	host := cmp.Or(t.Host, "a target with no host")
 	switch {
 	case t.Port != 0 && t.Protocol != "":
-		return fmt.Sprintf("%s %s/%d", t.Host, t.Protocol, t.Port)
+		return fmt.Sprintf("%s %s/%d", host, t.Protocol, t.Port)
 	case t.Port != 0:
-		return fmt.Sprintf("%s port %d", t.Host, t.Port)
+		return fmt.Sprintf("%s port %d", host, t.Port)
 	default:
-		return t.Host
+		return host
 	}
 }
 

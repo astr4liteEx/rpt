@@ -35,6 +35,9 @@ func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 	if why, ok := refusedKeys[key]; ok {
 		return sdk.Finding{}, fmt.Errorf("%w: %s: %s", ErrRefusedKey, key, why)
 	}
+	if now, ok := formerKeys[key]; ok {
+		return sdk.Finding{}, fmt.Errorf("%w: %s: it is from report format 1; set %s", ErrRefusedKey, key, now)
+	}
 	val, err := parseValue(value)
 	if err != nil {
 		return sdk.Finding{}, fmt.Errorf("%w: %s: %v", ErrBadValue, key, err)
@@ -55,7 +58,7 @@ func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 
 // unsetRefused are the keys Unset refuses: a finding needs the first four,
 // and the rest aren't stored in the file.
-var unsetRefused = []string{"id", "title", "scope", "severity", "kind", "path", "sections", "lines"}
+var unsetRefused = []string{"id", "title", "targets", "severity", "kind", "path", "sections", "lines"}
 
 // Unset removes top-level frontmatter keys from the finding with the given
 // ID, and returns the finding as now stored. Keys it doesn't have are no
@@ -160,36 +163,73 @@ func checkValue(key string, val *yaml.Node, severities []sdk.Severity) error {
 		if !slices.Contains(severities, sdk.Severity(s)) {
 			return bad("%q is not one of %v", s, severities)
 		}
-	case "scope", "evidence":
+	case "evidence":
 		if val.Kind != yaml.SequenceNode {
-			return bad("must be a list, like [S-12, S-14]")
+			return bad("must be a list, like [evidence/F-001-login.png]")
 		}
 		for _, item := range val.Content {
 			if item.Kind != yaml.ScalarNode || item.Value == "" {
 				return bad("every item must be a single value")
 			}
 		}
-	case "target":
+	case "targets":
 		var data any
-		if val.Kind != yaml.MappingNode || val.Decode(&data) != nil {
-			return bad("must be a map, like {host: 10.0.0.5, port: 443, protocol: tcp}")
+		if val.Kind != yaml.SequenceNode || val.Decode(&data) != nil {
+			return bad("must be a list, like [{scope: S-12}, {scope: S-20, host: 10.0.1.5, port: 443}]")
 		}
-		t, err := decodeTarget(data)
+		ts, err := decodeTargets(data)
 		if err != nil {
 			return bad("%v", err)
 		}
-		if err := checkTarget(*t); err != nil {
-			return bad("%v", err)
+		for i, t := range ts {
+			if err := checkTarget(t); err != nil {
+				return bad("item %d: %v", i, err)
+			}
 		}
 	}
 	return nil
 }
 
-// checkTarget checks a target's declared members.
+// ParseTarget reads one target from the command line: a scope ID alone,
+// such as S-12, or a YAML map, such as {scope: S-20, host: 10.0.1.5,
+// port: 22, protocol: tcp}. It checks the target's own members.
+func ParseTarget(s string) (sdk.Target, error) {
+	n, err := parseValue(s)
+	if err != nil {
+		return sdk.Target{}, fmt.Errorf("%w: target %q: %v", ErrBadValue, s, err)
+	}
+	var t sdk.Target
+	switch n.Kind {
+	case yaml.ScalarNode:
+		t.Scope = n.Value
+	case yaml.MappingNode:
+		var data any
+		if err := n.Decode(&data); err != nil {
+			return sdk.Target{}, fmt.Errorf("%w: target %q: %v", ErrBadValue, s, err)
+		}
+		ts, err := decodeTargets([]any{data})
+		if err != nil {
+			return sdk.Target{}, fmt.Errorf("%w: target %q: %v", ErrBadValue, s, err)
+		}
+		t = ts[0]
+	default:
+		return sdk.Target{}, fmt.Errorf("%w: target %q: want a scope ID or a map like {scope: S-12, port: 443}", ErrBadValue, s)
+	}
+	if err := checkTarget(t); err != nil {
+		return sdk.Target{}, fmt.Errorf("%w: target %q: %v", ErrBadValue, s, err)
+	}
+	return t, nil
+}
+
+// checkTarget checks a stored target's own members: it names a scope row,
+// and its port and protocol are valid. Whether it fits the row is
+// rpt validate's targets rule.
 func checkTarget(t sdk.Target) error {
 	switch {
-	case t.Host == "":
-		return errors.New("host is required")
+	case t.Scope == "" && t.Host != "":
+		return fmt.Errorf("%s has no scope ID; run it through rpt scope match first, or add scope", t.Host)
+	case t.Scope == "":
+		return errors.New("scope is required: the ID of the scope row it falls in")
 	case t.Port < 0 || t.Port > 65535:
 		return fmt.Errorf("port %d is out of range", t.Port)
 	case t.Protocol != "" && t.Protocol != "tcp" && t.Protocol != "udp":

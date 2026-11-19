@@ -93,9 +93,14 @@ func checkRecord(rec sdk.Finding, severities []sdk.Severity) error {
 	case rec.ID != "" && !ValidID(rec.ID):
 		return bad("id %q is not F- and at least three digits", rec.ID)
 	}
-	if rec.Target != nil {
-		if err := checkTarget(*rec.Target); err != nil {
-			return bad("target: %v", err)
+	for k, now := range formerKeys {
+		if _, ok := rec.Extra[k]; ok {
+			return bad("%s is from report format 1; it is now %s", k, now)
+		}
+	}
+	for i, t := range rec.Targets {
+		if err := checkTarget(t); err != nil {
+			return bad("targets[%d]: %v", i, err)
 		}
 	}
 	return nil
@@ -109,12 +114,9 @@ func newFindingFile(rec sdk.Finding, h Headings) ([]byte, error) {
 		key string
 		val any
 	}
-	fields := []field{{"id", rec.ID}, {"title", rec.Title}, {"scope", nonNil(rec.Scope)}, {"severity", rec.Severity}}
+	fields := []field{{"id", rec.ID}, {"title", rec.Title}, {"targets", nonNil(rec.Targets)}, {"severity", rec.Severity}}
 	if rec.Evidence != nil {
 		fields = append(fields, field{"evidence", rec.Evidence})
-	}
-	if rec.Target != nil {
-		fields = append(fields, field{"target", rec.Target})
 	}
 	for _, k := range slices.Sorted(maps.Keys(rec.Extra)) {
 		fields = append(fields, field{k, rec.Extra[k]})
@@ -135,9 +137,9 @@ func newFindingFile(rec sdk.Finding, h Headings) ([]byte, error) {
 	return ff.bytes(), nil
 }
 
-func nonNil(s []string) []string {
+func nonNil[T any](s []T) []T {
 	if s == nil {
-		return []string{}
+		return []T{}
 	}
 	return s
 }

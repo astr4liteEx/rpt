@@ -1,10 +1,29 @@
 package main
 
-import "github.com/astr4liteEx/rpt/internal/cli"
+import (
+	"slices"
+	"strings"
+
+	"github.com/astr4liteEx/rpt/internal/cli"
+)
 
 var findingColumns = []cli.Column{
 	{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity"},
-	{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Field: "scope"},
+	{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Value: findingScope},
+}
+
+// findingScope renders the scope rows a finding's targets fall in, once
+// each, in order: "S-12,S-14".
+func findingScope(m map[string]any) string {
+	targets, _ := m["targets"].([]any)
+	var ids []string
+	for _, t := range targets {
+		tm, _ := t.(map[string]any)
+		if id, _ := tm["scope"].(string); id != "" && !slices.Contains(ids, id) {
+			ids = append(ids, id)
+		}
+	}
+	return strings.Join(ids, ",")
 }
 
 // findingsVerb prints every finding in the report; with --lines, each

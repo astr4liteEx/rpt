@@ -45,8 +45,8 @@ func TestLsVerb(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	want := "location " + filepath.Join(root, "2026/acme-internal") + " 1 2\n" +
-		"location " + filepath.Join(root, "acme-external") + " 1 0\n" +
+	want := "location " + filepath.Join(root, "2026/acme-internal") + " 2 2\n" +
+		"location " + filepath.Join(root, "acme-external") + " 2 0\n" +
 		"location " + filepath.Join(root, "broken") + "  \n"
 	if got := pick(t, out, "kind", "path", "format", "findings"); got != want {
 		t.Errorf("stdout\n got: %q\nwant: %q", got, want)
@@ -86,11 +86,11 @@ func TestLsCurrent(t *testing.T) {
 		want           string
 	}{
 		{"nearest report at or above the working folder", filepath.Join(internal, "findings"), "", nil,
-			"location " + internal + " 1 2\n"},
+			"location " + internal + " 2 2\n"},
 		{"RPT_REPORT_DIR before the working folder", filepath.Join(internal, "findings"), external, nil,
-			"location " + external + " 1 0\n"},
+			"location " + external + " 2 0\n"},
 		{"--report before RPT_REPORT_DIR, made absolute", root, internal, []string{"--report", "acme-external"},
-			"location " + external + " 1 0\n"},
+			"location " + external + " 2 0\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -159,7 +159,7 @@ func TestLsCurrentJSON(t *testing.T) {
 	t.Setenv("RPT_REPORT_DIR", "")
 	code, out, _ := runIn(t, "", "ls", "--current", "--json", "--report", fixture)
 	abs, _ := filepath.Abs(fixture)
-	if want := `{"kind":"location","path":"` + abs + `","format":1,"findings":3}` + "\n"; code != 0 || out != want {
+	if want := `{"kind":"location","path":"` + abs + `","format":2,"findings":3}` + "\n"; code != 0 || out != want {
 		t.Errorf("exit %d, stdout %q; want %q", code, out, want)
 	}
 }

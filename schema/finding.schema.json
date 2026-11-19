@@ -2,21 +2,20 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/finding.schema.json",
   "title": "rpt finding record",
-  "description": "One finding in a report. Schema version 1. Unknown members are allowed and must be passed through unchanged.",
+  "description": "One finding in a report. Schema version 2. Unknown members are allowed and must be passed through unchanged.",
   "type": "object",
   "properties": {
     "kind": {"const": "finding"},
     "id": {"type": "string", "pattern": "^F-[0-9]{3,}$", "description": "Finding ID; assigned by rpt findings add when absent."},
     "title": {"type": "string"},
-    "scope": {"type": "array", "items": {"type": "string"}, "description": "Scope IDs from scope.csv."},
+    "targets": {"type": "array", "items": {"$ref": "#/$defs/target"}, "description": "Where the finding was found, each attributed to a scope row. A finding in a report needs at least one; rpt validate checks them against scope.csv."},
     "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
     "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
-    "target": {"$ref": "#/$defs/target"},
     "lines": {"$ref": "#/$defs/lines"}
   },
-  "required": ["kind", "title", "scope", "severity"],
+  "required": ["kind", "title", "targets", "severity"],
   "additionalProperties": true,
   "$defs": {
     "lines": {
@@ -42,13 +41,14 @@
     },
     "target": {
       "type": "object",
-      "description": "What the finding was found on. Set by parser plugins; read by rpt scope match, never rewritten.",
+      "description": "One place the finding was found on, attributed to a scope row. In a report scope is always set. A parser plugin, which doesn't know the scope, sets host instead, and rpt scope match fills scope from the most specific matching row.",
       "properties": {
-        "host": {"type": "string"},
-        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
-        "protocol": {"enum": ["tcp", "udp"]}
+        "scope": {"type": "string", "description": "The ID of the scope row the target falls in."},
+        "host": {"type": "string", "description": "Where inside a range row (a CIDR or *.domain) the finding is. Absent: the whole row, or a row that is one asset. Not allowed with a row that is one asset."},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Must equal the row's port when the row has one."},
+        "protocol": {"enum": ["tcp", "udp"], "description": "Must equal the row's protocol when the row has one."}
       },
-      "required": ["host"],
+      "anyOf": [{"required": ["scope"]}, {"required": ["host"]}],
       "additionalProperties": true
     }
   }

@@ -167,12 +167,12 @@ func (r *Report) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
 		}
 		var citing []string
 		for _, f := range findings {
-			if slices.Contains(f.Scope, id) {
+			if slices.ContainsFunc(f.Targets, func(t sdk.Target) bool { return t.Scope == id }) {
 				citing = append(citing, f.ID)
 			}
 		}
 		if len(citing) > 0 {
-			return sdk.ScopeRow{}, fmt.Errorf("%w: %s is cited by %s; change their scope first, or pass --force", ErrCited, id, strings.Join(citing, ", "))
+			return sdk.ScopeRow{}, fmt.Errorf("%w: %s is cited by %s; change their targets first, or pass --force", ErrCited, id, strings.Join(citing, ", "))
 		}
 	}
 	sp := t.spans[i]

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/scope.schema.json",
   "title": "rpt scope record",
-  "description": "One in-scope asset, a row of scope.csv. Schema version 1. Other CSV columns appear as extra string members; no column may be named kind or lines.",
+  "description": "One in-scope asset, a row of scope.csv. Schema version 2. Other CSV columns appear as extra string members; no column may be named kind or lines.",
   "type": "object",
   "properties": {
     "kind": {"const": "scope"},

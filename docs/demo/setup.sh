@@ -14,7 +14,8 @@ CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$demo/bin/rpt" ./cmd/rpt
 rpt=$demo/bin/rpt
 
 # rpt-parse-scan stands in for a scanner importer plugin: it turns a
-# host,port,severity,title CSV into finding records with a target.
+# host,port,severity,title CSV into finding records with a target host;
+# rpt scope match attributes each to a scope row.
 cat > "$demo/bin/rpt-parse-scan" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1-}" = --describe ]; then
@@ -23,24 +24,24 @@ if [ "${1-}" = --describe ]; then
 fi
 tail -n +2 | while IFS=, read -r host port sev title; do
 	jq -cn --arg h "$host" --argjson p "$port" --arg s "$sev" --arg t "$title" \
-		'{kind:"finding",title:$t,severity:$s,target:{host:$h,port:$p,protocol:"tcp"},
+		'{kind:"finding",title:$t,severity:$s,targets:[{host:$h,port:$p,protocol:"tcp"}],
 		  sections:{description:"Reported by the scanner.",remediation:"See the vendor advisory.",poc:"Scanner output."}}'
 done
 EOF
 chmod +x "$demo/bin/rpt-parse-scan"
 
-# finding NAME TITLE SEVERITY SCOPE DESCRIPTION REMEDIATION POC
+# finding TITLE SEVERITY TARGETS DESCRIPTION REMEDIATION POC
 finding() {
 	jq -cn --arg t "$1" --arg s "$2" --argjson sc "$3" --arg d "$4" --arg r "$5" --arg p "$6" \
-		'{kind:"finding",title:$t,severity:$s,scope:$sc,sections:{description:$d,remediation:$r,poc:$p}}'
+		'{kind:"finding",title:$t,severity:$s,targets:$sc,sections:{description:$d,remediation:$r,poc:$p}}'
 }
 findings() {
-	finding "SQL injection in login" high '["S-12"]' \
+	finding "SQL injection in login" high '[{"scope":"S-12"}]' \
 		"The user parameter of /login is concatenated into a SQL query." \
 		"Use parameterised queries." "user=' OR 1=1-- logs in as the first user."
-	finding "Reflected XSS in search" medium '["S-14"]' \
+	finding "Reflected XSS in search" medium '[{"scope":"S-14"}]' \
 		"The q parameter is reflected unescaped." "Encode output." "/search?q=<script>alert(1)</script>"
-	finding "TLS 1.0 enabled" low '["S-12"]' \
+	finding "TLS 1.0 enabled" low '[{"scope":"S-12"}]' \
 		"The server accepts TLS 1.0." "Disable TLS 1.0 and 1.1." "nmap --script ssl-enum-ciphers -p 443 10.0.0.5"
 }
 scope_rows='S-12,10.0.0.5,443,tcp
@@ -55,7 +56,7 @@ findings > "$demo/start/findings.jsonl"
 "$rpt" new "$demo/validate/acme-external"
 printf '%s\n' "$scope_rows" >> "$demo/validate/acme-external/scope.csv"
 findings | "$rpt" findings add --report "$demo/validate/acme-external" > /dev/null
-"$rpt" findings set --report "$demo/validate/acme-external" F-002 scope '[S-99]' > /dev/null
+"$rpt" findings set --report "$demo/validate/acme-external" F-002 targets '[{scope: S-99}]' > /dev/null
 
 # pipeline: a report with scope and no findings, and a scan export beside it
 # (one host, 192.168.9.9, is out of scope).

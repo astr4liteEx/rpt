@@ -21,12 +21,11 @@ type Finding struct {
 	Kind     string            `json:"kind"`
 	ID       string            `json:"id,omitzero"`
 	Title    string            `json:"title"`
-	Scope    []string          `json:"scope"` // scope IDs
+	Targets  []Target          `json:"targets"` // the scope rows it was found on
 	Severity Severity          `json:"severity"`
 	Path     string            `json:"path,omitzero"` // relative to the report root
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
-	Target   *Target           `json:"target,omitzero"`   // what was hit; set by parser plugins
 	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt findings add ignores it
 
 	// Extra holds every member not named above, so records pass through
@@ -149,26 +148,46 @@ type ReportMeta struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// ReportFinding is a finding inside a Report: its scope IDs are replaced by
-// the full scope rows and its evidence paths are made absolute, so renderers
-// never read scope.csv or resolve paths.
+// ReportFinding is a finding inside a Report: each target's scope ID is
+// replaced by the full scope row and its evidence paths are made absolute,
+// so renderers never read scope.csv or resolve paths.
 type ReportFinding struct {
 	ID       string            `json:"id"`
 	Title    string            `json:"title"`
 	Severity Severity          `json:"severity"`
-	Scope    []ScopeRow        `json:"scope"`
+	Targets  []ReportTarget    `json:"targets"`
 	Sections map[string]string `json:"sections"` // markdown, keyed description, remediation, poc
 	Assets   []string          `json:"assets"`   // absolute paths
-	Target   *Target           `json:"target,omitzero"`
 
 	// Extra holds the finding's unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Target is the host, port and protocol a finding was actually found on.
-// rpt scope match reads it to assign scope IDs and never rewrites it.
+// ReportTarget is a Target inside a Report, with the full scope row in
+// place of its ID.
+type ReportTarget struct {
+	Scope    ScopeRow `json:"scope"`
+	Host     string   `json:"host,omitzero"`
+	Port     int      `json:"port,omitzero"`
+	Protocol string   `json:"protocol,omitzero"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Target is one place a finding was found on, attributed to a scope row.
+// In a report every target names its row's ID in Scope. Host is set only
+// when the row is a range (a CIDR or *.domain) and says where inside it;
+// a row that is one asset (an address, a name or any other text) needs no
+// host. Port and protocol are optional and must fit the row's.
+//
+// A parser plugin, which doesn't know the report's scope, sets Host (and
+// Port and Protocol) and leaves Scope empty; rpt scope match fills Scope
+// from the most specific matching row and drops a Host the row makes
+// redundant. rpt findings add refuses a target without Scope.
 type Target struct {
-	Host     string `json:"host"`
+	Scope    string `json:"scope,omitzero"` // a scope row's ID
+	Host     string `json:"host,omitzero"`
 	Port     int    `json:"port,omitzero"`
 	Protocol string `json:"protocol,omitzero"` // "tcp" or "udp"
 

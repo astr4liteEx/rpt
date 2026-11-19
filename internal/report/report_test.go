@@ -28,8 +28,8 @@ func TestConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Format != 1 {
-		t.Errorf("format = %d, want 1", cfg.Format)
+	if cfg.Format != 2 {
+		t.Errorf("format = %d, want 2", cfg.Format)
 	}
 	want := []sdk.Severity{"critical", "high", "medium", "low", "info"}
 	if !slices.Equal(cfg.Severities, want) {
@@ -59,7 +59,7 @@ func writeFile(t *testing.T, dir, rel, content string) {
 
 func TestConfigDefaultsAndUnknownKeys(t *testing.T) {
 	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 1\nrenderer: typst\nlogo: acme.png\n")
+	writeFile(t, dir, "rpt.yaml", "format: 2\nrenderer: typst\nlogo: acme.png\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestConfigDefaultsAndUnknownKeys(t *testing.T) {
 
 func TestConfigBadYAMLNamesFileAndLine(t *testing.T) {
 	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 1\nname: [unclosed\n")
+	writeFile(t, dir, "rpt.yaml", "format: 2\nname: [unclosed\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -101,9 +101,9 @@ func TestConfigRequiredSectionsAndKeyLines(t *testing.T) {
 		yaml string
 		want []string
 	}{
-		{"absent: the three fixed sections", "format: 1\n", []string{"description", "remediation", "poc"}},
-		{"empty: none required", "format: 1\nrequired_sections: []\n", []string{}},
-		{"custom headings keep their text", "format: 1\nrequired_sections: [description, References]\n", []string{"description", "References"}},
+		{"absent: the three fixed sections", "format: 2\n", []string{"description", "remediation", "poc"}},
+		{"empty: none required", "format: 2\nrequired_sections: []\n", []string{}},
+		{"custom headings keep their text", "format: 2\nrequired_sections: [description, References]\n", []string{"description", "References"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -139,7 +139,7 @@ func TestConfigRequiredSectionsAndKeyLines(t *testing.T) {
 
 func TestConfigEmptySeveritiesStayEmpty(t *testing.T) {
 	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 1\nseverities: []\n")
+	writeFile(t, dir, "rpt.yaml", "format: 2\nseverities: []\n")
 	r, err := Open(dir)
 	if err != nil {
 		t.Fatal(err)

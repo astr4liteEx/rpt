@@ -54,7 +54,7 @@ func openCopy(t *testing.T) (*Report, string) {
 }
 
 const parsed = `{"kind":"finding","title":"Telnet enabled: plaintext logins (port 23)!",` +
-	`"scope":["S-20"],"severity":"high","target":{"host":"10.0.1.9","port":23,"protocol":"tcp"},` +
+	`"targets":[{"scope":"S-20","host":"10.0.1.9","port":23,"protocol":"tcp"},{"scope":"S-12"}],"severity":"high",` +
 	`"sections":{"description":"Telnet accepts logins in plaintext.","poc":"nc 10.0.1.9 23","remediation":"Disable telnet.","References":"RFC 854"},` +
 	`"source":{"plugin":"nuclei","template":"telnet-detect"}}`
 
@@ -92,9 +92,9 @@ func TestAddTwiceAddsTwo(t *testing.T) {
 
 func TestAddNames(t *testing.T) {
 	tests := []struct{ rec, wantPath string }{
-		{`{"kind":"finding","id":"F-010","title":"Énumération des utilisateurs","scope":[],"severity":"low"}`, "findings/F-010-num-ration-des-utilisateurs.md"},
-		{`{"kind":"finding","title":"!!!","scope":[],"severity":"low"}`, "findings/F-004-finding.md"},
-		{`{"kind":"finding","title":"A very long title that goes on and on about one single small problem","scope":[],"severity":"low"}`,
+		{`{"kind":"finding","id":"F-010","title":"Énumération des utilisateurs","targets":[],"severity":"low"}`, "findings/F-010-num-ration-des-utilisateurs.md"},
+		{`{"kind":"finding","title":"!!!","targets":[],"severity":"low"}`, "findings/F-004-finding.md"},
+		{`{"kind":"finding","title":"A very long title that goes on and on about one single small problem","targets":[],"severity":"low"}`,
 			"findings/F-004-a-very-long-title-that-goes-on-and-on-about-one.md"},
 	}
 	for _, tt := range tests {
@@ -111,11 +111,14 @@ func TestAddNames(t *testing.T) {
 
 func TestAddRefuses(t *testing.T) {
 	tests := []struct{ name, rec string }{
-		{"no title", `{"kind":"finding","scope":[],"severity":"low"}`},
-		{"unknown severity", `{"kind":"finding","title":"t","scope":[],"severity":"urgent"}`},
-		{"malformed id", `{"kind":"finding","id":"F-7","title":"t","scope":[],"severity":"low"}`},
-		{"id already taken", `{"kind":"finding","id":"F-003","title":"t","scope":[],"severity":"low"}`},
-		{"target without host", `{"kind":"finding","title":"t","scope":[],"severity":"low","target":{"port":22}}`},
+		{"no title", `{"kind":"finding","targets":[],"severity":"low"}`},
+		{"unknown severity", `{"kind":"finding","title":"t","targets":[],"severity":"urgent"}`},
+		{"malformed id", `{"kind":"finding","id":"F-7","title":"t","targets":[],"severity":"low"}`},
+		{"id already taken", `{"kind":"finding","id":"F-003","title":"t","targets":[],"severity":"low"}`},
+		{"target without scope", `{"kind":"finding","title":"t","targets":[{"port":22}],"severity":"low"}`},
+		{"target attributed by host only", `{"kind":"finding","title":"t","targets":[{"host":"10.0.0.5"}],"severity":"low"}`},
+		{"format 1 scope", `{"kind":"finding","title":"t","scope":["S-12"],"severity":"low"}`},
+		{"format 1 target", `{"kind":"finding","title":"t","targets":[],"severity":"low","target":{"host":"a"}}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

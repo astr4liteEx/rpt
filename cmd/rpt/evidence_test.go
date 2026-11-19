@@ -35,7 +35,7 @@ func TestEvidenceAdd(t *testing.T) {
 	}
 	// F-001 is CRLF: only an evidence line is added, with CRLF.
 	b, _ := os.ReadFile(filepath.Join(dir, "findings/xss-search.md"))
-	if want := "---\r\nid: F-001\r\ntitle: Reflected XSS in search\r\nscope: [S-14]\r\nseverity: medium\r\nevidence: [evidence/F-001-shot.png]\r\n---\r\n"; !strings.HasPrefix(string(b), want) {
+	if want := "---\r\nid: F-001\r\ntitle: Reflected XSS in search\r\ntargets: [{scope: S-14, port: 8443, protocol: tcp}]\r\nseverity: medium\r\nevidence: [evidence/F-001-shot.png]\r\n---\r\n"; !strings.HasPrefix(string(b), want) {
 		t.Errorf("frontmatter\n%q\nwant prefix\n%q", b, want)
 	}
 	if _, after, _ := runIn(t, "", "validate", "--report", dir, "--json"); after != before {

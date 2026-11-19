@@ -44,7 +44,8 @@ func (f findingFile) bytes() []byte {
 // setEntry sets top-level key to val in the frontmatter. An existing entry
 // is replaced in place, keeping the old value's quoting or flow style and
 // its line comment with the spacing before it; a new entry is appended,
-// lists and maps in flow style. Setting a value equal to the current one
+// lists and maps in flow style, except that a list of maps puts each map
+// in flow style on a line of its own. Setting a value equal to the current one
 // changes nothing.
 func (f *findingFile) setEntry(key string, val *yaml.Node) error {
 	var doc yaml.Node
@@ -74,7 +75,11 @@ func (f *findingFile) setEntry(key string, val *yaml.Node) error {
 	val = clean(val)
 
 	if i < 0 {
-		if val.Kind == yaml.SequenceNode || val.Kind == yaml.MappingNode {
+		if isListOfMaps(val) {
+			for _, item := range val.Content {
+				item.Style |= yaml.FlowStyle
+			}
+		} else if val.Kind == yaml.SequenceNode || val.Kind == yaml.MappingNode {
 			val.Style |= yaml.FlowStyle
 		}
 		entry, err := renderEntry(key, val)
@@ -120,6 +125,20 @@ func (f *findingFile) setEntry(key string, val *yaml.Node) error {
 	}
 	f.head = []byte(strings.Join(lines[:start], "") + entry + strings.Join(lines[end:], ""))
 	return nil
+}
+
+// isListOfMaps reports whether n is a non-empty list whose items are all
+// maps, such as a finding's targets.
+func isListOfMaps(n *yaml.Node) bool {
+	if n.Kind != yaml.SequenceNode || len(n.Content) == 0 {
+		return false
+	}
+	for _, item := range n.Content {
+		if item.Kind != yaml.MappingNode {
+			return false
+		}
+	}
+	return true
 }
 
 // removeEntry deletes a top-level key and its value's lines, including
@@ -230,19 +249,28 @@ func parseValue(s string) (*yaml.Node, error) {
 }
 
 // toNode converts a Go value to YAML by way of JSON, so struct fields use
-// their JSON names and unknown members (jsontext.Value) come along.
+// their JSON names, in their declared order, and unknown members
+// (jsontext.Value) come along. JSON is YAML, so the JSON is read as YAML
+// and its styles cleared, leaving the encoder to quote only what needs it.
 func toNode(v any) (*yaml.Node, error) {
 	b, err := json.Marshal(v, json.Deterministic(true))
 	if err != nil {
 		return nil, err
 	}
-	var data any
-	if err := json.Unmarshal(b, &data); err != nil {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(b, &doc); err != nil {
 		return nil, err
 	}
-	var n yaml.Node
-	if err := n.Encode(data); err != nil {
-		return nil, err
+	n := doc.Content[0]
+	clearStyle(n)
+	return n, nil
+}
+
+// clearStyle drops the layout yaml gave n when reading it from JSON:
+// quotes and flow style.
+func clearStyle(n *yaml.Node) {
+	n.Style = 0
+	for _, c := range n.Content {
+		clearStyle(c)
 	}
-	return &n, nil
 }

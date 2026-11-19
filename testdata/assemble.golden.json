@@ -1,6 +1,6 @@
 {
   "kind": "report",
-  "schema_version": 1,
+  "schema_version": 2,
   "report": {
     "severities": [
       "critical",
@@ -44,20 +44,24 @@
       "id": "F-003",
       "title": "SQL injection in login",
       "severity": "high",
-      "scope": [
+      "targets": [
         {
-          "kind": "scope",
-          "id": "S-12",
-          "host": "10.0.0.5",
-          "port": 443,
-          "env": "prod"
+          "scope": {
+            "kind": "scope",
+            "id": "S-12",
+            "host": "10.0.0.5",
+            "port": 443,
+            "env": "prod"
+          }
         },
         {
-          "kind": "scope",
-          "id": "S-14",
-          "host": "10.0.0.6",
-          "port": 8443,
-          "env": "prod"
+          "scope": {
+            "kind": "scope",
+            "id": "S-14",
+            "host": "10.0.0.6",
+            "port": 8443,
+            "env": "prod"
+          }
         }
       ],
       "sections": {
@@ -74,13 +78,17 @@
       "id": "F-001",
       "title": "Reflected XSS in search",
       "severity": "medium",
-      "scope": [
+      "targets": [
         {
-          "kind": "scope",
-          "id": "S-14",
-          "host": "10.0.0.6",
+          "scope": {
+            "kind": "scope",
+            "id": "S-14",
+            "host": "10.0.0.6",
+            "port": 8443,
+            "env": "prod"
+          },
           "port": 8443,
-          "env": "prod"
+          "protocol": "tcp"
         }
       ],
       "sections": {
@@ -95,7 +103,7 @@
       "id": "F-002",
       "title": "Weak TLS configuration",
       "severity": "info",
-      "scope": [],
+      "targets": [],
       "sections": {
         "description": "TLS 1.0 is still enabled.",
         "poc": "`nmap --script ssl-enum-ciphers -p 443 10.0.0.5`",

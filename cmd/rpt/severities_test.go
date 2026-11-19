@@ -21,9 +21,9 @@ func TestSeveritiesVerb(t *testing.T) {
 	}{
 		{"the fixture's levels, most severe first", fixture,
 			"severity critical 1\nseverity high 2\nseverity medium 3\nseverity low 4\nseverity info 5\n"},
-		{"custom levels as rpt.yaml lists them", withConfig("format: 1\nseverities: [urgent, normal]\n"),
+		{"custom levels as rpt.yaml lists them", withConfig("format: 2\nseverities: [urgent, normal]\n"),
 			"severity urgent 1\nseverity normal 2\n"},
-		{"no severities key gives the defaults", withConfig("format: 1\n"),
+		{"no severities key gives the defaults", withConfig("format: 2\n"),
 			"severity critical 1\nseverity high 2\nseverity medium 3\nseverity low 4\nseverity info 5\n"},
 	}
 	for _, tt := range tests {

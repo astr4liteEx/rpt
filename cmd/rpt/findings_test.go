@@ -43,7 +43,7 @@ func TestFindingsLinesFlag(t *testing.T) {
 
 func TestAddNeverWritesLines(t *testing.T) {
 	dir := reportCopy(t)
-	in := `{"kind":"finding","title":"Copied","scope":[],"severity":"low","lines":{"frontmatter":{"id":2}},"sections":{"description":"d"}}` + "\n"
+	in := `{"kind":"finding","title":"Copied","severity":"low","lines":{"frontmatter":{"id":2}},"sections":{"description":"d"}}` + "\n"
 	code, out, errOut := runIn(t, in, "findings", "add", "--report", dir, "--json")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
@@ -134,7 +134,7 @@ func TestLinesFileIsAbsolute(t *testing.T) {
 func TestFindingsAddFromFlagsWritesABlankFinding(t *testing.T) {
 	dir := reportCopy(t)
 	code, out, errOut := runIn(t, `{"kind":"finding","title":"ignored","severity":"low"}`+"\n",
-		"findings", "add", "--report", dir, "--title", "SQL injection", "--severity", "high", "--scope", "S-12,S-14")
+		"findings", "add", "--report", dir, "--title", "SQL injection", "--severity", "high", "--target", "S-12", "--target", "{scope: S-20, host: 10.0.1.5, port: 22}")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -145,7 +145,7 @@ func TestFindingsAddFromFlagsWritesABlankFinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "---\nid: F-004\ntitle: SQL injection\nscope: [S-12, S-14]\nseverity: high\n---\n" +
+	want := "---\nid: F-004\ntitle: SQL injection\ntargets:\n  - {scope: S-12}\n  - {scope: S-20, host: 10.0.1.5, port: 22}\nseverity: high\n---\n" +
 		"\n## Description\n\n## Remediation\n\n## Proof of concept\n"
 	if string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
@@ -154,7 +154,7 @@ func TestFindingsAddFromFlagsWritesABlankFinding(t *testing.T) {
 
 func TestFindingsAddFlagsNeedTitleAndSeverity(t *testing.T) {
 	dir := reportCopy(t)
-	for _, args := range [][]string{{"--title", "T"}, {"--severity", "high"}, {"--scope", "S-12"}} {
+	for _, args := range [][]string{{"--title", "T"}, {"--severity", "high"}, {"--target", "S-12"}} {
 		code, _, errOut := runIn(t, "", append([]string{"findings", "add", "--report", dir}, args...)...)
 		if code != 2 || !strings.Contains(errOut, "usage: rpt findings add") {
 			t.Errorf("%v: exit %d, stderr %q; want 2 and usage", args, code, errOut)
@@ -169,12 +169,12 @@ func TestFindingsAddFlagsNeedTitleAndSeverity(t *testing.T) {
 
 func TestFindingsAddScaffold(t *testing.T) {
 	dir := reportCopy(t)
-	in := `{"kind":"finding","title":"Half done","scope":[],"severity":"low","sections":{"description":"Known so far."}}` + "\n"
+	in := `{"kind":"finding","title":"Half done","severity":"low","sections":{"description":"Known so far."}}` + "\n"
 	if code, _, errOut := runIn(t, in, "findings", "add", "--scaffold", "--report", dir); code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	b, _ := os.ReadFile(filepath.Join(dir, "findings/F-004-half-done.md"))
-	want := "---\nid: F-004\ntitle: Half done\nscope: []\nseverity: low\n---\n" +
+	want := "---\nid: F-004\ntitle: Half done\ntargets: []\nseverity: low\n---\n" +
 		"\n## Description\n\nKnown so far.\n\n## Remediation\n\n## Proof of concept\n"
 	if string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
@@ -184,27 +184,27 @@ func TestFindingsAddScaffold(t *testing.T) {
 func TestFindingsUnset(t *testing.T) {
 	dir := reportCopy(t)
 	file := filepath.Join(dir, "findings/F-009-x.md")
-	src := "---\r\nid: F-009\r\ntitle: X\r\nscope: [S-12]\r\n# scored by hand\r\ncvss: \"9.1\"   # v3.1\r\n" +
-		"target:\r\n  host: 10.0.0.5\r\n  port: 443\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
+	src := "---\r\nid: F-009\r\ntitle: X\r\ntargets: [{scope: S-12}]\r\n# scored by hand\r\ncvss: \"9.1\"   # v3.1\r\n" +
+		"source:\r\n  plugin: nuclei\r\n  run: 3\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
 	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, out, errOut := runIn(t, "", "findings", "unset", "--report", dir, "F-009", "target", "cvss", "not-there")
+	code, out, errOut := runIn(t, "", "findings", "unset", "--report", dir, "F-009", "source", "cvss", "not-there")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if strings.Contains(out, "cvss") || strings.Contains(out, "target") {
+	if strings.Contains(out, "cvss") || strings.Contains(out, "source") {
 		t.Errorf("printed finding still has the keys: %s", out)
 	}
 	// The comment above cvss stays: it may describe what follows.
-	want := "---\r\nid: F-009\r\ntitle: X\r\nscope: [S-12]\r\n# scored by hand\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
+	want := "---\r\nid: F-009\r\ntitle: X\r\ntargets: [{scope: S-12}]\r\n# scored by hand\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
 	if b, _ := os.ReadFile(file); string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
 	}
 }
 
 func TestFindingsUnsetRefuses(t *testing.T) {
-	for _, key := range []string{"id", "title", "scope", "severity", "kind", "path", "sections", "lines"} {
+	for _, key := range []string{"id", "title", "targets", "severity", "kind", "path", "sections", "lines"} {
 		dir := reportCopy(t)
 		before := folderState(t, dir)
 		code, _, errOut := runIn(t, "", "findings", "unset", "--report", dir, "F-003", "cvss", key)

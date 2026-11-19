@@ -91,7 +91,7 @@ func TestDispatch(t *testing.T) {
 			t.Fatalf("stub output %q: %v", out, err)
 		}
 		want := stubOut{Args: args, Env: map[string]string{
-			"RPT_REPORT_DIR": fixture, "RPT_BIN": filepath.Join(b, "rpt"), "RPT_SCHEMA_VERSION": "1",
+			"RPT_REPORT_DIR": fixture, "RPT_BIN": filepath.Join(b, "rpt"), "RPT_SCHEMA_VERSION": "2",
 		}}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("stub saw %+v\nwant %+v", got, want)

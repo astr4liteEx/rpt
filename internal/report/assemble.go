@@ -13,15 +13,16 @@ import (
 )
 
 // SchemaVersion is the version of the record schemas rpt writes.
-const SchemaVersion = 1
+const SchemaVersion = 2
 
 // FormatVersion is the report format this rpt reads: the format key in
 // rpt.yaml.
-const FormatVersion = 1
+const FormatVersion = 2
 
 // Assemble builds the render-ready report record: findings sorted by the
-// config's severity order then ID number, scope IDs replaced by their full
-// rows, evidence and relative section links made absolute and listed as
+// config's severity order then ID number, each target's scope ID replaced
+// by its full row (a target that doesn't fit its row is left out),
+// evidence and relative section links made absolute and listed as
 // assets, and a count per severity level. It never refuses: anything it
 // can't use is left out and reported in the returned warnings, using the
 // validate rule that covers it. rpt validate is the gate. The error is for
@@ -111,19 +112,27 @@ func (a *assembly) finding(ff findingSrc, byID map[string]sdk.ScopeRow) sdk.Repo
 		ID:       f.ID,
 		Title:    f.Title,
 		Severity: f.Severity,
-		Scope:    []sdk.ScopeRow{},
+		Targets:  []sdk.ReportTarget{},
 		Sections: map[string]string{},
 		Assets:   []string{},
-		Target:   f.Target,
 		Extra:    f.Extra,
 	}
-	for _, id := range f.Scope {
-		row, ok := byID[id]
-		if !ok {
-			a.warn(ff.rel, ff.keyLines["scope"], RuleScopeIDsExist, "%s is not in scope.csv; left out of the finding's scope", id)
+	line := ff.keyLines["targets"]
+	for _, t := range f.Targets {
+		if err := checkTarget(t); err != nil {
+			a.warn(ff.rel, line, RuleTargets, "%v; target left out of the finding", err)
 			continue
 		}
-		rf.Scope = append(rf.Scope, row)
+		row, ok := byID[t.Scope]
+		if !ok {
+			a.warn(ff.rel, line, RuleScopeIDsExist, "%q is not in scope.csv; target left out of the finding", t.Scope)
+			continue
+		}
+		if err := TargetFits(t, row); err != nil {
+			a.warn(ff.rel, line, RuleTargets, "%v; target left out of the finding", err)
+			continue
+		}
+		rf.Targets = append(rf.Targets, sdk.ReportTarget{Scope: row, Host: t.Host, Port: t.Port, Protocol: t.Protocol, Extra: t.Extra})
 	}
 	addAsset := func(rel string) string {
 		abs := filepath.Join(a.r.abs, filepath.FromSlash(rel))

@@ -18,7 +18,7 @@ func fixedReport(t *testing.T) string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(p, []byte(strings.Replace(string(b), "[S-99]", "[S-12]", 1)), 0o644); err != nil {
+	if err := os.WriteFile(p, []byte(strings.Replace(string(b), "{scope: S-99}", "{scope: S-12}", 1)), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return dir
@@ -57,7 +57,7 @@ func TestAssembleVerb(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if want := "rpt: findings/tls-weak.md:5: warning: S-99 is not in scope.csv; left out of the finding's scope\n"; errOut != want {
+	if want := "rpt: findings/tls-weak.md:5: warning: \"S-99\" is not in scope.csv; target left out of the finding\n"; errOut != want {
 		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 	}
 	if strings.Count(out, "\n") != 1 || !strings.HasSuffix(out, "\n") {

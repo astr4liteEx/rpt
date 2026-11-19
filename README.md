@@ -30,7 +30,7 @@ acme-external/
 ```
 
 - **Plain files.** Findings are markdown with YAML frontmatter. You can edit them in any editor, diff them and review them.
-- **Format checking.** `rpt validate` finds missing sections, unknown severities, scope IDs that aren't in `scope.csv`, missing evidence files and more. It reports each problem with its file and line.
+- **Format checking.** `rpt validate` finds missing sections, unknown severities, findings not attributed to a scope row (or to one that isn't in `scope.csv`), missing evidence files and more. It reports each problem with its file and line.
 - **Unix pipelines.** Each command prints a table in a terminal and JSON Lines in a pipe, so you can chain parsers, filters and renderers.
 - **No hidden state.** rpt never runs git, keeps nothing outside the report folder, and never needs a network.
 
@@ -70,7 +70,7 @@ scripts/install.sh
 
 When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt findings set` fixes that one line, and `rpt assemble` then counts the findings per severity:
 
-![rpt validate reports S-99 missing from scope.csv, rpt findings set fixes F-002's scope, and rpt validate passes](docs/demo/validate.gif)
+![rpt validate reports S-99 missing from scope.csv, rpt findings set points F-002's target at S-14, and rpt validate passes](docs/demo/validate.gif)
 
 To try it yourself, starting from one blank finding and filling it in:
 
@@ -79,7 +79,7 @@ rpt new acme-external         # rpt.yaml, an empty scope.csv and findings/
 cd acme-external
 
 rpt scope add --host 10.0.0.5 --port 443 --protocol tcp            # row S-1
-rpt findings add --title "SQL injection in login" --severity high --scope S-1
+rpt findings add --title "SQL injection in login" --severity high --target S-1
 
 rpt validate                  # F-001's Description, Remediation and Proof of concept are empty
 $EDITOR findings/F-001-sql-injection-in-login.md
@@ -101,16 +101,16 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
 | `rpt findings [--lines]` | Lists findings. `--lines` adds each finding file's absolute path and where each frontmatter key and section sits in it, for checkers that load files or report problems by line. |
-| `rpt findings add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--scope`, `--id`), writes one blank finding with an empty heading for each required section; `--scaffold` adds those headings to stdin records too. |
+| `rpt findings add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section; `--scaffold` adds those headings to stdin records too. |
 | `rpt findings set <id> <key> <value>` | Changes one frontmatter value, given as YAML. Only that line of the file changes. |
-| `rpt findings unset <id> <key>...` | Removes frontmatter keys. A finding's `id`, `title`, `scope` and `severity` can't be removed. |
+| `rpt findings unset <id> <key>...` | Removes frontmatter keys. A finding's `id`, `title`, `targets` and `severity` can't be removed. |
 | `rpt findings delete <id>...` | Removes findings. Their evidence files stay. |
 | `rpt sections` | Lists the report's sections: the fixed ones with their headings, then the custom ones it requires. |
 | `rpt sections set <id> <key>` | Replaces one section's text in a finding with stdin, adding the section if it's missing. |
-| `rpt scope` | Lists scope rows. `--lines` adds the line of `scope.csv` each row starts on. |
+| `rpt scope [id...]` | Lists scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
 | `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-N`. |
 | `rpt scope delete <id>...` | Removes scope rows. A row a finding cites is refused unless you pass `--force`. |
-| `rpt scope match` | Reads finding records on stdin and adds the IDs of the scope rows their `target` matches. `--drop-out-of-scope` drops the findings that match none. |
+| `rpt scope match` | Reads finding records on stdin and attributes each target that has a `host` and no scope ID to the most specific scope row covering it. `--drop-out-of-scope` drops targets no row covers, and findings left with none. |
 | `rpt evidence [--orphans]` | Lists every evidence file the findings list or link to, with its absolute path and whether it exists. `--orphans` adds the files in `findings/evidence/` that nothing references. |
 | `rpt evidence add <id> <file>...` | Copies files into `findings/evidence/` as `<id>-<name>.<ext>` and lists them in the finding's evidence. `--as <name>` names a single copy. |
 | `rpt evidence prune` | Removes the files in `findings/evidence/` that nothing references. `--dry-run` only lists them. |

@@ -6,7 +6,7 @@ Steps for building or changing an rpt plugin, in any language. The rules a plugi
 
 Decide what the plugin is, since that decides which protocol sections bind it:
 
-- **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt.
+- **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt. It doesn't know the report's scope, so each target gets a `host` (and `port`, `protocol`) and no `scope`; `rpt scope match` attributes them.
 - **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
 - **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from `$RPT_BIN sections --json`.
 - **Checker**: emits `problem` records under its own rule names, located with `$RPT_BIN findings --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
@@ -43,7 +43,7 @@ The [`sdk`](../sdk) package implements the protocol; use it instead of re-derivi
 | `main` | `func main() { sdk.Main(plugin) }`, with `plugin` an `sdk.Plugin{Description, Run}` |
 | Tests, `--describe` included | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
 | Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line |
-| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`, `sdk.SeverityLevel`, `sdk.Section`, `sdk.Verb`, `sdk.Location`; unknown members ride in `Extra` |
+| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`, `sdk.ReportTarget`, `sdk.SeverityLevel`, `sdk.Section`, `sdk.Verb`, `sdk.Location`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
 | Calling rpt | `exec.Command(sdk.Bin(), "findings", "--json")` |
 

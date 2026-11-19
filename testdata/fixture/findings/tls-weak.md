@@ -2,7 +2,7 @@
 id: F-002
 title: Weak TLS configuration
 # Planted problem: S-99 is not in scope.csv. rpt validate must catch it.
-scope: [S-99]
+targets: [{scope: S-99}]
 severity: info
 ---
 

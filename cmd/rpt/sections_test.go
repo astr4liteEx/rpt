@@ -12,12 +12,12 @@ func TestSectionsVerb(t *testing.T) {
 	tests := []struct {
 		name, config, want string
 	}{
-		{"defaults", "format: 1\n",
+		{"defaults", "format: 2\n",
 			"section description Description true true\n" +
 				"section remediation Remediation true true\n" +
 				"section poc Proof of concept true true\n"},
 		{"renamed, partly required, with custom required sections",
-			"format: 1\nsections:\n  remediation: Recommendation\n" +
+			"format: 2\nsections:\n  remediation: Recommendation\n" +
 				"required_sections: [Impact, recommendation, References]\n",
 			"section description Description true false\n" +
 				"section remediation Recommendation true true\n" +
@@ -42,7 +42,7 @@ func TestSectionsVerb(t *testing.T) {
 func TestSectionsSet(t *testing.T) {
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	// xss-search.md is F-001, saved with CRLF line ends.
-	head := "---\nid: F-001\ntitle: Reflected XSS in search\nscope: [S-14]\nseverity: medium\n---\n\n## Description\n\n" +
+	head := "---\nid: F-001\ntitle: Reflected XSS in search\ntargets: [{scope: S-14, port: 8443, protocol: tcp}]\nseverity: medium\n---\n\n## Description\n\n" +
 		"The `q` parameter is reflected unescaped.\n\n## Remediation\n\n"
 	tail := "## Proof of concept\n\n`/search?q=<script>alert(1)</script>`\n\n## References\n\n- OWASP XSS Prevention Cheat Sheet\n"
 	tests := []struct {
@@ -77,7 +77,7 @@ func TestSectionsSetRefuses(t *testing.T) {
 		name, file, stdin, wantErr string
 	}{
 		{"text with its own ## heading", "", "Fix it.\n\n## Sneaky\n\nmore\n", "## heading"},
-		{"a section the file has twice", "---\nid: F-009\ntitle: T\nscope: []\nseverity: low\n---\n## Remediation\n\na\n\n## Remediation\n\nb\n", "x", "twice"},
+		{"a section the file has twice", "---\nid: F-009\ntitle: T\ntargets: []\nseverity: low\n---\n## Remediation\n\na\n\n## Remediation\n\nb\n", "x", "twice"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

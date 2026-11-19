@@ -2,14 +2,14 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/problem.schema.json",
   "title": "rpt problem record",
-  "description": "One broken rule found by rpt validate or a checker plugin. Schema version 1.",
+  "description": "One broken rule found by rpt validate or a checker plugin. Schema version 2.",
   "type": "object",
   "properties": {
     "kind": {"const": "problem"},
     "path": {"type": "string", "description": "File the problem is in, relative to the report root."},
     "line": {"type": "integer", "minimum": 1, "description": "1-based line; absent when the problem has no line."},
     "column": {"type": "integer", "minimum": 1, "description": "1-based byte offset in the line; only with line. rpt validate's rules don't set it; plugins may."},
-    "rule": {"type": "string", "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, requiredSections, evidence, config, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Plugins may emit problems under rule names of their own."},
+    "rule": {"type": "string", "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, targets, requiredSections, evidence, config, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Plugins may emit problems under rule names of their own."},
     "level": {"enum": ["error", "warning"]},
     "message": {"type": "string"}
   },

@@ -39,8 +39,12 @@ A finding's permanent name, `F-` and a number, cited by clients and retests.
 _Avoid_: finding number, ref
 
 **Target**:
-The host, port and protocol a finding was actually found on.
+One place a finding was found on, attributed to a scope row: the row's ID, plus where inside it (a host, for a range row) and optionally a port and protocol. A finding has one or more.
 _Avoid_: asset, affected host (in data), endpoint
+
+**Range row**:
+A scope row whose host is a CIDR or `*.domain`, covering many assets; a target on it may name a host inside it. Every other scope row is one asset, named by an address, a name or any text.
+_Avoid_: subnet row, wildcard entry
 
 **Scope row**:
 One entry of the agreed scope in `scope.csv`: a host, address range or wildcard domain, optionally narrowed by port and protocol.

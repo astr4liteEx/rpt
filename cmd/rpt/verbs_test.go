@@ -27,7 +27,7 @@ func TestVerbsVerb(t *testing.T) {
 		if !strings.Contains(line, `"name":"scope","source":"builtin"`) {
 			continue
 		}
-		for _, sub := range []string{"rpt scope [--lines] [--json] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
+		for _, sub := range []string{"rpt scope [--lines] [--json] [id...] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
 			if !strings.Contains(line, sub) {
 				t.Errorf("scope's usage lacks %q:\n%s", sub, line)
 			}
@@ -57,7 +57,7 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"findings unset":  {{}, {"F-001"}, {"--no-such-flag"}},
 		"ls":              {{"a", "b"}, {"--no-such-flag"}},
 		"new":             {{}, {"a", "b"}},
-		"scope":           {{"extra"}, {"--no-such-flag"}},
+		"scope":           {{"--no-such-flag"}},
 		"scope match":     {{"extra"}, {"--no-such-flag"}},
 		"scope add":       {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},
 		"scope delete":    {{}, {"--no-such-flag"}},

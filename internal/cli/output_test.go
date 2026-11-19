@@ -4,11 +4,18 @@ import (
 	"bytes"
 	"fmt"
 	"testing"
-
-	"github.com/astr4liteEx/rpt/sdk"
 )
 
-var findings = []sdk.Finding{
+// listRec is a record with a list member, to show how tables render lists.
+type listRec struct {
+	Kind     string   `json:"kind"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Scope    []string `json:"scope"`
+	Severity string   `json:"severity"`
+}
+
+var findings = []listRec{
 	{Kind: "finding", ID: "F-003", Title: "SQL injection in login", Scope: []string{"S-12", "S-14"}, Severity: "high"},
 	{Kind: "finding", ID: "F-001", Title: "Reflected XSS", Scope: []string{"S-14"}, Severity: "medium"},
 }
