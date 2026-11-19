@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json/v2"
+	"maps"
 	"os"
 	"path/filepath"
 	"strings"
@@ -177,5 +178,44 @@ func TestFindingsAddScaffold(t *testing.T) {
 		"## Description\n\nKnown so far.\n\n## Remediation\n\n\n## Proof of concept\n\n"
 	if string(b) != want {
 		t.Errorf("file\n%q\nwant\n%q", b, want)
+	}
+}
+
+func TestFindingsUnset(t *testing.T) {
+	dir := reportCopy(t)
+	file := filepath.Join(dir, "findings/F-009-x.md")
+	src := "---\r\nid: F-009\r\ntitle: X\r\nscope: [S-12]\r\n# scored by hand\r\ncvss: \"9.1\"   # v3.1\r\n" +
+		"target:\r\n  host: 10.0.0.5\r\n  port: 443\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	code, out, errOut := runIn(t, "", "findings", "unset", "--report", dir, "F-009", "target", "cvss", "not-there")
+	if code != 0 || errOut != "" {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
+	}
+	if strings.Contains(out, "cvss") || strings.Contains(out, "target") {
+		t.Errorf("printed finding still has the keys: %s", out)
+	}
+	// The comment above cvss stays: it may describe what follows.
+	want := "---\r\nid: F-009\r\ntitle: X\r\nscope: [S-12]\r\n# scored by hand\r\nseverity: low\r\n---\r\n## Description\r\n\r\nd\r\n"
+	if b, _ := os.ReadFile(file); string(b) != want {
+		t.Errorf("file\n%q\nwant\n%q", b, want)
+	}
+}
+
+func TestFindingsUnsetRefuses(t *testing.T) {
+	for _, key := range []string{"id", "title", "scope", "severity", "kind", "path", "sections", "lines"} {
+		dir := reportCopy(t)
+		before := folderState(t, dir)
+		code, _, errOut := runIn(t, "", "findings", "unset", "--report", dir, "F-003", "cvss", key)
+		if code != 1 || !strings.Contains(errOut, "key can't be unset: "+key) {
+			t.Errorf("unset %s: exit %d, stderr %q; want 1", key, code, errOut)
+		}
+		if !maps.Equal(before, folderState(t, dir)) {
+			t.Errorf("unset %s: folder changed; a refused key must stop every change", key)
+		}
+	}
+	if code, _, _ := runIn(t, "", "findings", "unset", "--report", reportCopy(t), "F-404", "cvss"); code != 1 {
+		t.Errorf("unknown ID: exit %d, want 1", code)
 	}
 }

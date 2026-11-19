@@ -43,6 +43,7 @@ func TestVerbsPrintTableUsage(t *testing.T) {
 		"findings add":    {{"extra"}, {"--no-such-flag"}},
 		"findings set":    {{}, {"--no-such-flag"}},
 		"findings delete": {{}, {"--no-such-flag"}},
+		"findings unset":  {{}, {"F-001"}, {"--no-such-flag"}},
 		"ls":              {{"a", "b"}, {"--no-such-flag"}},
 		"new":             {{}, {"a", "b"}},
 		"scope":           {{"extra"}, {"--no-such-flag"}},

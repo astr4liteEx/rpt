@@ -122,6 +122,42 @@ func (f *findingFile) setEntry(key string, val *yaml.Node) error {
 	return nil
 }
 
+// removeEntry deletes a top-level key and its value's lines, including
+// the continuation lines of a block value. Comment and blank lines before
+// the next key stay: they belong to it. A missing key is no change.
+func (f *findingFile) removeEntry(key string) error {
+	var doc yaml.Node
+	if err := yaml.Unmarshal(f.head, &doc); err != nil {
+		return err
+	}
+	if len(doc.Content) == 0 {
+		return nil
+	}
+	m := doc.Content[0]
+	if m.Kind != yaml.MappingNode {
+		return fmt.Errorf("frontmatter is not a mapping")
+	}
+	lines := strings.SplitAfter(string(f.head), "\n")
+	if lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+	for i := 0; i+1 < len(m.Content); i += 2 {
+		if m.Content[i].Value != key {
+			continue
+		}
+		start, end := m.Content[i].Line-1, len(lines)
+		if i+2 < len(m.Content) {
+			end = m.Content[i+2].Line - 1
+		}
+		for end > start+1 && isGap(lines[end-1]) {
+			end--
+		}
+		f.head = []byte(strings.Join(lines[:start], "") + strings.Join(lines[end:], ""))
+		return nil
+	}
+	return nil
+}
+
 // isGap reports whether a frontmatter line is blank or a top-level comment.
 func isGap(line string) bool {
 	return strings.TrimSpace(line) == "" || strings.HasPrefix(line, "#")

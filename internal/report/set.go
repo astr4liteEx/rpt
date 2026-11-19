@@ -12,9 +12,10 @@ import (
 
 // Errors from editing a finding, all mistakes in the request.
 var (
-	ErrNoFinding  = errors.New("no such finding")
-	ErrRefusedKey = errors.New("key can't be set")
-	ErrBadValue   = errors.New("bad value")
+	ErrNoFinding    = errors.New("no such finding")
+	ErrRefusedKey   = errors.New("key can't be set")
+	ErrRefusedUnset = errors.New("key can't be unset")
+	ErrBadValue     = errors.New("bad value")
 )
 
 // refusedKeys can't be set: IDs are permanent, sections are edited by hand,
@@ -50,6 +51,35 @@ func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 		return sdk.Finding{}, err
 	}
 	return r.edit(rel, func(ff *findingFile) error { return ff.setEntry(key, val) })
+}
+
+// unsetRefused are the keys Unset refuses: a finding needs the first four,
+// and the rest aren't stored in the file.
+var unsetRefused = []string{"id", "title", "scope", "severity", "kind", "path", "sections", "lines"}
+
+// Unset removes top-level frontmatter keys from the finding with the given
+// ID, and returns the finding as now stored. Keys it doesn't have are no
+// change. A refused key stops every change. Nothing else in the file
+// changes.
+func (r *Report) Unset(id string, keys ...string) (sdk.Finding, error) {
+	for _, k := range keys {
+		if slices.Contains(unsetRefused, k) {
+			return sdk.Finding{}, fmt.Errorf("%w: %s: a finding needs it, or rpt sets it", ErrRefusedUnset, k)
+		}
+	}
+	rel, err := r.locate(id)
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	f, err := r.edit(rel, func(ff *findingFile) error {
+		for _, k := range keys {
+			if err := ff.removeEntry(k); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	return f, err
 }
 
 // locate returns the path of the finding with the given ID.

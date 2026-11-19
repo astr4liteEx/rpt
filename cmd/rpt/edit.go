@@ -72,6 +72,42 @@ func setVerb(e *env, args []string) int {
 	return cli.ExitOK
 }
 
+// unsetVerb removes frontmatter keys from one finding.
+func unsetVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "findings unset")
+	pos, err := parseInterspersed(flags, args)
+	if err != nil {
+		return cli.ExitUsage
+	}
+	if len(pos) < 2 {
+		return badUsage(e, "findings unset")
+	}
+	out, err := of.output(e, findingColumns)
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	r := openReport(e, *of.report)
+	if r == nil {
+		return cli.ExitUsage
+	}
+	defer r.Close()
+
+	f, err := r.Unset(pos[0], pos[1:]...)
+	if err != nil {
+		return logEditError(e, err, 0)
+	}
+	if err := out.Write(f); err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	if err := out.Flush(); err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitUsage
+	}
+	return cli.ExitOK
+}
+
 // logEditError logs an error from editing and returns its exit code. A
 // problem in a report file, or anything wrong with what was asked (an
 // unknown finding, a key that can't be set, a bad value), is exit 1; any
@@ -82,7 +118,7 @@ func logEditError(e *env, err error, line int) int {
 		e.log.Error(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
 		return cli.ExitProblems
 	}
-	if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrRefusedKey) || errors.Is(err, report.ErrBadValue) {
+	if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrRefusedKey) || errors.Is(err, report.ErrRefusedUnset) || errors.Is(err, report.ErrBadValue) {
 		if line > 0 {
 			e.log.Error(err.Error(), "path", "stdin", "line", line)
 		} else {
