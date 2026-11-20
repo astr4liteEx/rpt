@@ -73,7 +73,7 @@ Filtering a stream (stdin to stdout):
 
 - stdout carries records only: JSON Lines when stdout is a pipe or file. A table or other human form is allowed on a terminal.
 - stderr carries messages, one per line: `<program>: <path>:<line>:<column>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known (most messages have no column).
-- Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could); `2` usage error. `126` belongs to rpt (the plugin couldn't start).
+- Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could); `2` usage error; `3` the plugin couldn't do its work, such as a tool it needs being missing, failing or timing out, so its output says nothing about the report (say why in one stderr line). `126` belongs to rpt (the plugin couldn't start).
 
 ## In a pipeline
 
