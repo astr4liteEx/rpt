@@ -8,6 +8,20 @@
       "medium",
       "low",
       "info"
+    ],
+    "sections": [
+      {
+        "key": "description",
+        "heading": "Description"
+      },
+      {
+        "key": "remediation",
+        "heading": "Remediation"
+      },
+      {
+        "key": "poc",
+        "heading": "Proof of concept"
+      }
     ]
   },
   "summary": {

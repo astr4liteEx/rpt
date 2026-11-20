@@ -143,8 +143,24 @@ type ReportMeta struct {
 	// can order the summary and the findings without guessing.
 	Severities []Severity `json:"severities"`
 
+	// Sections are the report's sections in the order rpt writes them:
+	// the fixed ones with this report's headings, then the custom ones it
+	// requires, as rpt sections gives them. A finding's sections are keyed
+	// by Key; Heading is what a reader sees.
+	Sections []ReportSection `json:"sections"`
+
 	// Extra holds unknown members of the record. rpt never copies unknown
 	// config keys here.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// ReportSection is one section in ReportMeta: the key a finding's sections
+// use and the heading this report gives it.
+type ReportSection struct {
+	Key     string `json:"key"`
+	Heading string `json:"heading"`
+
+	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 

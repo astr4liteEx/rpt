@@ -86,12 +86,12 @@ $EDITOR findings/F-001-sql-injection-in-login.md
 rpt evidence add F-001 ~/shots/login-bypass.png                    # copied in, listed in F-001's evidence
 rpt validate                  # clean, exits 0
 
-rpt assemble | rpt-render-pdf --client Acme > report.pdf
+rpt assemble | rpt-render-pdf --client Acme --out report.pdf
 ```
 
 For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains one planted problem for `rpt validate` to find.
 
-`rpt-render-pdf` stands for any renderer plugin. `rpt assemble` prints the whole report as one JSON record, with each finding's evidence paths made absolute and a count of findings per severity.
+`rpt-render-pdf` stands for any renderer plugin. `rpt assemble` prints the whole report as one JSON record, with each finding's evidence paths made absolute, a count of findings per severity, and the report's section headings. A renderer writes its document where `--out` says, so stdout carries only records.
 
 ## Commands
 

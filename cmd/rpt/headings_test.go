@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -123,5 +124,30 @@ func TestRequiredSectionByRenamedHeading(t *testing.T) {
 		"---\nid: F-001\ntitle: XSS\ntargets: [{scope: S-1}]\nseverity: low\n---\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n")
 	if code, out, errOut := runIn(t, "", "validate", "--report", dir); code != 0 || out != "" {
 		t.Errorf("validate: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+}
+
+func TestAssembleCarriesSections(t *testing.T) {
+	dir := renamedReport(t, renamedConfig+"required_sections: [Impact]\n", "")
+	code, out, errOut := runIn(t, "", "assemble", "--report", dir)
+	if code != 0 {
+		t.Fatalf("assemble: exit %d, stderr %q", code, errOut)
+	}
+	var rec struct {
+		Report struct {
+			Sections []map[string]string `json:"sections"`
+		} `json:"report"`
+	}
+	if err := json.Unmarshal([]byte(out), &rec); err != nil {
+		t.Fatalf("not one report record: %q: %v", out, err)
+	}
+	want := []map[string]string{
+		{"key": "description", "heading": "Description"},
+		{"key": "remediation", "heading": "Recommendation"},
+		{"key": "poc", "heading": "Steps to reproduce"},
+		{"key": "Impact", "heading": "Impact"},
+	}
+	if !slices.EqualFunc(rec.Report.Sections, want, maps.Equal) {
+		t.Errorf("report.sections\n got: %v\nwant: %v", rec.Report.Sections, want)
 	}
 }

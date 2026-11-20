@@ -24,8 +24,8 @@ type Description struct {
 	Output string `json:"output,omitzero"`
 
 	// Roles names what the plugin is, so a tool on top of rpt can find,
-	// say, every checker: RoleChecker, RoleFilter, RoleWriter. A plugin
-	// can hold several; empty is "not said".
+	// say, every checker: RoleChecker, RoleFilter, RoleWriter,
+	// RoleRenderer. A plugin can hold several; empty is "not said".
 	Roles []string `json:"roles,omitzero"`
 
 	// Extra holds any unknown members.
@@ -42,6 +42,10 @@ const (
 	RoleFilter = "filter"
 	// RoleWriter changes the report, only through $RPT_BIN write verbs.
 	RoleWriter = "writer"
+	// RoleRenderer reads a report record and writes a document to a place
+	// it's given (a file or folder flag); it never changes the report and
+	// writes no records to stdout.
+	RoleRenderer = "renderer"
 )
 
 // Plugin is a plugin program: its description and the function that does

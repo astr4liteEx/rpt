@@ -18,9 +18,19 @@
     "reportMeta": {
       "type": "object",
       "properties": {
-        "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."}
+        "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."},
+        "sections": {"type": "array", "items": {"$ref": "#/$defs/reportSection"}, "description": "The report's sections in the order rpt writes them: the fixed ones with this report's headings, then the custom ones it requires, as rpt sections gives them."}
       },
-      "required": ["severities"],
+      "required": ["severities", "sections"],
+      "additionalProperties": true
+    },
+    "reportSection": {
+      "type": "object",
+      "properties": {
+        "key": {"type": "string", "description": "The key a finding's sections use: description, remediation, poc, or a custom section's heading."},
+        "heading": {"type": "string", "description": "The heading this report gives the section, for a reader."}
+      },
+      "required": ["key", "heading"],
       "additionalProperties": true
     },
     "reportFinding": {

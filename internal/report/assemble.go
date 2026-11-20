@@ -79,6 +79,7 @@ func (r *Report) Assemble() (sdk.Report, []sdk.Problem, error) {
 		SchemaVersion: SchemaVersion,
 		Report: sdk.ReportMeta{
 			Severities: cfg.Severities,
+			Sections:   reportSections(cfg),
 		},
 		Summary:  summary,
 		Scope:    nonNilRows(rows),
@@ -199,6 +200,16 @@ func compareIDs(a, b string) int {
 		return 1
 	}
 	return cmp.Compare(a, b)
+}
+
+// reportSections is the config's section list as the report record gives
+// it: key and heading only.
+func reportSections(cfg Config) []sdk.ReportSection {
+	out := []sdk.ReportSection{}
+	for _, s := range cfg.SectionList() {
+		out = append(out, sdk.ReportSection{Key: s.Key, Heading: s.Heading})
+	}
+	return out
 }
 
 func nonNilRows(rows []sdk.ScopeRow) []sdk.ScopeRow {

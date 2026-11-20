@@ -36,8 +36,8 @@
     },
     "roles": {
       "type": "array",
-      "description": "The roles a verb holds, each a promise: checker emits problem records about the report, exits 1 only when one is an error, and never changes the report; filter reads records on stdin and writes records on stdout; writer changes the report, only through $RPT_BIN write verbs.",
-      "items": {"enum": ["checker", "filter", "writer"]},
+      "description": "The roles a verb holds, each a promise: checker emits problem records about the report, exits 1 only when one is an error, and never changes the report; filter reads records on stdin and writes records on stdout; writer changes the report, only through $RPT_BIN write verbs; renderer reads a report record and writes a document to a place it is given (a file or folder flag), never changes the report and writes no records to stdout.",
+      "items": {"enum": ["checker", "filter", "writer", "renderer"]},
       "uniqueItems": true
     },
     "dataType": {
