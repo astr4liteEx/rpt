@@ -12,7 +12,8 @@ acme-external/
 │   └── evidence/
 │       └── F-003-login.png
 └── pages/                report-level prose
-    └── P-001-executive-summary.md
+    ├── P-001-executive-summary.md
+    └── evidence/
 ```
 
 rpt finds the report from `--report <dir>`, else `$RPT_REPORT_DIR`, else the nearest folder at or above the current one that holds `rpt.yaml`. `rpt ls --current` prints the report those rules pick, as one `location` record with its absolute path; it exits 1 when they find none, or when `--report` or `$RPT_REPORT_DIR` names a folder without `rpt.yaml`. `rpt ls [dir]` searches the other way: it lists every report at or under a folder, never looking inside a report for another (reports don't nest), and skipping hidden folders and symlinks.
@@ -116,7 +117,7 @@ The body is split into sections at `##` headings. `## Description`, `## Remediat
 
 The file name is free. `rpt finding add` names new files `F-NNN-<title-slug>.md`.
 
-Evidence files can sit anywhere inside the report, but `findings/evidence/` is where `rpt evidence add` puts them. It names each copy `<id>-<slug>.<ext>`: the slug is the source file's name without its extension, lowercased, with each run of other characters than `a`–`z` and `0`–`9` turned into one `-`, at most 40 characters, or `evidence` if nothing is left; the extension is lowercased. A name that's taken gets `-2`, `-3` and so on. A file in `findings/evidence/` that no finding lists or links to is an orphan: `rpt validate` warns about it, and `rpt evidence prune` removes it. Hidden files there, such as `.gitkeep`, are left alone.
+Evidence files can be of any type and sit anywhere inside the report, but `findings/evidence/` is where `rpt evidence add` copies a finding's, and `pages/evidence/` a page's; a file already in the report is listed where it is, not copied. It names each copy `<id>-<slug>.<ext>`: the slug is the source file's name without its extension, lowercased, with each run of other characters than `a`–`z` and `0`–`9` turned into one `-`, at most 40 characters, or `evidence` if nothing is left; the extension is lowercased. A name that's taken gets `-2`, `-3` and so on. A link's text is the file's caption: `rpt evidence set <owner> <ref> caption <text>` rewrites every link to it. A file in either folder that no finding or page lists or links to is an orphan: `rpt validate` warns about it, and `rpt evidence prune` removes it. Hidden files there, such as `.gitkeep`, are left alone.
 
 ## Pages
 
@@ -155,6 +156,6 @@ A page has an `id` (`P-` and at least three digits), a `title`, an optional `evi
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
 | `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define, other than an `x-<plugin>` section. |
-| `evidenceUnlinked` | warning | A file in `findings/evidence/` that no finding lists or links to. Not checked while a finding file is unreadable. |
+| `evidenceUnlinked` | warning | A file in `findings/evidence/` or `pages/evidence/` that no finding or page lists or links to. Not checked while a finding or page file is unreadable. |
 
 Plugins can check more by emitting problems under their own rule names.

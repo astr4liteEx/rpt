@@ -67,9 +67,13 @@ func init() {
 			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>..."},
 			{"unset", configUnsetVerb, "rpt config unset [--force] [--if-rev rev] [--dry-run] <path>..."},
 		}},
-		"evidence": {evidenceVerb, sdk.Command{Summary: "List the findings' evidence files; add copies files in, prune removes unreferenced ones", Usage: "rpt evidence [--orphans] [--json] [--report dir]", Output: "records"}, []sub{
-			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--if-rev rev] [--dry-run] <id> <file>..."},
-			{"prune", evidencePruneVerb, "rpt evidence prune [--dry-run]"},
+		"evidence": {nounVerb("evidence"), sdk.Command{Summary: "Get, add, set, unset and remove the evidence findings and pages list and link; prune removes files nothing references", Usage: "rpt evidence <action>", Input: "records", Output: "records"}, []sub{
+			{"get", evidenceGetVerb, "rpt evidence get [owner...], or rpt evidence get --orphans"},
+			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--link section [--text caption]] [--if-rev rev] [--dry-run] <owner> <file>..., or rpt evidence add [--dry-run] < records.jsonl"},
+			{"set", evidenceSetVerb, "rpt evidence set [--if-rev rev] [--dry-run] <owner> <ref> caption|path <value>"},
+			{"unset", evidenceUnsetVerb, "rpt evidence unset [--if-rev rev] [--dry-run] <owner> <ref> caption"},
+			{"remove", evidenceRemoveVerb, "rpt evidence remove [--yes] [--drop-text] [--if-rev rev] [--dry-run] <owner> <ref>"},
+			{"prune", evidencePruneVerb, "rpt evidence prune [--yes] [--dry-run]"},
 		}},
 		"finding": {nounVerb("finding"), sdk.Command{Summary: "Get, add, set, unset and remove findings", Usage: "rpt finding <action>", Input: "records", Output: "records"}, []sub{
 			{"get", findingGetVerb, "rpt finding get [--lines] [id...]"},

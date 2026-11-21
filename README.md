@@ -83,7 +83,7 @@ rpt finding add --title "SQL injection in login" --severity high --target S-001
 
 rpt validate                  # F-001's Description, Remediation and Proof of concept are empty
 $EDITOR findings/F-001-sql-injection-in-login.md
-rpt evidence add F-001 ~/shots/login-bypass.png                    # copied in, listed in F-001's evidence
+rpt evidence add F-001 ~/shots/login-bypass.png --link poc --text "Login bypass"   # copied in, listed, linked
 rpt validate                  # clean, exits 0
 
 rpt assemble | rpt-render-pdf --client Acme --out report.pdf
@@ -116,9 +116,11 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt scope unset <id> <column>...` | Blanks cells of a row. A row's `id` and `host` can't be blanked. |
 | `rpt scope remove <id>...` | Removes scope rows, after asking on a terminal; elsewhere pass `--yes`. A row a finding cites is refused unless you pass `--force` (leave the targets dangling) or `--cleanup` (drop them). |
 | `rpt scope match` | Reads finding records on stdin and attributes each target that has a `host` and no scope ID to the most specific scope row covering it. `--drop-out-of-scope` drops targets no row covers, and findings left with none. |
-| `rpt evidence [--orphans]` | Lists every evidence file the findings list or link to, with its absolute path and whether it exists. `--orphans` adds the files in `findings/evidence/` that nothing references. |
-| `rpt evidence add <id> <file>...` | Copies files into `findings/evidence/` as `<id>-<name>.<ext>` and lists them in the finding's evidence. `--as <name>` names a single copy. |
-| `rpt evidence prune` | Removes the files in `findings/evidence/` that nothing references. `--dry-run` only lists them. |
+| `rpt evidence get [owner...]` | Lists every evidence file the findings and pages list or link to, with its path, media type and whether it exists; a link also gives its text, section, line and column. `--orphans` adds the files in `findings/evidence/` and `pages/evidence/` that nothing references. |
+| `rpt evidence add <owner> <file>...` | Lists files in a finding's or page's evidence. A file already in the report is listed where it is; others are copied into `findings/evidence/` or `pages/evidence/` as `<id>-<name>.<ext>` (`--as <name>` names a single copy). `--link <section> --text <caption>` also links each file at the end of that section (`body` for a page), as an image when it is one. With no files, reads `evidence` records naming the owner and `file`. |
+| `rpt evidence set <owner> <ref> caption\|path <value>` | `caption` rewrites the text of every link to the file, and is refused when nothing links it. `path` moves the file and rewrites every reference to it, in every finding and page. `rpt evidence unset <owner> <ref> caption` empties the caption. |
+| `rpt evidence remove <owner> <ref>` | Detaches a file: its evidence list entry and image links go, and text links keep their words unless `--drop-text`. The file stays for `prune`. Asks on a terminal; elsewhere pass `--yes`. |
+| `rpt evidence prune` | Removes the files in `findings/evidence/` and `pages/evidence/` that nothing references, after asking on a terminal; elsewhere pass `--yes`. `--dry-run` only lists them. |
 | `rpt config get [path]` | Prints the report config as one record: severities, section headings, required sections, rule levels and plugin settings, defaults filled in. A path gives only that member; `--merged x-<plugin>` lays a plugin's report section over its user settings file. |
 | `rpt config set <path> <value>...` | Changes one config value. `--rename old=new` with a new `severities` or `required_sections` list rewrites every finding using the old name; dropping a level findings still use needs `--force`. Setting `sections.<key>` (a fixed section's heading) rewrites that heading in every finding. |
 | `rpt config unset <path>...` | Removes config keys; severities, sections and required sections go back to the defaults. |

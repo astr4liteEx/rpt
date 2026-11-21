@@ -124,18 +124,30 @@ type ConfigLines struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Evidence is an "evidence" record rpt evidence emits: one reference a
-// finding makes to an evidence file, or, with --orphans, a file under
-// findings/evidence/ that nothing references (no Finding, Ref or Source).
+// Evidence is an "evidence" record rpt evidence get emits: one reference
+// a finding or page makes to an evidence file, in its evidence list or as
+// a link in its text, or with --orphans a file in an evidence folder that
+// nothing references (no owner, Ref or Source).
 type Evidence struct {
 	Kind    string `json:"kind"`
-	Finding string `json:"finding,omitzero"` // the referencing finding's ID
-	Ref     string `json:"ref,omitzero"`     // as written in the finding, relative to its file
+	Finding string `json:"finding,omitzero"` // the owner, when a finding
+	Page    string `json:"page,omitzero"`    // the owner, when a page
+	Ref     string `json:"ref,omitzero"`     // as written, relative to the owner's file
 	Source  string `json:"source,omitzero"`  // "frontmatter" (the evidence list) or "body" (a link)
 	Path    string `json:"path,omitzero"`    // relative to the report root; absent when Ref leaves the report
 	File    string `json:"file,omitzero"`    // absolute, symlinks kept; absent when Ref leaves the report
 	Exists  bool   `json:"exists"`
-	Rev     string `json:"rev,omitzero"` // the referencing finding's rev
+	// MediaType is the file's type, from its content, else its extension.
+	MediaType string `json:"media_type,omitzero"`
+	// Text is a link's text, its caption; Image says it is an image link.
+	Text  string `json:"text,omitzero"`
+	Image bool   `json:"image,omitzero"`
+	// Section is the key of the finding section a link is in; Line and
+	// Column are where the link starts in the owner's file.
+	Section string `json:"section,omitzero"`
+	Line    int    `json:"line,omitzero"`
+	Column  int    `json:"column,omitzero"`
+	Rev     string `json:"rev,omitzero"` // the owner's rev
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

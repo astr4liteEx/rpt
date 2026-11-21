@@ -102,7 +102,7 @@ func (w *write) refuse(err error, path string, line int) {
 	p := sdk.Problem{Path: path, Line: line, Rule: ruleWrite, Level: sdk.Error, Message: err.Error()}
 	if re, ok := errors.AsType[*report.RevError](err); ok {
 		p.Path, p.Line, p.Rule = re.Path, 0, ruleRev
-	} else if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrNoScopeRow) || errors.Is(err, report.ErrNoPage) {
+	} else if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrNoScopeRow) || errors.Is(err, report.ErrNoPage) || errors.Is(err, report.ErrNoEvidence) {
 		p.Rule = ruleExists
 	} else if fe, ok := errors.AsType[*report.FileError](err); ok {
 		p.Path, p.Line, p.Rule, p.Message = fe.Path, fe.Line, ruleReadable, fe.Err.Error()

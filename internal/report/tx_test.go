@@ -94,7 +94,7 @@ func TestDryRunKeepsNothing(t *testing.T) {
 	}
 	before := readAll(t, dir)
 	tx := r.Begin()
-	f, err := tx.AddEvidence("F-001", []string{shot}, "")
+	rec, err := tx.AddEvidence("F-001", []EvidenceSource{{Path: shot}}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestDryRunKeepsNothing(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, EvidenceDir)); !errors.Is(err, os.ErrNotExist) {
 		t.Error("dry run left the evidence folder it made")
 	}
-	if f.Rev == "" || len(f.Evidence) != 1 {
+	if f := rec.(sdk.Finding); f.Rev == "" || len(f.Evidence) != 1 {
 		t.Errorf("dry run gave %+v; want the finding as it would be", f)
 	}
 }

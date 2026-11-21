@@ -130,7 +130,7 @@ func TestEvidenceListOrphansAndPrune(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	code, out, errOut := runIn(t, "", "evidence", "--report", dir)
+	code, out, errOut := runIn(t, "", "evidence", "get", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -142,7 +142,7 @@ func TestEvidenceListOrphansAndPrune(t *testing.T) {
 		t.Errorf("listed\n%s\nwant\n%s", got, want)
 	}
 
-	_, out, _ = runIn(t, "", "evidence", "--report", dir, "--orphans")
+	_, out, _ = runIn(t, "", "evidence", "get", "--report", dir, "--orphans")
 	orphans := "  findings/evidence/old/nested.log\n  findings/evidence/stray.txt\n"
 	if got := pick(t, out, "finding", "source", "path"); !strings.HasSuffix(got, orphans) || strings.Count(got, "\n") != 4 {
 		t.Errorf("with --orphans\n%s\nwant the two references, then\n%s", got, orphans)
@@ -158,7 +158,7 @@ func TestEvidenceListOrphansAndPrune(t *testing.T) {
 	if _, out, _ = runIn(t, "", "evidence", "prune", "--report", dir, "--dry-run"); pick(t, out, "path") != "findings/evidence/old/nested.log\nfindings/evidence/stray.txt\n" || !maps.Equal(before, folderState(t, dir)) {
 		t.Errorf("--dry-run: stdout %q, or it changed the report", out)
 	}
-	if code, out, _ = runIn(t, "", "evidence", "prune", "--report", dir); code != 0 || strings.Count(out, "\n") != 2 {
+	if code, out, _ = runIn(t, "", "evidence", "prune", "--yes", "--report", dir); code != 0 || strings.Count(out, "\n") != 2 {
 		t.Errorf("prune: exit %d, stdout %q", code, out)
 	}
 	for f, want := range map[string]bool{"stray.txt": false, "old/nested.log": false, ".gitkeep": true, "F-003-login.png": true} {
@@ -174,7 +174,7 @@ func TestEvidencePruneRefusesWhenAFindingIsUnreadable(t *testing.T) {
 	os.WriteFile(filepath.Join(dir, "findings/broken.md"), []byte("no frontmatter\n"), 0o644)
 	os.WriteFile(filepath.Join(dir, "findings/evidence/stray.txt"), []byte("x"), 0o644)
 	before := folderState(t, dir)
-	if code, _, errOut := runIn(t, "", "evidence", "prune", "--report", dir); code != 1 || !strings.Contains(errOut, "broken.md") {
+	if code, _, errOut := runIn(t, "", "evidence", "prune", "--yes", "--report", dir); code != 1 || !strings.Contains(errOut, "broken.md") {
 		t.Errorf("exit %d, stderr %q; want 1 naming broken.md", code, errOut)
 	}
 	if !maps.Equal(before, folderState(t, dir)) {
@@ -183,9 +183,94 @@ func TestEvidencePruneRefusesWhenAFindingIsUnreadable(t *testing.T) {
 }
 
 func TestEvidenceUsage(t *testing.T) {
-	for _, args := range [][]string{{"bogus"}, {"add"}, {"add", "F-001"}} {
+	for _, args := range [][]string{{"bogus"}, {}, {"add", "F-001"}, {"get", "--orphans", "F-001"}, {"prune"}} {
 		if code, _, _ := runIn(t, "", append([]string{"evidence"}, args...)...); code != 2 {
 			t.Errorf("rpt evidence %v: exit %d, want 2", args, code)
+		}
+	}
+}
+
+func TestEvidenceAddLinksInOneWrite(t *testing.T) {
+	dir := reportCopy(t)
+	shot := source(t, "shot.png", "\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR")
+	code, out, errOut := runIn(t, "", "evidence", "add", "F-001", shot, "--link", "poc", "--text", "Login bypass", "--report", dir)
+	if code != 0 || pick(t, out, "kind", "id") != "finding F-001\n" {
+		t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	_, out, _ = runIn(t, "", "evidence", "get", "F-001", "--report", dir)
+	if got := pick(t, out, "source", "text", "image", "section", "media_type"); got != "frontmatter    image/png\nbody Login bypass true poc image/png\n" {
+		t.Errorf("evidence get: %q", got)
+	}
+}
+
+func TestEvidenceAddFromRecords(t *testing.T) {
+	dir := reportCopy(t)
+	shot := source(t, "chart.png", "x")
+	in := `{"kind":"evidence","finding":"f-001","file":"` + shot + `"}` + "\n" + `{"kind":"note"}` + "\n"
+	code, out, errOut := runIn(t, in, "evidence", "add", "--report", dir)
+	if code != 0 || pick(t, out, "kind") != "finding\nnote\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	if code, out, _ := runIn(t, `{"kind":"evidence","finding":"F-001"}`+"\n", "evidence", "add", "--report", dir); code != 1 || pick(t, out, "rule") != "input\n" {
+		t.Errorf("no file: exit %d, stdout %q", code, out)
+	}
+}
+
+func TestEvidenceRemoveAsksAndDetaches(t *testing.T) {
+	dir := reportCopy(t)
+	if code, _, errOut := runIn(t, "", "evidence", "remove", "F-003", "evidence/F-003-login.png", "--report", dir); code != 2 || !strings.Contains(errOut, "--yes") {
+		t.Errorf("off a terminal: exit %d, stderr %q", code, errOut)
+	}
+	code, out, errOut := runIn(t, "", "evidence", "remove", "F-003", "evidence/F-003-login.png", "--yes", "--report", dir)
+	if code != 0 || pick(t, out, "id", "evidence") != "F-003 \n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "findings/evidence/F-003-login.png")); err != nil {
+		t.Error("the file went")
+	}
+	_, out, _ = runIn(t, "", "evidence", "get", "--orphans", "--report", dir)
+	if !strings.Contains(out, `"path":"findings/evidence/F-003-login.png"`) {
+		t.Errorf("not an orphan now: %s", out)
+	}
+}
+
+func TestEvidenceSetCaptionAndPath(t *testing.T) {
+	dir := reportCopy(t)
+	if code, _, errOut := runIn(t, "", "evidence", "set", "F-003", "evidence/F-003-login.png", "caption", "Bypass", "--report", dir); code != 0 {
+		t.Fatalf("caption: exit %d, stderr %q", code, errOut)
+	}
+	code, out, errOut := runIn(t, "", "evidence", "set", "F-003", "evidence/F-003-login.png", "path", "evidence/login.png", "--report", dir)
+	if code != 0 || pick(t, out, "id", "evidence") != "F-003 [evidence/login.png]\n" {
+		t.Fatalf("path: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	_, out, _ = runIn(t, "", "evidence", "get", "F-003", "--report", dir)
+	if got := pick(t, out, "ref", "text"); got != "evidence/login.png \nevidence/login.png Bypass\n" {
+		t.Errorf("get: %q", got)
+	}
+	if code, _, _ := runIn(t, "", "evidence", "unset", "F-003", "evidence/login.png", "caption", "--report", dir); code != 0 {
+		t.Errorf("unset caption: exit %d", code)
+	}
+}
+
+func TestEvidencePruneAsks(t *testing.T) {
+	old := interactive
+	interactive = func(*env) bool { return true }
+	t.Cleanup(func() { interactive = old })
+	for _, tt := range []struct {
+		answer  string
+		removed bool
+	}{{"y\n", true}, {"n\n", false}} {
+		dir := reportCopy(t)
+		stray := filepath.Join(dir, "pages", "evidence", "stray.txt")
+		os.MkdirAll(filepath.Dir(stray), 0o755)
+		os.WriteFile(stray, []byte("x"), 0o644)
+		code, _, errOut := runIn(t, tt.answer, "evidence", "prune", "--report", dir)
+		if !strings.Contains(errOut, "pages/evidence/stray.txt") || !strings.Contains(errOut, "[y/N]") {
+			t.Errorf("%q: prompt %q", tt.answer, errOut)
+		}
+		_, err := os.Stat(stray)
+		if gone := err != nil; gone != tt.removed || (code == 0) != tt.removed {
+			t.Errorf("%q: exit %d, removed %v", tt.answer, code, gone)
 		}
 	}
 }

@@ -315,15 +315,15 @@ func (v *validation) evidence(ff findingSrc) {
 }
 
 func (v *validation) evidenceUnlinked() {
-	all, err := v.r.Evidence(true)
+	all, err := v.r.Evidence(nil, true)
 	if err != nil {
 		v.add(EvidenceDir, 0, RuleEvidenceUnlinked, sdk.Warning, "%v", err)
 		return
 	}
 	for _, e := range all {
-		if e.Finding == "" {
+		if e.Finding == "" && e.Page == "" {
 			v.add(e.Path, 0, RuleEvidenceUnlinked, sdk.Warning,
-				"no finding lists or links to this file; link it, or remove it with rpt evidence prune")
+				"no finding or page lists or links to this file; link it, or remove it with rpt evidence prune")
 		}
 	}
 }

@@ -216,7 +216,7 @@ func uniq(ids []string) []string {
 // requestErrors are mistakes in what was asked: refusals, not failures.
 var requestErrors = []error{
 	report.ErrNoFinding, report.ErrNoPage, report.ErrRefusedKey, report.ErrRefusedUnset, report.ErrBadValue,
-	report.ErrNoScopeRow, report.ErrCited, report.ErrBadSource, report.ErrInUse,
+	report.ErrNoScopeRow, report.ErrCited, report.ErrBadSource, report.ErrInUse, report.ErrNoEvidence,
 }
 
 func isRequestError(err error) bool {

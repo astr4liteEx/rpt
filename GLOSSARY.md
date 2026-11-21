@@ -51,7 +51,7 @@ Evidence as an assembled report gives it: its reference as written, its path in 
 _Avoid_: evidence (that is the file in the report), attachment
 
 **Orphan evidence**:
-A file in the findings' evidence folder that no finding lists or links to.
+A file in an evidence folder, `findings/evidence/` or `pages/evidence/`, that no finding or page lists or links to.
 _Avoid_: unused asset, stray file, dangling evidence
 
 **Finding ID**:

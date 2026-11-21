@@ -32,6 +32,7 @@ const (
 	rankScope          // scope.csv
 	rankConfig         // rpt.yaml
 	rankPage           // page files
+	rankGone           // evidence files moved or pruned: removed once nothing refers to them
 )
 
 // RevError refuses a write because a thing changed since the caller read
