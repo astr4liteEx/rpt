@@ -145,7 +145,8 @@ var (
 type Model struct {
 	Dir    string // the report folder, as given
 	root   *os.Root
-	files  map[string]*file // every file read or changed, by path
+	files  map[string]*file    // every file read or changed, by path
+	listed map[string][]string // every folder listed: its .md files on disk
 	Config *Config
 	Scope  *Scope
 	docs   map[*Kind][]*Doc // in file-name order
@@ -159,6 +160,9 @@ type file struct {
 	data    []byte // as it will be written
 	remove  bool
 	dirty   bool
+	// copyFrom is an OS path the file is copied from when saved, in
+	// place of data.
+	copyFrom string
 }
 
 // Load reads the report in dir. Files that don't parse are kept, with
@@ -169,7 +173,11 @@ func Load(dir string) (*Model, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open report %s: %w", dir, err)
 	}
-	m := &Model{Dir: dir, root: root, files: map[string]*file{}, docs: map[*Kind][]*Doc{}}
+	m := &Model{Dir: dir, root: root, files: map[string]*file{}, listed: map[string][]string{}, docs: map[*Kind][]*Doc{}}
+	if err := m.recover(); err != nil {
+		root.Close()
+		return nil, err
+	}
 	if err := m.load(); err != nil {
 		root.Close()
 		return nil, err
@@ -247,8 +255,29 @@ func (m *Model) put(rel string, data []byte) error {
 }
 
 // list names the regular .md files in dir, sorted, as this command sees
-// the folder.
+// the folder: the files on disk and the new ones it has added. Save
+// checks the folder hasn't changed since.
 func (m *Model) list(dir string) ([]string, error) {
+	disk, ok := m.listed[dir]
+	if !ok {
+		var err error
+		if disk, err = m.mdFiles(dir); err != nil {
+			return nil, err
+		}
+		m.listed[dir] = disk
+	}
+	names := slices.Clone(disk)
+	for rel, f := range m.files {
+		if path.Dir(rel) == dir && path.Ext(rel) == ".md" && f.dirty && !f.remove && !f.existed {
+			names = append(names, path.Base(rel))
+		}
+	}
+	slices.Sort(names)
+	return slices.Compact(names), nil
+}
+
+// mdFiles names the regular .md files in dir on disk, sorted.
+func (m *Model) mdFiles(dir string) ([]string, error) {
 	ents, err := fs.ReadDir(m.root.FS(), dir)
 	if err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return nil, &FileError{Path: dir, Err: err}
@@ -259,13 +288,7 @@ func (m *Model) list(dir string) ([]string, error) {
 			names = append(names, e.Name())
 		}
 	}
-	for rel, f := range m.files {
-		if path.Dir(rel) == dir && path.Ext(rel) == ".md" && f.dirty && !f.remove && !f.existed {
-			names = append(names, path.Base(rel))
-		}
-	}
-	slices.Sort(names)
-	return slices.Compact(names), nil
+	return names, nil
 }
 
 // Docs lists the documents of a kind in file-name order, broken ones too.
