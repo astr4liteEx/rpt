@@ -47,7 +47,7 @@ var tagPlugin = sdk.Plugin{
 		Input:    "records",
 		Output:   "records",
 		Roles:    []string{sdk.RoleFilter},
-		Requires: &sdk.Requires{SchemaVersion: []int{2}},
+		Requires: &sdk.Requires{SchemaVersion: &sdk.Range{Min: 2}},
 		Schemas:  &sdk.Schemas{Finding: map[string]jsontext.Value{"x-tag-label": jsontext.Value(`{"type":"string"}`)}},
 	},
 	Complete: func(args []string, word string) []string {
@@ -141,7 +141,7 @@ func TestRunAnswersWithoutWork(t *testing.T) {
 		{[]string{"--help"}, "Usage: rpt tag < findings.jsonl\n\nTag findings with a label\n"},
 		{[]string{"__complete", "F-001", "--l"}, "--label\tthe label to set\n:4\n"},
 		{[]string{"__completeNoDesc", ""}, "--label\n:4\n"},
-		{[]string{"--describe"}, `{"summary":"Tag findings with a label","usage":"rpt tag < findings.jsonl","input":"records","output":"records","roles":["filter"],"schemas":{"finding":{"x-tag-label":{"type":"string"}}},"requires":{"schema_version":[2]}}` + "\n"},
+		{[]string{"--describe"}, `{"summary":"Tag findings with a label","usage":"rpt tag < findings.jsonl","input":"records","output":"records","roles":["filter"],"schemas":{"finding":{"x-tag-label":{"type":"string"}}},"requires":{"schema_version":{"min":2}}}` + "\n"},
 	} {
 		code, out, _ := run(t, "", tt.args...)
 		if code != 0 || out != tt.want || worked {
@@ -162,4 +162,16 @@ func TestCallStale(t *testing.T) {
 	if err != nil || res.Code != 1 || !res.Stale() || len(res.Problems()) != 1 {
 		t.Errorf("%+v, %v", res, err)
 	}
+}
+
+func ExampleRange_String() {
+	for _, r := range []*sdk.Range{nil, {Min: 2}, {Max: 1}, {Min: 2, Max: 2}, {Min: 2, Max: 3}} {
+		fmt.Println(r)
+	}
+	// Output:
+	// any
+	// 2 or later
+	// up to 1
+	// 2
+	// 2 to 3
 }

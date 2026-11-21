@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -61,24 +61,51 @@ type Schemas struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Requires lists the rpt versions a plugin works with. A list left out
-// fits any; otherwise rpt's own number must be in it.
+// Requires gives the rpt versions a plugin works with, each as a range.
+// A range left out fits any version.
 type Requires struct {
-	SchemaVersion []int `json:"schema_version,omitzero"` // record schemas, VersionInfo.SchemaVersion
-	Format        []int `json:"format,omitzero"`         // report format, VersionInfo.Format
+	SchemaVersion *Range `json:"schema_version,omitzero"` // record schemas, VersionInfo.SchemaVersion
+	Format        *Range `json:"format,omitzero"`         // report format, VersionInfo.Format
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
+// A Range is the versions from Min to Max, both included. A bound left
+// out (zero) is open, so {Min: 2} fits 2 and every later version.
+type Range struct {
+	Min int `json:"min,omitzero"`
+	Max int `json:"max,omitzero"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Has reports whether v is in the range; a nil range has every version.
+func (r *Range) Has(v int) bool {
+	return r == nil || (r.Min == 0 || v >= r.Min) && (r.Max == 0 || v <= r.Max)
+}
+
+// String writes the range for people: "2", "2 to 3", "2 or later",
+// "up to 1", or "any" for a nil or open range.
+func (r *Range) String() string {
+	switch {
+	case r == nil || r.Min == 0 && r.Max == 0:
+		return "any"
+	case r.Max == 0:
+		return strconv.Itoa(r.Min) + " or later"
+	case r.Min == 0:
+		return "up to " + strconv.Itoa(r.Max)
+	case r.Min == r.Max:
+		return strconv.Itoa(r.Min)
+	}
+	return strconv.Itoa(r.Min) + " to " + strconv.Itoa(r.Max)
+}
+
 // Fits reports whether a plugin requiring r works with an rpt writing
 // schemaVersion and reading format.
 func (r *Requires) Fits(schemaVersion, format int) bool {
-	if r == nil {
-		return true
-	}
-	return (len(r.SchemaVersion) == 0 || slices.Contains(r.SchemaVersion, schemaVersion)) &&
-		(len(r.Format) == 0 || slices.Contains(r.Format, format))
+	return r == nil || r.SchemaVersion.Has(schemaVersion) && r.Format.Has(format)
 }
 
 // The roles a plugin can declare in Description.Roles. Each is a promise

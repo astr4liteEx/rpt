@@ -64,7 +64,7 @@ rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries eve
 
 ### `requires`
 
-`requires` says which rpt the plugin works with: `{"schema_version": [2], "format": [2]}`, the record schema versions and report formats it handles (as `rpt version` gives them). A list left out fits any. When this rpt's number isn't in a list, `rpt help` hides the plugin, and `rpt help --all` lists it with `incompatible: true`. `rpt <command>` still runs it, after one warning on stderr.
+`requires` says which rpt the plugin works with: `{"schema_version": {"min": 2}, "format": {"min": 2, "max": 2}}`, the ranges of record schema versions and report formats it handles (as `rpt version` gives them), both bounds included. A bound left out is open, and a range left out fits any. When this rpt's number is outside a range, `rpt help` hides the plugin, and `rpt help --all` lists it with `incompatible: true`. `rpt <command>` still runs it, after one warning on stderr.
 
 ### `schemas`
 

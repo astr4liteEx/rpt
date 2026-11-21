@@ -86,7 +86,7 @@ func TestPluginSchemaInStream(t *testing.T) {
 }
 
 func TestIncompatiblePlugin(t *testing.T) {
-	plugins(t, map[string]string{"old": `{"summary":"s","requires":{"schema_version":[1]}}`, "new": `{"summary":"s","requires":{"schema_version":[2],"format":[2]}}`})
+	plugins(t, map[string]string{"old": `{"summary":"s","requires":{"schema_version":{"max":1}}}`, "new": `{"summary":"s","requires":{"schema_version":{"min":2},"format":{"min":2,"max":2}}}`})
 	_, out, _ := runIn(t, "", "help", "--json")
 	if strings.Contains(out, `"name":"old"`) || !strings.Contains(out, `"name":"new"`) {
 		t.Errorf("help: %s", out)
@@ -100,7 +100,7 @@ func TestIncompatiblePlugin(t *testing.T) {
 // TestRunningIncompatiblePluginWarns runs the built rpt: running a plugin
 // execs it, which only a separate process can do.
 func TestRunningIncompatiblePluginWarns(t *testing.T) {
-	plugins(t, map[string]string{"old": `{"summary":"s","requires":{"format":[1]}}`})
+	plugins(t, map[string]string{"old": `{"summary":"s","requires":{"format":{"max":1}}}`})
 	cmd := exec.Command(filepath.Join(bins(t), "rpt"), "old")
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
 	var errOut strings.Builder

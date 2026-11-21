@@ -22,7 +22,8 @@
   "required": ["kind", "name", "source"],
   "additionalProperties": true,
   "$defs": {
-    "requires": {"type": "object", "description": "The rpt versions a plugin works with. A list left out fits any; otherwise rpt's own number must be in it.", "properties": {"schema_version": {"type": "array", "items": {"type": "integer"}, "description": "Record schema versions, as rpt version gives schema_version."}, "format": {"type": "array", "items": {"type": "integer"}, "description": "Report format versions, as rpt version gives format."}}, "additionalProperties": true},
+    "requires": {"type": "object", "description": "The rpt versions a plugin works with, each as a range. A range left out fits any version.", "properties": {"schema_version": {"$ref": "#/$defs/range", "description": "Record schema versions, as rpt version gives schema_version."}, "format": {"$ref": "#/$defs/range", "description": "Report format versions, as rpt version gives format."}}, "additionalProperties": true},
+    "range": {"type": "object", "description": "The versions from min to max, both included. A bound left out is open.", "properties": {"min": {"type": "integer", "minimum": 1}, "max": {"type": "integer", "minimum": 1}}, "additionalProperties": true},
     "schemas": {
       "type": "object",
       "description": "JSON Schemas (draft 2020-12) for the x- names the plugin owns, which rpt validate checks under the pluginSchema rule. A plugin named <command> owns x-<command> (its config section) and names starting x-<command>-; a schema for any other name is ignored with a warning. A $ref may point inside the schema or at one of rpt's schemas by $id, nowhere else.",
