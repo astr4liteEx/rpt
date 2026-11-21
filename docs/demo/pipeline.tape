@@ -1,7 +1,6 @@
 Output docs/demo/pipeline.gif
-# rpt verbs lists every built-in before the plugin: a wider, taller frame.
-Set Width 2180
-Set Height 800
+Set Width 1440
+Set Height 620
 Source docs/demo/common.tape
 
 Hide
@@ -13,7 +12,7 @@ Type "cat ../scan.csv"
 Sleep 300ms
 Enter
 Sleep 2.5s
-Type "rpt verbs"
+Type "rpt help parse-scan"
 Sleep 300ms
 Enter
 Sleep 2.5s

@@ -9,13 +9,13 @@ Decide what the plugin is, since that decides which protocol sections bind it:
 - **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt. It doesn't know the report's scope, so each target gets a `host` (and `port`, `protocol`) and no `scope`; `rpt scope match` attributes them.
 - **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
 - **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from the report record's `report.sections`, so it needs only stdin, after a redaction filter too.
-- **Checker**: emits `problem` records under its own rule names, located with `$RPT_BIN finding get --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
+- **Checker**: emits `problem` records under its own rule names, each with `command` set to its own name, located with `$RPT_BIN finding get --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
 
-Done when the plugin has a verb name that is not an rpt built-in (`rpt help --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
+Done when the plugin has a command name that is not an rpt built-in (`rpt help --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
 
 ## 2. Write `--describe`
 
-Print the description object and exit 0, before any other work. Declare `input` and `output` (`records`, or a data type like `xml/nessus`; see the protocol's `--describe` section), reusing names other plugins already use for the same data (`rpt help --json | jq -r '.input, .output'`). Declare `roles` too, so tools find the plugin by what it is: `checker` or `filter` if step 1 placed it there, and `writer` if it changes the report; declare only roles whose promise (the same section) it keeps every run. If the plugin writes `x-<verb>-…` keys, columns or record kinds, or reads settings from `x-<verb>` in `rpt.yaml`, declare a schema for each under `schemas` (the protocol's `schemas` section), so `rpt validate` checks them. Declare `requires` with the schema versions and report formats it handles. Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
+Print the description object and exit 0, before any other work. Declare `input` and `output` (`records`, or a data type like `xml/nessus`; see the protocol's `--describe` section), reusing names other plugins already use for the same data (`rpt help --json | jq -r '.input, .output'`). Declare `roles` too, so tools find the plugin by what it is: `checker` or `filter` if step 1 placed it there, and `writer` if it changes the report; declare only roles whose promise (the same section) it keeps every run. If the plugin writes `x-<command>-…` keys, columns or record kinds, or reads settings from `x-<command>` in `rpt.yaml`, declare a schema for each under `schemas` (the protocol's `schemas` section), so `rpt validate` checks them. Declare `requires` with the schema versions and report formats it handles. Done when `rpt-<command> --describe | jq -e .summary` prints the summary and exits 0.
 
 ## 3. Write the work
 
@@ -31,7 +31,7 @@ Run every check; the plugin is done when all pass:
 - [ ] An unknown member on a record the plugin changes survives (filters).
 - [ ] The plugin works with no `RPT_*` variable set.
 - [ ] Findings it writes go into a scratch copy of a report with `rpt finding add`, and `rpt validate` on that copy reports no new errors (sources).
-- [ ] With the plugin on `PATH`, `rpt help` lists it with `source` `plugin`, its summary, IO and roles, not shadowed, and `rpt <verb>` runs it.
+- [ ] With the plugin on `PATH`, `rpt help` lists it with `source` `plugin`, its summary, IO and roles, not shadowed, and `rpt <command>` runs it.
 - [ ] It reads the report only through rpt: no parsing of finding files, `rpt.yaml` or `scope.csv` (stock and community plugins). Loading a whole finding file read-only at the path rpt gives, to lint or scan it, is allowed. If it can't do its job without that, stop and file a feature request for rpt instead (the protocol's "Ask, don't re-derive").
 
 ## Go plugins
@@ -47,7 +47,7 @@ The [`sdk`](../sdk) package implements the protocol; use it instead of re-derivi
 | Writing a record | `sdk.Emit(stdout, v)`: one deterministic JSON line |
 | Typed records | `sdk.Finding`, `sdk.Page`, `sdk.ScopeRow`, `sdk.Config`, `sdk.Evidence`, `sdk.Problem`, `sdk.Report` (with `ReportFinding`, `ReportPage`, `ReportTarget`, `ReportSection`, `Asset`), `sdk.Target`, `sdk.Command`, `sdk.Location`, `sdk.VersionInfo`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
-| Settings | `sdk.Settings("<verb>", &settings)` over the defaults already in `settings`, then parse flags |
+| Settings | `sdk.Settings("<command>", &settings)` over the defaults already in `settings`, then parse flags |
 | Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again) |
 
 Cleanup goes in `Plugin.Run`: `sdk.Main` exits when `Run` returns.

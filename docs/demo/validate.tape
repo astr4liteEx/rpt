@@ -1,6 +1,6 @@
 Output docs/demo/validate.gif
 Set Width 1440
-Set Height 560
+Set Height 1000
 Source docs/demo/common.tape
 
 Hide
@@ -20,8 +20,8 @@ Type "rpt validate && echo clean"
 Sleep 300ms
 Enter
 Sleep 2s
-Type "rpt assemble | jq -c .summary"
+Type "rpt finding get F-002"
 Sleep 300ms
 Enter
-Sleep 3s
+Sleep 4s
 Hide

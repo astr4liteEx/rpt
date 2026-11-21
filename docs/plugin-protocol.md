@@ -1,16 +1,16 @@
 # rpt plugin protocol
 
-A plugin is any program, in any language, that follows this page. The core runs it as `rpt <verb>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional. For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
+A plugin is any program, in any language, that follows this page. The core runs it as `rpt <command>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional. For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
 
 Supported systems: Linux.
 
 ## Finding and running a plugin
 
-- **Name:** an executable regular file named `rpt-<verb>` in a `PATH` folder. `<verb>` is lowercase letters, digits and hyphens.
-- **Lookup:** `rpt <verb>` runs the built-in command if there is one (`rpt help` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
-- **Arguments:** passed byte for byte, without the verb: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
+- **Name:** an executable regular file named `rpt-<command>` in a `PATH` folder. `<command>` is lowercase letters, digits and hyphens.
+- **Lookup:** `rpt <command>` runs the built-in command if there is one (`rpt help` lists them); built-ins always win. Otherwise it runs the first `rpt-<command>` in `PATH` order, skipping empty and relative `PATH` entries.
+- **Arguments:** passed byte for byte, without the command name: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
 - **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
-- **Listing:** `rpt help` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `command` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <verb>` never runs it. `rpt --help` also lists every plugin that isn't shadowed, under "Plugin commands".
+- **Listing:** `rpt help` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `command` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <command>` never runs it. `rpt --help` also lists every plugin that isn't shadowed, under "Plugin commands".
 
 ## Environment
 
@@ -19,7 +19,7 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 | Variable | Value | Fallback when absent |
 | --- | --- | --- |
 | `RPT_BIN` | Absolute path of the rpt that started the plugin. Call back into rpt through it, so the plugin and the core agree on the format | `rpt` from `PATH` |
-| `RPT_REPORT_DIR` | Absolute path of the report folder, found from `$RPT_REPORT_DIR` or the nearest folder holding `rpt.yaml`. Unset when there is no report, and when the plugin runs on its own: to open a finding file, use `lines.file` from `$RPT_BIN findings --json --lines` | The plugin's own `--report` flag, or none |
+| `RPT_REPORT_DIR` | Absolute path of the report folder, found from `$RPT_REPORT_DIR` or the nearest folder holding `rpt.yaml`. Unset when there is no report, and when the plugin runs on its own: to open a finding file, use `lines.file` from `$RPT_BIN finding get --json --lines` | The plugin's own `--report` flag, or none |
 | `RPT_SCHEMA_VERSION` | Version of the record schemas this rpt writes, now `2` | `schema_version` in the records read |
 
 ## `--help` and `__complete`
@@ -51,7 +51,7 @@ Given the single argument `--describe`, print one JSON object on one line and ex
 
 - `checker`: emits `problem` records about the report; exits 1 only when one is an error; never changes the report. `rpt validate` is one. To check records before a writer takes them, put `$RPT_BIN validate -` between: it passes a clean stream through unchanged and stops a broken one, so the writer adds nothing.
 - `filter`: reads records on stdin and writes records on stdout, such as redaction or `rpt scope match`.
-- `writer`: changes the report, only through `$RPT_BIN` write verbs.
+- `writer`: changes the report, only through `$RPT_BIN` write commands.
 - `renderer`: reads a report record and writes a document to a place it's given (a file or folder flag); never changes the report and writes no records to stdout.
 
 Declare only roles whose promise the plugin keeps every run. Absent means "not said", as for `input` and `output`.
@@ -104,7 +104,7 @@ Filtering a stream (stdin to stdout):
 ## Output and exit codes
 
 - stdout carries records only: JSON Lines when stdout is a pipe or file. A table or other human form is allowed on a terminal.
-- **Problems go both ways:** each one is a `problem` record on stdout, in the stream with the other records, and a text line on stderr. On a terminal showing a table, the text alone. A problem names the `command` that found it (your plugin's name, as in `rpt <name>`); never change the `command` of a problem passing through. rpt does the same: a broken finding file in `rpt findings` is a problem record (rule `readable`) after the good findings, and an unknown ID is one with rule `exists`.
+- **Problems go both ways:** each one is a `problem` record on stdout, in the stream with the other records, and a text line on stderr. On a terminal showing a table, the text alone. A problem names the `command` that found it (your plugin's name, as in `rpt <name>`); never change the `command` of a problem passing through. rpt does the same: a broken finding file in `rpt finding get` is a problem record (rule `readable`) after the good findings, and an unknown ID is one with rule `exists`.
 - stderr carries messages, one per line: `<program>: <path>:<line>:<column>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known (most messages have no column).
 - Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could), or a failure after the arguments were understood; `2` usage error, and only that; `3` the plugin couldn't do its work, such as a tool it needs being missing, failing or timing out, so its output says nothing about the report (say why in one stderr line). `126` belongs to rpt (the plugin couldn't start).
 
@@ -126,10 +126,10 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
   - Pages: pipe `page` records into `$RPT_BIN page add`; `page set <id> <path> <value>...` and `page unset` change them as for findings (path `body` for the text), and `page remove --yes <id>...` removes them.
   - Scope: pipe `scope` records into `$RPT_BIN scope add`; `$RPT_BIN scope set <id> <column> <value>` changes a cell (renaming an ID rewrites every citing target), `scope unset <id> <column>...` blanks cells, and `$RPT_BIN scope remove --yes <id>...` removes rows. A row a finding cites, or a change a citing target no longer fits, is refused unless `--force` (leave it dangling) or `--cleanup` (drop those targets).
   - **All or nothing.** A write checks everything first: one refused record or ID and nothing is written. A write that touches several files stages them all, reads each again, and refuses (rule `rev`, "changed since read") if any changed since it read them; it never overwrites an editor's save. Refusals are error-level `problem` records on stdout, and stderr text, exit 1: rule `exists` for an unknown ID, `rev` for a stale rev, `write` for anything else refused. In the rare case a write stops partway through its commit, each file not written is a `notWritten` problem; run the same command again to finish.
-  - **Revs.** Finding, scope and evidence records carry a `rev`: opaque, compared for equality only. A plugin that computes a change from what it read passes the rev back, `--if-rev <rev>` (or `--if-rev <id>=<rev>`, repeatable, when the command names several things), and the write is refused if the thing changed since. The records a write prints carry the new revs.
+  - **Revs.** Finding, page, scope, config and evidence records carry a `rev`: opaque, compared for equality only. A plugin that computes a change from what it read passes the rev back, `--if-rev <rev>` (or `--if-rev <id>=<rev>`, repeatable, when the command names several things), and the write is refused if the thing changed since. The records a write prints carry the new revs.
   - **`--dry-run`** on every write checks it and prints exactly what the write would, revs included, and writes nothing.
 - **Check** things the core doesn't by emitting `problem` records under your own rule names; `rpt validate`'s rule names are listed in [`schema/problem.schema.json`](../schema/problem.schema.json). To point at a line, take it from `$RPT_BIN finding get --json --lines` or, for a scope row, `$RPT_BIN scope get --json --lines`. Give a problem about a finding, page or `rpt.yaml` that file's `rev`, as `rpt validate` does, so a fixer can pass it as `--if-rev`. In a finding, line `text + n` of a section is line n+1 of that section's text. A `column` (1-based byte in the line) may follow the line.
-- **Ask, don't re-derive.** rpt is the only parser of report files. A stock plugin (shipped in rpt-plugins) or a community plugin never parses finding files, `rpt.yaml` or `scope.csv` itself. Loading a finding file whole and read-only, at the path rpt gives (for example to lint it or scan it for secrets, or to hand it unchanged to a tool that does), is not parsing it; working out its frontmatter or sections yourself is, so take those from `findings --json --lines`. When it needs something rpt doesn't give and every plugin would want it, that is a feature request for rpt, not code in the plugin. A local plugin, one you keep for yourself, may do whatever works for you.
+- **Ask, don't re-derive.** rpt is the only parser of report files. A stock plugin (shipped in rpt-plugins) or a community plugin never parses finding files, `rpt.yaml` or `scope.csv` itself. Loading a finding file whole and read-only, at the path rpt gives (for example to lint it or scan it for secrets, or to hand it unchanged to a tool that does), is not parsing it; working out its frontmatter or sections yourself is, so take those from `finding get --json --lines`. When it needs something rpt doesn't give and every plugin would want it, that is a feature request for rpt, not code in the plugin. A local plugin, one you keep for yourself, may do whatever works for you.
 - A plugin reading `report` records checks that `schema_version` is one it knows. `$RPT_BIN version --json` tells it, before reading, which record schema and report format that rpt uses.
 - A report holds no engagement details: no client, title or dates. A renderer takes them from its own input (flags, environment, its own file), as in `rpt assemble | rpt-render-pdf --client Acme --period 2026-11-02..2026-11-06 --out report.pdf`. The report record does carry the report's section headings, `report.sections`, so a renderer needs nothing but stdin.
 

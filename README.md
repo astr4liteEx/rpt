@@ -16,17 +16,19 @@
 
 ## Overview
 
-In rpt, a report is a plain folder that holds markdown findings, a scope table and a small YAML config. rpt defines that format, checks it, and sends it to other programs as JSON Lines. Everything else is a **plugin**, such as importing scanner output, scoring or rendering a PDF. A plugin is a separate program, in any language, that also runs on its own.
+In rpt, a report is a plain folder that holds markdown findings and pages, a scope table and a small YAML config. rpt defines that format, checks it, and sends it to other programs as JSON Lines. Everything else is a **plugin**, such as importing scanner output, scoring or rendering a PDF. A plugin is a separate program, in any language, that also runs on its own.
 
 ```
 acme-external/
 ├── rpt.yaml              format version, severity levels, sections
 ├── scope.csv             the agreed scope: hosts, ranges, wildcard domains
-└── findings/
-    ├── F-001-reflected-xss-in-search.md
-    ├── F-003-sql-injection-in-login.md
-    └── evidence/
-        └── F-003-login.png
+├── findings/
+│   ├── F-001-reflected-xss-in-search.md
+│   ├── F-003-sql-injection-in-login.md
+│   └── evidence/
+│       └── F-003-login.png
+└── pages/                report-level prose: executive summary, methodology
+    └── P-001-executive-summary.md
 ```
 
 - **Plain files.** Findings are markdown with YAML frontmatter. You can edit them in any editor, diff them and review them.
@@ -77,11 +79,11 @@ In nushell, run `generate completions rpt`: nushell's own command builds a compl
 
 `rpt new` creates an empty report. Add scope rows with `rpt scope add`, pipe finding records into `rpt finding add`, and `rpt validate` checks the result:
 
-![rpt new creates a report, rpt scope add adds two scope rows, rpt finding add imports three findings and rpt validate reports it clean](docs/demo/quick-start.gif)
+![rpt new creates a report, rpt scope add adds two scope rows, rpt finding add imports three findings, each shown in a bordered table, and rpt validate reports it clean](docs/demo/quick-start.gif)
 
-When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt finding set` fixes that one line, and `rpt assemble` then counts the findings per severity:
+When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt finding set` fixes that one line, and `rpt finding get` shows the finding for reading:
 
-![rpt validate reports S-99 missing from scope.csv, rpt finding set points F-002's target at S-14, and rpt validate passes](docs/demo/validate.gif)
+![rpt validate reports S-99 missing from scope.csv, pointing at the line, rpt finding set points F-002's target at S-14, rpt validate passes, and rpt finding get F-002 shows the finding between rules](docs/demo/validate.gif)
 
 To try it yourself, starting from one blank finding and filling it in:
 
@@ -108,7 +110,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 | Command | What it does |
 | --- | --- |
-| `rpt new <dir>` | Creates an empty report in a new or empty folder. |
+| `rpt new <dir>` | Creates an empty report in a new or empty folder. `--like <report>` takes another report's `rpt.yaml` and `scope.csv` columns, and `--with-pages` its pages too, IDs and evidence kept, for a house setup with boilerplate methodology. `--json` prints the new report's `location` record. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
 | `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (line and column) and section sits in it, for checkers that load files or report problems by position. `--assets` adds every file the finding lists or links, so `rpt finding get --assets F-003 \| jq 'del(.id)' \| rpt finding add --report ../other` copies it to another report, evidence and all. |
@@ -160,13 +162,13 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 > [!TIP]
 > Every command that changes a report keeps the author's comments, quoting and line endings, and is all or nothing: it checks everything first, writes every file it touches or none, and refuses if a file changed while it worked. Use them from scripts in place of editing files by hand.
 
-**Revs.** Finding and scope records carry a `rev`. Pass it back as `--if-rev` and the write is refused if the thing changed since you read it. `--dry-run` on any write prints what it would do, revs included, and writes nothing.
+**Revs.** Finding, page, scope and config records carry a `rev`. Pass it back as `--if-rev` and the write is refused if the thing changed since you read it. `--dry-run` on any write prints what it would do, revs included, and writes nothing.
 
 ## Plugins
 
 When a command isn't built in, `rpt <command>` runs `rpt-<command>` from your `PATH` and passes it the arguments unchanged. A `--report` given before the plugin's name reaches it as `$RPT_REPORT_DIR`. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
 
-![rpt verbs lists an importer after the built-ins; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt finding add](docs/demo/pipeline.gif)
+![rpt help parse-scan shows the importer plugin's own help; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt finding add](docs/demo/pipeline.gif)
 
 ```sh
 set -o pipefail

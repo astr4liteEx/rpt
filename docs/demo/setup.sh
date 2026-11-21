@@ -22,6 +22,10 @@ if [ "${1-}" = --describe ]; then
 	echo '{"summary":"Import a scanner CSV export as finding records","usage":"rpt parse-scan < scan.csv","input":"csv/scan","output":"records"}'
 	exit 0
 fi
+if [ "${1-}" = --help ]; then
+	printf 'Usage: rpt parse-scan < scan.csv\n\nImport a scanner CSV export (host,port,severity,title) as finding records.\nEach target has a host and no scope: pipe it through rpt scope match.\n'
+	exit 0
+fi
 tail -n +2 | while IFS=, read -r host port sev title; do
 	jq -cn --arg h "$host" --argjson p "$port" --arg s "$sev" --arg t "$title" \
 		'{kind:"finding",title:$t,severity:$s,targets:[{host:$h,port:$p,protocol:"tcp"}],

@@ -1,6 +1,6 @@
 # The rpt report format
 
-A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. `rpt new <dir>` starts one: it writes `rpt.yaml` with the defaults spelled out, a `scope.csv` holding only its header row, and empty `findings/` and `pages/`. It refuses a folder that isn't empty or that lies inside another report. [`testdata/fixture`](../testdata/fixture) is a filled-in example.
+A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. `rpt new <dir>` starts one: it writes `rpt.yaml` with the defaults spelled out, a `scope.csv` holding only its header row, and empty `findings/` and `pages/`. It refuses a folder that isn't empty or that lies inside another report. `rpt new <dir> --like <report>` starts from another report instead: its `rpt.yaml` byte for byte and its `scope.csv` header, with no rows. `--with-pages` copies its `pages/` and `pages/evidence/` too, IDs kept; without it `pages/` starts empty while `pages` and `required_pages` stay in `rpt.yaml`, so `rpt validate` names the required pages still to write. [`testdata/fixture`](../testdata/fixture) is a filled-in example.
 
 ```
 acme-external/
