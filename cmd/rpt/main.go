@@ -76,9 +76,12 @@ func init() {
 		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
 		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
-		"scope": {scopeVerb, sdk.Command{Summary: "List scope rows, or those with the IDs given; add and delete change them, match attributes finding targets to scope rows", Usage: "rpt scope [--lines] [--json] [id...]", Input: "records", Output: "records"}, []sub{
-			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-N] [--col name=value]... [--dry-run]"},
-			{"delete", scopeDeleteVerb, "rpt scope delete [--force] [--if-rev id=rev]... [--dry-run] <id>..."},
+		"scope": {nounVerb("scope"), sdk.Command{Summary: "Get, add, set, unset and remove scope rows; match attributes finding targets to them", Usage: "rpt scope <action>", Input: "records", Output: "records"}, []sub{
+			{"get", scopeGetVerb, "rpt scope get [--lines] [id...]"},
+			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]... [--dry-run]"},
+			{"set", scopeSetVerb, "rpt scope set [--force|--cleanup] [--if-rev rev] [--dry-run] <id> <column> <value>"},
+			{"unset", scopeUnsetVerb, "rpt scope unset [--if-rev rev] [--dry-run] <id> <column>..."},
+			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
 		"sections":   {sectionsVerb, sdk.Command{Summary: "List the report's sections", Usage: "rpt sections [--json]", Output: "records"}, nil},

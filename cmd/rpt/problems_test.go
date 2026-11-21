@@ -30,11 +30,11 @@ func TestReadGivesProblemRecords(t *testing.T) {
 }
 
 func TestMissingIDIsAProblemRecord(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "--report", fixture, "S-20", "S-404")
+	code, out, errOut := runIn(t, "", "scope", "get", "--report", fixture, "S-20", "S-404")
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
-	if got, want := pick(t, out, "kind", "id", "path", "rule", "level", "command"), "scope S-20    \nproblem  scope.csv exists error scope\n"; got != want {
+	if got, want := pick(t, out, "kind", "id", "path", "rule", "level", "command"), "scope S-20    \nproblem  scope.csv exists error scope get\n"; got != want {
 		t.Errorf("stdout\n got: %q\nwant: %q", got, want)
 	}
 	if !strings.Contains(errOut, "S-404") {

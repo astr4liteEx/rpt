@@ -29,7 +29,7 @@ func TestHelpListsCommands(t *testing.T) {
 		if !strings.Contains(line, `"name":"scope","source":"builtin"`) {
 			continue
 		}
-		for _, sub := range []string{"rpt scope [--lines] [--json] [id...] | ", " | rpt scope add ", " | rpt scope delete ", " | rpt scope match "} {
+		for _, sub := range []string{"rpt scope <action> | ", " | rpt scope get ", " | rpt scope add ", " | rpt scope remove ", " | rpt scope match "} {
 			if !strings.Contains(line, sub) {
 				t.Errorf("scope's usage lacks %q:\n%s", sub, line)
 			}
@@ -114,10 +114,10 @@ func TestDidYouMean(t *testing.T) {
 
 func TestGlobalFlagsEitherSide(t *testing.T) {
 	for _, args := range [][]string{
-		{"--report", fixture, "scope", "S-20"},
-		{"--report=" + fixture, "--json", "scope", "S-20"},
-		{"scope", "S-20", "--report", fixture},
-		{"scope", "--report", fixture, "S-20"},
+		{"--report", fixture, "scope", "get", "S-20"},
+		{"--report=" + fixture, "--json", "scope", "get", "S-20"},
+		{"scope", "get", "S-20", "--report", fixture},
+		{"scope", "get", "--report", fixture, "S-20"},
 	} {
 		code, out, errOut := runIn(t, "", args...)
 		if code != 0 || pick(t, out, "id") != "S-20\n" {
@@ -154,12 +154,14 @@ func TestUsageMatchesTable(t *testing.T) {
 		"help":           {{"--no-such-flag"}},
 		"ls":             {{"a", "b"}, {"--no-such-flag"}},
 		"new":            {{}, {"a", "b"}, {"--no-such-flag"}},
-		"scope":          {{"--no-such-flag"}},
+		"scope":          {{}, {"extra"}, {"--no-such-flag"}},
 		"scope match":    {{"extra"}, {"--no-such-flag"}},
 		"scope add":      {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},
-		"scope delete":   {{}, {"--no-such-flag"}},
+		"scope get":      {{"--no-such-flag"}},
+		"scope set":      {{}, {"S-12", "port"}, {"S-12", "port", "1", "--force", "--cleanup"}, {"--no-such-flag"}},
+		"scope unset":    {{}, {"S-12"}, {"--no-such-flag"}},
+		"scope remove":   {{}, {"S-12", "--yes", "--force", "--cleanup"}, {"--no-such-flag"}},
 		"sections":       {{"extra"}, {"--no-such-flag"}},
-		"sections set":   {{}, {"F-001"}, {"F-001", "a", "b"}, {"--no-such-flag"}},
 		"severities":     {{"extra"}, {"--no-such-flag"}},
 		"validate":       {{"extra"}, {"--no-such-flag"}},
 		"version":        {{"extra"}, {"--no-such-flag"}},

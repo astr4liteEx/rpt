@@ -19,11 +19,11 @@ var scopeColumns = []cli.Column{
 	{Header: "PORT", Field: "port"}, {Header: "PROTOCOL", Field: "protocol"},
 }
 
-// scopeVerb prints the report's scope rows, or with IDs only those rows in
-// the order given; with --lines, each record also says which line of
+// scopeGetVerb prints the report's scope rows, or with IDs only those rows
+// in the order given; with --lines, each record also says which line of
 // scope.csv it starts on.
-func scopeVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "scope")
+func scopeGetVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope get")
 	withLines := flags.Bool("lines", false, "add each row's lines: scope.csv's absolute path and the line the row starts on")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
@@ -50,6 +50,9 @@ func scopeVerb(e *env, args []string) int {
 		var picked []sdk.ScopeRow
 		for _, id := range slices.Compact(ids) {
 			i := slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return r.ID == id })
+			if i < 0 { // an ID may be given in any case
+				i = slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return strings.EqualFold(r.ID, id) })
+			}
 			if i < 0 {
 				missing = append(missing, id)
 				continue
@@ -220,7 +223,7 @@ func scopeAddVerb(e *env, args []string) int {
 	host := flags.String("host", "", "add one row for this host instead of reading stdin")
 	port := flags.Int("port", 0, "the row's port (with --host)")
 	protocol := flags.String("protocol", "", "the row's protocol, tcp or udp (with --host)")
-	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-N")
+	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-NNN")
 	cols := colFlags{}
 	flags.Var(cols, "col", "another column's value, name=value (with --host; repeatable)")
 	wf := addWriteFlags(flags, false)
@@ -293,20 +296,80 @@ func scopeAddVerb(e *env, args []string) int {
 	return w.finish()
 }
 
-// scopeDeleteVerb removes scope rows by ID and prints each as it was. A
-// row a finding cites is refused unless --force; one refusal and nothing
-// is deleted.
-func scopeDeleteVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "scope delete")
-	force := flags.Bool("force", false, "delete rows even when findings cite them")
+// citedFlags adds --force and --cleanup, which say what a scope write does
+// to the finding targets it would leave dangling or unfit.
+func citedFlags(f *flagSet) func() (report.Cited, bool) {
+	force := f.Bool("force", false, "leave finding targets citing the row dangling, or unfit for it")
+	cleanup := f.Bool("cleanup", false, "drop the finding targets the change leaves dangling or unfit")
+	return func() (report.Cited, bool) {
+		switch {
+		case *force && *cleanup:
+			return 0, false
+		case *force:
+			return report.CitedForce, true
+		case *cleanup:
+			return report.CitedCleanup, true
+		}
+		return report.CitedRefuse, true
+	}
+}
+
+// scopeChanged adds what one scope write did to w: the row, then each
+// finding it rewrote.
+func scopeChanged(w *write, ch report.ScopeChange) {
+	w.done(ch.Row, report.ScopeFile)
+	for _, f := range ch.Findings {
+		w.done(f, f.Path)
+	}
+}
+
+// scopeSetVerb sets one column of one scope row. Setting id renames the
+// row and every target citing it.
+func scopeSetVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope set")
+	cited := citedFlags(flags)
 	wf := addWriteFlags(flags, true)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
-	ids := uniq(flags.Args())
-	if len(ids) == 0 {
-		return badUsage(e, "scope delete")
+	pos := flags.Args()
+	mode, ok := cited()
+	if len(pos) != 3 || !ok {
+		return badUsage(e, "scope set")
 	}
+	return writeScope(e, of, wf, "scope set", []string{pos[0]}, func(w *write) {
+		ch, err := w.tx.SetScope(pos[0], pos[1], pos[2], mode)
+		if err != nil {
+			w.refuse(err, report.ScopeFile, 0)
+			return
+		}
+		scopeChanged(w, ch)
+	})
+}
+
+// scopeUnsetVerb blanks columns of one scope row.
+func scopeUnsetVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope unset")
+	wf := addWriteFlags(flags, true)
+	if err := flags.Parse(args); err != nil {
+		return cli.ExitUsage
+	}
+	pos := flags.Args()
+	if len(pos) < 2 {
+		return badUsage(e, "scope unset")
+	}
+	return writeScope(e, of, wf, "scope unset", []string{pos[0]}, func(w *write) {
+		ch, err := w.tx.UnsetScope(pos[0], pos[1:]...)
+		if err != nil {
+			w.refuse(err, report.ScopeFile, 0)
+			return
+		}
+		scopeChanged(w, ch)
+	})
+}
+
+// writeScope runs a write on scope rows named by ids.
+func writeScope(e *env, of outputFlags, wf writeFlags, name string, ids []string, do func(*write)) int {
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
@@ -317,17 +380,68 @@ func scopeDeleteVerb(e *env, args []string) int {
 		return cli.ExitProblems
 	}
 	defer r.Close()
-	w, ok := newWrite(e, out, r, wf, "scope delete", ids)
+	w, ok := newWrite(e, out, r, wf, name, ids)
 	if !ok {
 		return cli.ExitUsage
 	}
-	for _, id := range ids {
-		row, err := w.tx.DeleteScope(id, *force)
-		if err != nil {
-			w.refuse(err, report.ScopeFile, 0)
-			continue
-		}
-		w.done(row, report.ScopeFile)
-	}
+	do(w)
 	return w.finish()
+}
+
+// scopeRemoveVerb removes scope rows by ID and prints each as it was. A
+// row a finding cites is refused unless --force or --cleanup; one refusal
+// and nothing is removed. On a terminal it asks first; otherwise it needs
+// --yes.
+func scopeRemoveVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "scope remove")
+	yes := addYesFlag(flags)
+	cited := citedFlags(flags)
+	wf := addWriteFlags(flags, true)
+	if err := flags.Parse(args); err != nil {
+		return cli.ExitUsage
+	}
+	ids := uniq(flags.Args())
+	mode, ok := cited()
+	if len(ids) == 0 || !ok {
+		return badUsage(e, "scope remove")
+	}
+	if !mayAsk(e, *yes, *wf.dryRun) {
+		return cli.ExitUsage
+	}
+	return writeScope(e, of, wf, "scope remove", ids, func(w *write) {
+		var things, effects []string
+		for _, id := range ids {
+			ch, err := w.tx.RemoveScope(id, mode)
+			if err != nil {
+				w.refuse(err, report.ScopeFile, 0)
+				continue
+			}
+			scopeChanged(w, ch)
+			things = append(things, strings.Join(slices.DeleteFunc([]string{ch.Row.ID, ch.Row.Host, portOf(ch.Row)}, func(s string) bool { return s == "" }), "  "))
+			if len(ch.Findings) > 0 {
+				var fs []string
+				for _, f := range ch.Findings {
+					fs = append(fs, f.ID)
+				}
+				effects = append(effects, fmt.Sprintf("--cleanup drops %s's targets from %s", ch.Row.ID, strings.Join(fs, ", ")))
+			}
+			if len(ch.Left) > 0 {
+				effects = append(effects, fmt.Sprintf("--force leaves %s citing %s", strings.Join(ch.Left, ", "), ch.Row.ID))
+			}
+		}
+		if len(w.refused) == 0 && !w.failed && !*yes && !*wf.dryRun && !confirm(e, "scope row", things, effects) {
+			w.declined = true
+		}
+	})
+}
+
+// portOf renders a row's port and protocol, e.g. "tcp/443".
+func portOf(row sdk.ScopeRow) string {
+	switch {
+	case row.Port != 0 && row.Protocol != "":
+		return fmt.Sprintf("%s/%d", row.Protocol, row.Port)
+	case row.Port != 0:
+		return fmt.Sprint(row.Port)
+	}
+	return row.Protocol
 }

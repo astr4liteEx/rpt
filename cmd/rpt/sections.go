@@ -1,7 +1,6 @@
 package main
 
 import (
-
 	"github.com/astr4liteEx/rpt/internal/cli"
 )
 

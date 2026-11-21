@@ -46,6 +46,8 @@ type write struct {
 	items   []writeItem
 	refused []sdk.Problem
 	failed  bool // an error that isn't a problem, already logged
+	// declined: the user said no when asked; nothing is written or printed.
+	declined bool
 }
 
 // A writeItem is one record the write prints: one it made (rec, from the
@@ -116,6 +118,9 @@ func (w *write) refuse(err error, path string, line int) {
 // refused, prints only the problems and writes nothing. It returns the
 // exit code.
 func (w *write) finish() int {
+	if w.declined {
+		return cli.ExitProblems
+	}
 	if len(w.refused) > 0 || w.failed {
 		return w.problems(w.refused)
 	}

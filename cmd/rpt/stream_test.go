@@ -15,7 +15,7 @@ func runIn(t *testing.T, stdin string, args ...string) (int, string, string) {
 }
 
 func TestScopeVerb(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "--report", fixture)
+	code, out, errOut := runIn(t, "", "scope", "get", "--report", fixture)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -25,14 +25,14 @@ func TestScopeVerb(t *testing.T) {
 }
 
 func TestScopeByID(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "--report", fixture, "S-20", "S-12")
+	code, out, errOut := runIn(t, "", "scope", "get", "--report", fixture, "S-20", "S-12")
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	if got := pick(t, out, "id", "host"); got != "S-20 10.0.1.0/24\nS-12 10.0.0.5\n" {
 		t.Errorf("stdout = %q, want S-20 then S-12, in the order asked", got)
 	}
-	code, out, errOut = runIn(t, "", "scope", "--report", fixture, "S-12", "S-99")
+	code, out, errOut = runIn(t, "", "scope", "get", "--report", fixture, "S-12", "S-99")
 	if code != 1 || pick(t, out, "kind", "id") != "scope S-12\nproblem \n" || !strings.Contains(errOut, "S-99: no such scope row") {
 		t.Errorf("unknown ID: exit %d, stdout %q, stderr %q; want 1, S-12 printed, S-99 named", code, out, errOut)
 	}

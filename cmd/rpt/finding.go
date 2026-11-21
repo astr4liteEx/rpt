@@ -368,9 +368,7 @@ func findingRemoveVerb(e *env, args []string) int {
 		if evidence {
 			effects = append(effects, "their evidence files stay; rpt evidence prune removes them")
 		}
-		if !confirm(e, "finding", lines, effects) {
-			return cli.ExitProblems
-		}
+		w.declined = !confirm(e, "finding", lines, effects)
 	}
 	return w.finish()
 }

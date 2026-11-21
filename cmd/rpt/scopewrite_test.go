@@ -27,10 +27,10 @@ func TestScopeAddFromFlags(t *testing.T) {
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if got := pick(t, out, "id", "host", "port", "env"); got != "S-21 10.0.2.0/24 22 dev\n" {
+	if got := pick(t, out, "id", "host", "port", "env"); got != "S-100 10.0.2.0/24 22 dev\n" {
 		t.Errorf("stdout = %q, want the new row with the next free ID", got)
 	}
-	if got := readScope(t, dir); got != fixtureScope+"S-21,10.0.2.0/24,22,dev\n" {
+	if got := readScope(t, dir); got != fixtureScope+"S-100,10.0.2.0/24,22,dev\n" {
 		t.Errorf("scope.csv = %q", got)
 	}
 }
@@ -62,7 +62,7 @@ func TestScopeLines(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "scope.csv"), []byte(csv), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	code, out, errOut := runIn(t, "", "scope", "--lines", "--json", "--report", dir)
+	code, out, errOut := runIn(t, "", "scope", "get", "--lines", "--json", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
@@ -72,7 +72,7 @@ func TestScopeLines(t *testing.T) {
 	if got := revs.ReplaceAllString(out, ""); got != want {
 		t.Errorf("stdout\n%s\nwant\n%s", got, want)
 	}
-	if _, out, _ := runIn(t, "", "scope", "--json", "--report", dir); strings.Contains(out, `"lines":`) {
+	if _, out, _ := runIn(t, "", "scope", "get", "--json", "--report", dir); strings.Contains(out, `"lines":`) {
 		t.Errorf("without --lines, records carry lines:\n%s", out)
 	}
 
@@ -108,10 +108,10 @@ func TestScopeAddFromStdin(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
-	if got := pick(t, out, "kind", "id"); got != "scope S-30\nfinding \nscope S-31\n" {
+	if got := pick(t, out, "kind", "id"); got != "scope S-30\nfinding \nscope S-100\n" {
 		t.Errorf("stdout = %q", got)
 	}
-	want := strings.ReplaceAll(fixtureScope+"S-30,app.acme.com,,\"prod, eu\"\nS-31,10.9.9.9,8080,\n", "\n", "\r\n")
+	want := strings.ReplaceAll(fixtureScope+"S-30,app.acme.com,,\"prod, eu\"\nS-100,10.9.9.9,8080,\n", "\n", "\r\n")
 	if got := readScope(t, dir); got != want {
 		t.Errorf("scope.csv\n%q\nwant\n%q", got, want)
 	}
@@ -121,21 +121,65 @@ func TestScopeDelete(t *testing.T) {
 	dir := reportCopy(t)
 	before := folderState(t, dir)
 	// S-12 is cited by F-003: refused, and nothing changes.
-	code, _, errOut := runIn(t, "", "scope", "delete", "--report", dir, "S-12")
+	code, _, errOut := runIn(t, "", "scope", "remove", "--yes", "--report", dir, "S-12")
 	if code != 1 || !strings.Contains(errOut, "F-003") || !maps.Equal(before, folderState(t, dir)) {
 		t.Errorf("cited row: exit %d, stderr %q; want 1, F-003 named, nothing changed", code, errOut)
 	}
-	code, out, errOut := runIn(t, "", "scope", "delete", "--report", dir, "S-20", "S-404")
+	code, out, errOut := runIn(t, "", "scope", "remove", "--yes", "--report", dir, "S-20", "S-404")
 	if code != 1 || !strings.Contains(errOut, "S-404") || pick(t, out, "kind", "rule") != "problem exists\n" || !maps.Equal(before, folderState(t, dir)) {
 		t.Errorf("exit %d, stdout %q, stderr %q; want S-404 unknown, nothing deleted, exit 1", code, out, errOut)
 	}
-	if code, out, errOut := runIn(t, "", "scope", "delete", "--report", dir, "S-20"); code != 0 || pick(t, out, "id") != "S-20\n" {
+	if code, out, errOut := runIn(t, "", "scope", "remove", "--yes", "--report", dir, "S-20"); code != 0 || pick(t, out, "id") != "S-20\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want S-20 deleted", code, out, errOut)
 	}
-	if code, _, errOut := runIn(t, "", "scope", "delete", "--report", dir, "--force", "S-12"); code != 0 {
+	if code, _, errOut := runIn(t, "", "scope", "remove", "--yes", "--report", dir, "--force", "S-12"); code != 0 {
 		t.Errorf("--force: exit %d, stderr %q", code, errOut)
 	}
 	if got := readScope(t, dir); got != "id,host,port,env\nS-14,10.0.0.6,8443,prod\n" {
 		t.Errorf("scope.csv = %q", got)
+	}
+}
+
+func TestScopeSetRenamePrintsTheFindings(t *testing.T) {
+	dir := reportCopy(t)
+	code, out, errOut := runIn(t, "", "scope", "set", "s-14", "id", "S-015", "--report", dir)
+	if code != 0 || pick(t, out, "kind", "id") != "scope S-015\nfinding F-003\nfinding F-001\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	if code, out, _ := runIn(t, "", "validate", "--report", dir); strings.Contains(out, "S-015") || strings.Contains(out, "S-14") {
+		t.Errorf("validate after the rename: exit %d\n%s", code, out)
+	}
+}
+
+func TestScopeSetNarrowing(t *testing.T) {
+	dir := reportCopy(t)
+	before := folderState(t, dir)
+	code, out, errOut := runIn(t, "", "scope", "set", "S-14", "port", "443", "--report", dir)
+	if code != 1 || pick(t, out, "rule") != "write\n" || !strings.Contains(errOut, "--cleanup") || !maps.Equal(before, folderState(t, dir)) {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	code, out, errOut = runIn(t, "", "scope", "set", "S-14", "port", "443", "--cleanup", "--report", dir)
+	if code != 0 || pick(t, out, "kind", "id") != "scope S-14\nfinding F-001\n" {
+		t.Errorf("--cleanup: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+}
+
+func TestScopeRemoveCleanupAsks(t *testing.T) {
+	old := interactive
+	interactive = func(*env) bool { return true }
+	t.Cleanup(func() { interactive = old })
+	dir := reportCopy(t)
+	code, out, errOut := runIn(t, "y\n", "scope", "remove", "S-12", "S-20", "--cleanup", "--report", dir)
+	if code != 0 || pick(t, out, "kind", "id") != "scope S-12\nfinding F-003\nscope S-20\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	if !strings.Contains(errOut, "Remove 2 scope rows:\n  S-12  10.0.0.5  443\n  S-20  10.0.1.0/24\n--cleanup drops S-12's targets from F-003\n") {
+		t.Errorf("prompt %q", errOut)
+	}
+}
+
+func TestScopeNounNeedsAnAction(t *testing.T) {
+	if code, _, errOut := runIn(t, "", "scope", "--report", fixture); code != 2 || !strings.Contains(errOut, "usage: rpt scope <action>") {
+		t.Errorf("exit %d, stderr %q", code, errOut)
 	}
 }

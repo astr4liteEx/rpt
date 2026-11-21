@@ -70,15 +70,49 @@ func (tx *Tx) scopeTable() (scopeTable, error) {
 	return t, nil
 }
 
-// nextScopeID is S- and one more than the highest S-<number> in use.
-func (t scopeTable) nextScopeID() string {
+// nextScopeID is S- and one more than the highest S-<number> in use, by a
+// row or by a finding's target (an ID left dangling by --force is never
+// reused), padded to three digits: S-012 and S-12 both count as 12.
+func (tx *Tx) nextScopeID(t scopeTable) (string, error) {
 	n := 0
-	for _, row := range t.rows {
-		if v, err := strconv.Atoi(strings.TrimPrefix(row.ID, "S-")); err == nil && strings.HasPrefix(row.ID, "S-") {
-			n = max(n, v)
+	count := func(id string) {
+		if d, ok := strings.CutPrefix(strings.ToUpper(id), "S-"); ok {
+			if v, err := strconv.Atoi(d); err == nil && v > n {
+				n = v
+			}
 		}
 	}
-	return "S-" + strconv.Itoa(n+1)
+	for _, row := range t.rows {
+		count(row.ID)
+	}
+	cites, err := tx.citations()
+	if err != nil {
+		return "", err
+	}
+	for _, c := range cites {
+		for _, t := range c.f.Targets {
+			count(t.Scope)
+		}
+	}
+	return fmt.Sprintf("S-%03d", n+1), nil
+}
+
+// find returns the index of the row with the given ID: exactly, or else
+// the one row whose ID matches it in any case; -1 if none.
+func (t scopeTable) find(id string) int {
+	if i := slices.IndexFunc(t.rows, func(x sdk.ScopeRow) bool { return x.ID == id }); i >= 0 {
+		return i
+	}
+	i := -1
+	for j, x := range t.rows {
+		if strings.EqualFold(x.ID, id) {
+			if i >= 0 {
+				return -1 // ambiguous: S-a and s-A
+			}
+			i = j
+		}
+	}
+	return i
 }
 
 // AddScope appends row to scope.csv, taking its id or the next free S-N,
@@ -101,7 +135,9 @@ func (tx *Tx) AddScope(row sdk.ScopeRow) (sdk.ScopeRow, error) {
 		return sdk.ScopeRow{}, err
 	}
 	if row.ID == "" {
-		row.ID = t.nextScopeID()
+		if row.ID, err = tx.nextScopeID(t); err != nil {
+			return sdk.ScopeRow{}, err
+		}
 	} else if slices.ContainsFunc(t.rows, func(x sdk.ScopeRow) bool { return x.ID == row.ID }) {
 		return sdk.ScopeRow{}, bad("id: %s is already taken", row.ID)
 	}
@@ -159,50 +195,4 @@ func newline(crlf bool) string {
 		return "\r\n"
 	}
 	return "\n"
-}
-
-// DeleteScope removes the row with the given id from scope.csv and returns
-// it. A row a finding cites is refused, naming the findings, unless force.
-// The other rows keep their bytes.
-func (r *Report) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
-	return one(r, func(tx *Tx) (sdk.ScopeRow, error) { return tx.DeleteScope(id, force) })
-}
-
-// DeleteScope is Report.DeleteScope as part of the write tx.
-func (tx *Tx) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
-	r := tx.r
-	t, err := tx.scopeTable()
-	if err != nil {
-		return sdk.ScopeRow{}, err
-	}
-	i := slices.IndexFunc(t.rows, func(x sdk.ScopeRow) bool { return x.ID == id })
-	if i < 0 {
-		return sdk.ScopeRow{}, fmt.Errorf("%w: %s in %s", ErrNoScopeRow, id, ScopeFile)
-	}
-	sp := t.spans[i]
-	row := t.rows[i]
-	row.Rev = rowRev(trimEOL(t.src[:t.headerEnd]), t.src[sp[0]:sp[1]])
-	if err := tx.checkRev(id, ScopeFile, row.Rev); err != nil {
-		return sdk.ScopeRow{}, err
-	}
-	if !force {
-		findings, err := r.Findings()
-		if err != nil && !onlyFileErrors(err) {
-			return sdk.ScopeRow{}, err
-		}
-		var citing []string
-		for _, f := range findings {
-			if slices.ContainsFunc(f.Targets, func(t sdk.Target) bool { return t.Scope == id }) {
-				citing = append(citing, f.ID)
-			}
-		}
-		if len(citing) > 0 {
-			return sdk.ScopeRow{}, fmt.Errorf("%w: %s is cited by %s; change their targets first, or pass --force", ErrCited, id, strings.Join(citing, ", "))
-		}
-	}
-	out := append(append([]byte{}, t.src[:sp[0]]...), t.src[sp[1]:]...)
-	if err := tx.put(ScopeFile, out, rankScope); err != nil {
-		return sdk.ScopeRow{}, err
-	}
-	return row, nil
 }

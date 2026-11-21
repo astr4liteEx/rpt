@@ -80,13 +80,13 @@ func TestDryRun(t *testing.T) {
 
 func TestScopeDeleteIfRev(t *testing.T) {
 	dir := reportCopy(t)
-	_, out, _ := runIn(t, "", "scope", "S-20", "--report", dir)
+	_, out, _ := runIn(t, "", "scope", "get", "S-20", "--report", dir)
 	rev := revOf(t, out)
 	// Adding a row leaves S-20's rev alone.
 	if code, _, errOut := runIn(t, "", "scope", "add", "--host", "new.example", "--report", dir); code != 0 {
 		t.Fatalf("add: exit %d, stderr %q", code, errOut)
 	}
-	if code, out, errOut := runIn(t, "", "scope", "delete", "S-20", "--if-rev", "S-20="+rev, "--report", dir); code != 0 || pick(t, out, "id") != "S-20\n" {
+	if code, out, errOut := runIn(t, "", "scope", "remove", "--yes", "S-20", "--if-rev", "S-20="+rev, "--report", dir); code != 0 || pick(t, out, "id") != "S-20\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
 }
@@ -99,7 +99,7 @@ func TestRevIsReserved(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "scope.csv"), []byte("id,host,rev\nS-1,a,b\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if code, _, errOut := runIn(t, "", "scope", "--report", dir); code != 1 || !strings.Contains(errOut, `column "rev" is reserved`) {
+	if code, _, errOut := runIn(t, "", "scope", "get", "--report", dir); code != 1 || !strings.Contains(errOut, `column "rev" is reserved`) {
 		t.Errorf("rev column: exit %d, stderr %q", code, errOut)
 	}
 }

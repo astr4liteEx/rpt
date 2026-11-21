@@ -78,8 +78,8 @@ To try it yourself, starting from one blank finding and filling it in:
 rpt new acme-external         # rpt.yaml, an empty scope.csv and findings/
 cd acme-external
 
-rpt scope add --host 10.0.0.5 --port 443 --protocol tcp            # row S-1
-rpt finding add --title "SQL injection in login" --severity high --target S-1
+rpt scope add --host 10.0.0.5 --port 443 --protocol tcp            # row S-001
+rpt finding add --title "SQL injection in login" --severity high --target S-001
 
 rpt validate                  # F-001's Description, Remediation and Proof of concept are empty
 $EDITOR findings/F-001-sql-injection-in-login.md
@@ -106,9 +106,11 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
 | `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
 | `rpt sections` | Lists the report's sections: the fixed ones with their headings, then the custom ones it requires. |
-| `rpt scope [id...]` | Lists scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
-| `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-N`. |
-| `rpt scope delete <id>...` | Removes scope rows. A row a finding cites is refused unless you pass `--force`. |
+| `rpt scope get [id...]` | Prints scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
+| `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-NNN`, counting the IDs findings cite as well as the rows. |
+| `rpt scope set <id> <column> <value>` | Changes one cell of a row. Setting `id` renames the row and every finding target citing it. A change that leaves a citing target unfit (a new port, say) is refused unless you pass `--force` (leave it) or `--cleanup` (drop it). |
+| `rpt scope unset <id> <column>...` | Blanks cells of a row. A row's `id` and `host` can't be blanked. |
+| `rpt scope remove <id>...` | Removes scope rows, after asking on a terminal; elsewhere pass `--yes`. A row a finding cites is refused unless you pass `--force` (leave the targets dangling) or `--cleanup` (drop them). |
 | `rpt scope match` | Reads finding records on stdin and attributes each target that has a `host` and no scope ID to the most specific scope row covering it. `--drop-out-of-scope` drops targets no row covers, and findings left with none. |
 | `rpt evidence [--orphans]` | Lists every evidence file the findings list or link to, with its absolute path and whether it exists. `--orphans` adds the files in `findings/evidence/` that nothing references. |
 | `rpt evidence add <id> <file>...` | Copies files into `findings/evidence/` as `<id>-<name>.<ext>` and lists them in the finding's evidence. `--as <name>` names a single copy. |

@@ -92,7 +92,7 @@ type ScopeRow struct {
 	// Rev is the row's revision, over the header and the row's own text;
 	// pass it back as --if-rev.
 	Rev string `json:"rev,omitzero"`
-	// Lines is where the row sits in scope.csv, set by rpt scope --lines.
+	// Lines is where the row sits in scope.csv, set by rpt scope get --lines.
 	Lines *ScopeLines `json:"lines,omitzero"`
 
 	// Extra holds the row's other CSV columns and any unknown members.
