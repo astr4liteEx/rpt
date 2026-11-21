@@ -10,6 +10,7 @@ import (
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/sdk"
+	"github.com/spf13/pflag"
 )
 
 var commandColumns = []cli.Column{
@@ -68,44 +69,41 @@ func isBuiltin(name string) bool {
 // then the plugins on PATH by name, each described the way --describe
 // describes it. Given a command (and sub), it shows that one's usage, as
 // rpt <command> [sub] --help does; a plugin is asked for its --help.
-func helpVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "help")
+func helpVerb(flags *pflag.FlagSet) runner {
 	all := flags.Bool("all", false, "list every command, plugins this rpt isn't compatible with too")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	if flags.NArg() > 0 {
-		name := flags.Arg(0)
-		if !isBuiltin(name) {
-			return dispatch(e, name, []string{"--help"}, globals{})
+	return func(e *env, args []string) int {
+		if len(args) > 0 {
+			if !isBuiltin(args[0]) {
+				return dispatch(e, args[0], []string{"--help"}, globals{})
+			}
+			return execute(e, append(args, "--help"))
 		}
-		return execute(e, globals{}, append(flags.Args(), "--help"))
-	}
-	out, err := of.output(e, commandColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	var list []sdk.Command
-	for _, name := range slices.Sorted(maps.Keys(builtins)) {
-		d := builtins[name].desc
-		d.Kind, d.Name, d.Source = "command", name, "builtin"
-		list = append(list, d)
-	}
-	for _, v := range append(list, describePlugins(e)...) {
-		if v.Incompatible && !*all {
-			continue
-		}
-		if err := out.Write(v); err != nil {
+		out, err := e.output(commandColumns)
+		if err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
+		var list []sdk.Command
+		for _, name := range slices.Sorted(maps.Keys(builtins)) {
+			d := builtins[name].desc
+			d.Kind, d.Name, d.Source = "command", name, "builtin"
+			list = append(list, d)
+		}
+		for _, v := range append(list, describePlugins(e)...) {
+			if v.Incompatible && !*all {
+				continue
+			}
+			if err := out.Write(v); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		if err := out.Flush(); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		return cli.ExitOK
 	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return cli.ExitOK
 }
 
 // describeBuiltin prints a built-in's --describe answer: the members a

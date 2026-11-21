@@ -45,21 +45,20 @@ func scopeMap(f sdk.Finding) map[string]any {
 	return map[string]any{"targets": targets}
 }
 
-// nounVerb is a noun given no action: it prints the noun's usage and exits
-// 2, or with --help prints it and exits 0.
+// nounVerb is a noun given no action, or one it doesn't have: a usage
+// error naming its actions.
 func nounVerb(name string) verb {
-	return func(e *env, args []string) int {
-		flags, _ := newFlags(e, name)
-		if err := flags.Parse(args); err != nil {
-			if errors.Is(err, pflag.ErrHelp) {
-				return cli.ExitOK
+	return func(*pflag.FlagSet) runner {
+		return func(e *env, args []string) int {
+			var actions []string
+			for _, s := range builtins[name].subs {
+				actions = append(actions, s.name())
 			}
-			return cli.ExitUsage
+			if len(args) > 0 {
+				return usageError(e, "unknown action %q: %s", args[0], strings.Join(actions, ", "))
+			}
+			return usageError(e, "needs an action: %s", strings.Join(actions, ", "))
 		}
-		if flags.NArg() > 0 {
-			fmt.Fprintf(e.stderr, "rpt: %s: unknown action %q\n", name, flags.Arg(0))
-		}
-		return badUsage(e, name)
 	}
 }
 
@@ -78,163 +77,155 @@ func findingIDs(ids []string) []string {
 // findingGetVerb prints every finding, or with IDs those findings in the
 // order given; with --lines, each record also says where its keys and
 // sections sit in its file.
-func findingGetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "finding get")
+func findingGetVerb(flags *pflag.FlagSet) runner {
 	withLines := flags.Bool("lines", false, "add each finding's lines: its file's absolute path and where its frontmatter keys and sections sit in it")
 	withAssets := flags.Bool("assets", false, "add each finding's assets: every file it lists or links, with its absolute path, to carry it to another report with rpt finding add")
 	asTable := flags.Bool("table", false, "on a terminal, show the findings named as a table rather than for reading")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	ids := findingIDs(flags.Args())
-	out, err := of.output(e, findingColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
+	return func(e *env, args []string) int {
+		ids := findingIDs(args)
+		out, err := e.output(findingColumns)
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		r := openReport(e)
+		if r == nil {
+			return cli.ExitProblems
+		}
+		defer r.Close()
 
-	read := r.Findings
-	if *withLines {
-		read = r.FindingsWithLines
-	}
-	list, readErr := read()
-	var missing []string
-	if len(ids) > 0 {
-		var picked []sdk.Finding
-		for _, id := range ids {
-			i := slices.IndexFunc(list, func(f sdk.Finding) bool { return f.ID == id })
-			if i < 0 {
-				missing = append(missing, id)
-				continue
+		read := r.Findings
+		if *withLines {
+			read = r.FindingsWithLines
+		}
+		list, readErr := read()
+		var missing []string
+		if len(ids) > 0 {
+			var picked []sdk.Finding
+			for _, id := range ids {
+				i := slices.IndexFunc(list, func(f sdk.Finding) bool { return f.ID == id })
+				if i < 0 {
+					missing = append(missing, id)
+					continue
+				}
+				picked = append(picked, list[i])
 			}
-			picked = append(picked, list[i])
+			list = picked
 		}
-		list = picked
-	}
-	if *withAssets {
-		for i := range list {
-			assets, err := r.AssetsOf(list[i].Path)
-			if err != nil {
-				readErr = errors.Join(readErr, err)
-				continue
+		if *withAssets {
+			for i := range list {
+				assets, err := r.AssetsOf(list[i].Path)
+				if err != nil {
+					readErr = errors.Join(readErr, err)
+					continue
+				}
+				list[i].Assets = assets
 			}
-			list[i].Assets = assets
 		}
-	}
-	if cfg, err := r.Config(); err == nil {
-		var order []string
-		for _, l := range cfg.Severities {
-			order = append(order, string(l))
+		if cfg, err := r.Config(); err == nil {
+			var order []string
+			for _, l := range cfg.Severities {
+				order = append(order, string(l))
+			}
+			out.Totals = cli.SeverityTotals(order)
 		}
-		out.Totals = cli.SeverityTotals(order)
-	}
-	if out.Table() && len(ids) > 0 && !*asTable {
-		v := cli.NewReadingView(e.stdout)
+		if out.Table() && len(ids) > 0 && !*asTable {
+			v := cli.NewReadingView(e.stdout)
+			for _, f := range list {
+				body, err := r.Body(f.Path)
+				if err != nil {
+					readErr = errors.Join(readErr, err)
+					continue
+				}
+				facts := cli.Facts(cli.Severity(string(f.Severity)), cli.Dim(findingScope(scopeMap(f))), cli.Dim(f.Path))
+				if err := v.Record(f.ID, f.Title, facts, body); err != nil {
+					e.log.Error(err.Error())
+					return cli.ExitProblems
+				}
+			}
+			list = nil
+		}
 		for _, f := range list {
-			body, err := r.Body(f.Path)
-			if err != nil {
-				readErr = errors.Join(readErr, err)
-				continue
-			}
-			facts := cli.Facts(cli.Severity(string(f.Severity)), cli.Dim(findingScope(scopeMap(f))), cli.Dim(f.Path))
-			if err := v.Record(f.ID, f.Title, facts, body); err != nil {
+			if err := out.Write(f); err != nil {
 				e.log.Error(err.Error())
 				return cli.ExitProblems
 			}
 		}
-		list = nil
-	}
-	for _, f := range list {
-		if err := out.Write(f); err != nil {
+		for _, id := range missing {
+			p := sdk.Problem{Path: report.FindingsDir, Rule: ruleExists, Level: sdk.Error, Message: fmt.Sprintf("%v: %s", report.ErrNoFinding, id)}
+			if err := e.problem(out, p); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		if err := out.Flush(); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
-	}
-	for _, id := range missing {
-		p := sdk.Problem{Path: report.FindingsDir, Rule: ruleExists, Level: sdk.Error, Message: fmt.Sprintf("%v: %s", report.ErrNoFinding, id)}
-		if err := e.problem(out, p); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
+		if code := reportErrors(e, out, readErr); code != cli.ExitOK || len(missing) == 0 {
+			return code
 		}
-	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
-	if code := reportErrors(e, out, readErr); code != cli.ExitOK || len(missing) == 0 {
-		return code
-	}
-	return cli.ExitProblems
 }
 
 // findingSetVerb changes one value of one finding: a frontmatter key,
 // sections.<key> (the text from stdin when no value is given) or
 // x-<plugin>.<key>. Several values make a list.
-func findingSetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "finding set")
+func findingSetVerb(flags *pflag.FlagSet) runner {
 	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	pos := flags.Args()
-	section := len(pos) == 2 && strings.HasPrefix(pos[1], "sections.")
-	if len(pos) < 3 && !section {
-		code := badUsage(e, "finding set")
-		fmt.Fprintln(e.stderr, `each value is YAML: high, S-12 '{scope: S-20, port: 443}', "9.1"; a section's text comes from stdin when no value is given`)
-		return code
-	}
-	id := report.CanonicalID(pos[0])
-	values := pos[2:]
-	if section {
-		text, err := io.ReadAll(e.stdin)
-		if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
+	return func(e *env, args []string) int {
+		pos := args
+		section := len(pos) == 2 && strings.HasPrefix(pos[1], "sections.")
+		if len(pos) < 3 && !section {
+			return usageError(e, "needs an ID, a path and a value")
 		}
-		values = []string{string(text)}
+		id := report.CanonicalID(pos[0])
+		values := pos[2:]
+		if section {
+			text, err := io.ReadAll(e.stdin)
+			if err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+			values = []string{string(text)}
+		}
+		return writeFinding(e, wf, id, func(tx *report.Tx) (sdk.Finding, error) {
+			return tx.Set(id, pos[1], values...)
+		})
 	}
-	return writeFinding(e, of, wf, "finding set", id, func(tx *report.Tx) (sdk.Finding, error) {
-		return tx.Set(id, pos[1], values...)
-	})
 }
 
 // findingUnsetVerb removes keys, sections and plugin keys from one
 // finding.
-func findingUnsetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "finding unset")
+func findingUnsetVerb(flags *pflag.FlagSet) runner {
 	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
+	return func(e *env, args []string) int {
+		pos := args
+		if len(pos) < 2 {
+			return usageError(e, "needs an ID and a path")
+		}
+		id := report.CanonicalID(pos[0])
+		return writeFinding(e, wf, id, func(tx *report.Tx) (sdk.Finding, error) {
+			return tx.Unset(id, pos[1:]...)
+		})
 	}
-	pos := flags.Args()
-	if len(pos) < 2 {
-		return badUsage(e, "finding unset")
-	}
-	id := report.CanonicalID(pos[0])
-	return writeFinding(e, of, wf, "finding unset", id, func(tx *report.Tx) (sdk.Finding, error) {
-		return tx.Unset(id, pos[1:]...)
-	})
 }
 
 // writeFinding runs a write that changes the one finding id, printing it
 // as stored.
-func writeFinding(e *env, of outputFlags, wf writeFlags, name, id string, change func(*report.Tx) (sdk.Finding, error)) int {
-	out, err := of.output(e, findingColumns)
+func writeFinding(e *env, wf writeFlags, id string, change func(*report.Tx) (sdk.Finding, error)) int {
+	out, err := e.output(findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
-	r := openReport(e, *of.report)
+	r := openReport(e)
 	if r == nil {
 		return cli.ExitProblems
 	}
 	defer r.Close()
-	w, ok := newWrite(e, out, r, wf, name, []string{id})
+	w, ok := newWrite(e, out, r, wf, []string{id})
 	if !ok {
 		return cli.ExitUsage
 	}
@@ -289,8 +280,7 @@ func (t *targetFlags) Set(v string) error {
 // from its flags instead, with a heading for every required section, and
 // doesn't read stdin. Every record is checked before any is written: one
 // refusal and nothing is written.
-func findingAddVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "finding add")
+func findingAddVerb(flags *pflag.FlagSet) runner {
 	title := flags.String("title", "", "write one finding with this title instead of reading stdin")
 	severity := flags.String("severity", "", "the finding's severity (with --title)")
 	var targets targetFlags
@@ -299,126 +289,123 @@ func findingAddVerb(e *env, args []string) int {
 	scaffold := flags.Bool("scaffold", false, "give stdin records an empty heading for each required section they lack")
 	noScaffold := flags.Bool("no-scaffold", false, "with --title, leave out the required sections' headings")
 	wf := addWriteFlags(flags, false)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	pos := flags.Args()
-	fromFlags := false
-	flags.Visit(func(f *pflag.Flag) {
-		fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "target", "id", "no-scaffold"}, f.Name)
-	})
-	if len(pos) != 0 || fromFlags && (*title == "" || *severity == "") {
-		return badUsage(e, "finding add")
-	}
-	out, err := of.output(e, findingColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-	w, _ := newWrite(e, out, r, wf, "finding add", nil)
-
-	add := func(f sdk.Finding, line int, scaffold bool) {
-		path := report.FindingsDir
-		if line > 0 {
-			path = stdinPath
+	return func(e *env, args []string) int {
+		pos := args
+		fromFlags := false
+		flags.Visit(func(f *pflag.Flag) {
+			fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "target", "id", "no-scaffold"}, f.Name)
+		})
+		if len(pos) != 0 || fromFlags && (*title == "" || *severity == "") {
+			return usageError(e, "reads records on stdin, or takes --title and --severity")
 		}
-		if scaffold {
-			if f, err = r.Scaffold(f); err != nil {
+		out, err := e.output(findingColumns)
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		r := openReport(e)
+		if r == nil {
+			return cli.ExitProblems
+		}
+		defer r.Close()
+		w, _ := newWrite(e, out, r, wf, nil)
+
+		add := func(f sdk.Finding, line int, scaffold bool) {
+			path := report.FindingsDir
+			if line > 0 {
+				path = stdinPath
+			}
+			if scaffold {
+				if f, err = r.Scaffold(f); err != nil {
+					w.refuse(err, path, line)
+					return
+				}
+			}
+			added, err := w.tx.Add(f)
+			if err != nil {
 				w.refuse(err, path, line)
 				return
 			}
+			w.done(added, added.Path)
 		}
-		added, err := w.tx.Add(f)
-		if err != nil {
-			w.refuse(err, path, line)
-			return
-		}
-		w.done(added, added.Path)
-	}
 
-	if fromFlags {
-		add(sdk.Finding{Kind: "finding", ID: report.CanonicalID(*id), Title: *title, Severity: sdk.Severity(*severity), Targets: targets}, 0, !*noScaffold)
+		if fromFlags {
+			add(sdk.Finding{Kind: "finding", ID: report.CanonicalID(*id), Title: *title, Severity: sdk.Severity(*severity), Targets: targets}, 0, !*noScaffold)
+			return w.finish()
+		}
+		recs, code, ok := readInput(e, out)
+		if !ok {
+			return code
+		}
+		for _, rec := range recs {
+			if rec.Kind != "finding" {
+				w.pass(rec.Raw)
+				continue
+			}
+			var f sdk.Finding
+			if err := json.Unmarshal(rec.Raw, &f); err != nil {
+				w.refused = append(w.refused, sdk.Problem{Path: stdinPath, Line: rec.Line, Rule: ruleInput, Level: sdk.Error, Message: "finding: " + err.Error()})
+				continue
+			}
+			add(f, rec.Line, *scaffold)
+		}
 		return w.finish()
 	}
-	recs, code, ok := readInput(e, out)
-	if !ok {
-		return code
-	}
-	for _, rec := range recs {
-		if rec.Kind != "finding" {
-			w.pass(rec.Raw)
-			continue
-		}
-		var f sdk.Finding
-		if err := json.Unmarshal(rec.Raw, &f); err != nil {
-			w.refused = append(w.refused, sdk.Problem{Path: stdinPath, Line: rec.Line, Rule: ruleInput, Level: sdk.Error, Message: "finding: " + err.Error()})
-			continue
-		}
-		add(f, rec.Line, *scaffold)
-	}
-	return w.finish()
 }
 
 // findingRemoveVerb removes each named finding's file and prints the
 // finding as it was. Every ID is checked first: one unknown and nothing is
 // removed. On a terminal it asks first; otherwise it needs --yes.
-func findingRemoveVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "finding remove")
+func findingRemoveVerb(flags *pflag.FlagSet) runner {
 	yes := addYesFlag(flags)
 	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	ids := findingIDs(flags.Args())
-	if len(ids) == 0 {
-		return badUsage(e, "finding remove")
-	}
-	if !mayAsk(e, *yes, *wf.dryRun) {
-		return cli.ExitUsage
-	}
-	out, err := of.output(e, findingColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-	w, ok := newWrite(e, out, r, wf, "finding remove", ids)
-	if !ok {
-		return cli.ExitUsage
-	}
-	var lines []string
-	evidence := false
-	for _, id := range ids {
-		f, err := w.tx.Delete(id)
+	return func(e *env, args []string) int {
+		ids := findingIDs(args)
+		if len(ids) == 0 {
+			return usageError(e, "needs an ID")
+		}
+		if !mayAsk(e, *yes, *wf.dryRun) {
+			return cli.ExitUsage
+		}
+		out, err := e.output(findingColumns)
 		if err != nil {
-			w.refuse(err, report.FindingsDir, 0)
-			continue
+			e.log.Error(err.Error())
+			return cli.ExitProblems
 		}
-		w.done(f, f.Path)
-		lines = append(lines, fmt.Sprintf("%s  %s  %s", f.ID, f.Title, f.Path))
-		evidence = evidence || len(f.Evidence) > 0
-	}
-	if len(w.refused) == 0 && !w.failed && !*yes && !*wf.dryRun {
-		var effects []string
-		if evidence {
-			effects = append(effects, "their evidence files stay; rpt evidence prune removes them")
+		r := openReport(e)
+		if r == nil {
+			return cli.ExitProblems
 		}
-		w.declined = !confirm(e, "finding", lines, effects)
+		defer r.Close()
+		w, ok := newWrite(e, out, r, wf, ids)
+		if !ok {
+			return cli.ExitUsage
+		}
+		var lines []string
+		evidence := false
+		for _, id := range ids {
+			f, err := w.tx.Delete(id)
+			if err != nil {
+				w.refuse(err, report.FindingsDir, 0)
+				continue
+			}
+			w.done(f, f.Path)
+			lines = append(lines, fmt.Sprintf("%s  %s  %s", f.ID, f.Title, f.Path))
+			evidence = evidence || len(f.Evidence) > 0
+		}
+		if len(w.refused) == 0 && !w.failed && !*yes && !*wf.dryRun {
+			var effects []string
+			if evidence {
+				effects = append(effects, "their evidence files stay; rpt evidence prune removes them")
+			}
+			w.declined = !confirm(e, "finding", lines, effects)
+		}
+		return w.finish()
 	}
-	return w.finish()
 }
 
 // addYesFlag adds --yes, which a remove needs when it can't ask.
-func addYesFlag(f *flagSet) *bool {
+func addYesFlag(f *pflag.FlagSet) *bool {
 	return f.Bool("yes", false, "remove without asking; needed when stdin or stderr isn't a terminal")
 }
 

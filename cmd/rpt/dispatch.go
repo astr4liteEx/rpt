@@ -23,7 +23,7 @@ func dispatch(e *env, name string, args []string, g globals) int {
 	bin, err := exec.LookPath("rpt-" + name)
 	if err != nil {
 		msg := fmt.Sprintf("rpt: unknown command %q, and no rpt-%s plugin on PATH\n", name, name)
-		if s := newRoot(e, nil, g, true).SuggestionsFor(name); len(s) > 0 {
+		if s := newRoot(e, new(int)).SuggestionsFor(name); len(s) > 0 {
 			msg += "Did you mean this?\n\t" + strings.Join(s, "\n\t") + "\n"
 		}
 		fmt.Fprint(e.stderr, msg+"Run 'rpt --help' for the commands.\n")

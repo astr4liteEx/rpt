@@ -54,7 +54,7 @@ func TestCompleteIDsAndValues(t *testing.T) {
 	if got, _ := complete(t, "finding", "get", "--a"); len(got) != 1 || !strings.HasPrefix(got[0], "--assets\t") {
 		t.Errorf("flags: %q", got)
 	}
-	if got, _ := complete(t, "validate", "-"); got[len(got)-1] != "-\tthe records on stdin" {
+	if got, _ := complete(t, "validate", ""); len(got) == 0 || got[len(got)-1] != "-\tthe records on stdin" {
 		t.Errorf("validate -: %q", got)
 	}
 	if _, d := complete(t, "new", ""); d != ":16" {
@@ -78,8 +78,8 @@ func TestEveryCommandCompletes(t *testing.T) {
 			}
 		}
 		for _, s := range b.subs {
-			if _, d := complete(t, name, s.name, ""); d == "" {
-				t.Errorf("%s %s: no directive", name, s.name)
+			if _, d := complete(t, name, s.name(), ""); d == "" {
+				t.Errorf("%s %s: no directive", name, s.name())
 			}
 		}
 	}

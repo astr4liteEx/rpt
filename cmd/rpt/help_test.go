@@ -185,7 +185,7 @@ func TestUsageMatchesTable(t *testing.T) {
 			t.Errorf("no misuse case for built-in %q; add one", name)
 			continue
 		}
-		want := "usage: " + usageOf(name) + "\n"
+		want := "Run 'rpt " + name + " --help' for usage.\n"
 		for _, args := range cases {
 			code, _, errOut := runIn(t, "", append(strings.Fields(name), args...)...)
 			if code != 2 || !strings.Contains(errOut, want) {
@@ -204,7 +204,7 @@ func isHelpFor(out, name string) bool {
 	b := builtins[f[0]]
 	summary := b.desc.Summary
 	for _, s := range b.subs {
-		if len(f) > 1 && s.name == f[1] {
+		if len(f) > 1 && s.name() == f[1] {
 			summary = s.summary
 		}
 	}
@@ -216,8 +216,22 @@ func builtinNames() []string {
 	for name, b := range builtins {
 		names = append(names, name)
 		for _, s := range b.subs {
-			names = append(names, name+" "+s.name)
+			names = append(names, name+" "+s.name())
 		}
 	}
 	return names
+}
+
+// TestUsageErrorPointsAtHelp: a bad flag names the help of the command
+// it was given to, rpt itself before any command.
+func TestUsageErrorPointsAtHelp(t *testing.T) {
+	for args, want := range map[string]string{
+		"--bogus finding get": "Run 'rpt --help' for usage.",
+		"finding get --bogus": "Run 'rpt finding get --help' for usage.",
+		"finding":             "Run 'rpt finding --help' for usage.",
+	} {
+		if code, _, errOut := runIn(t, "", strings.Fields(args)...); code != 2 || !strings.HasSuffix(errOut, want+"\n") {
+			t.Errorf("rpt %s: exit %d, stderr %q; want 2 and %q", args, code, errOut, want)
+		}
+	}
 }

@@ -31,7 +31,7 @@ func TestDeleteVerb(t *testing.T) {
 func TestDeleteUsage(t *testing.T) {
 	dir := reportCopy(t)
 	code, _, errOut := runIn(t, "", "finding", "remove", "--yes", "--report", dir)
-	if code != 2 || !strings.Contains(errOut, "usage: rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>...") {
+	if code != 2 || !strings.Contains(errOut, "Run 'rpt finding remove --help' for usage.") {
 		t.Errorf("exit %d, stderr %q; want 2 and usage", code, errOut)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "findings/sqli-login.md")); err != nil {

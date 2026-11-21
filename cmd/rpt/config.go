@@ -16,6 +16,7 @@ import (
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
+	"github.com/spf13/pflag"
 )
 
 // configColumns show a config on a terminal: one row per member.
@@ -24,52 +25,50 @@ var configColumns = []cli.Column{{Header: "KEY", Field: "key"}, {Header: "VALUE"
 // configGetVerb prints the report config as one config record. With a
 // path, the record holds only that member; with --merged, a plugin's
 // section is laid over its user settings file.
-func configGetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "config get")
+func configGetVerb(flags *pflag.FlagSet) runner {
 	withLines := flags.Bool("lines", false, "add where each key sits in rpt.yaml")
 	merged := flags.Bool("merged", false, "with x-<plugin>: lay the report's section over the user's ~/.config/rpt/plugins/<plugin>/config.yaml")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	pos := flags.Args()
-	if len(pos) > 1 || *merged && (len(pos) != 1 || !strings.HasPrefix(pos[0], "x-") || strings.Contains(pos[0], ".")) {
-		return badUsage(e, "config get")
-	}
-	out, err := of.output(e, configColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	var rec sdk.Config
-	if *merged {
-		rec, err = mergedSettings(*of.report, pos[0])
+	return func(e *env, args []string) int {
+		pos := args
+		if len(pos) > 1 || *merged && (len(pos) != 1 || !strings.HasPrefix(pos[0], "x-") || strings.Contains(pos[0], ".")) {
+			return usageError(e, "takes at most one path, and --merged takes one x-<plugin> section")
+		}
+		out, err := e.output(configColumns)
 		if err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
-	} else {
-		r := openReport(e, *of.report)
-		if r == nil {
-			return cli.ExitProblems
+		var rec sdk.Config
+		if *merged {
+			rec, err = mergedSettings(e.report, pos[0])
+			if err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		} else {
+			r := openReport(e)
+			if r == nil {
+				return cli.ExitProblems
+			}
+			defer r.Close()
+			if rec, err = r.ConfigRecord(*withLines); err != nil {
+				return reportErrors(e, out, err)
+			}
 		}
-		defer r.Close()
-		if rec, err = r.ConfigRecord(*withLines); err != nil {
-			return reportErrors(e, out, err)
-		}
-	}
-	m, err := configMembers(rec)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	order := []string{"kind", "format", "severities", "sections", "required_sections", "rules", "rev", "lines"}
-	if len(pos) == 1 {
-		if m, err = pickMember(m, pos[0]); err != nil {
+		m, err := configMembers(rec)
+		if err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
+		order := []string{"kind", "format", "severities", "sections", "required_sections", "rules", "rev", "lines"}
+		if len(pos) == 1 {
+			if m, err = pickMember(m, pos[0]); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		return writeConfig(e, out, m, order)
 	}
-	return writeConfig(e, out, m, order)
 }
 
 // configMembers is a config record as its members.
@@ -255,63 +254,58 @@ func (r *renameFlags) Set(v string) error {
 }
 
 // configSetVerb sets one value of the report config.
-func configSetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "config set")
+func configSetVerb(flags *pflag.FlagSet) runner {
 	var renames renameFlags
 	flags.Var(&renames, "rename", "with severities or required_sections: keep old's findings under new (repeatable)")
 	force := flags.Bool("force", false, "drop severity levels findings still use")
 	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
+	return func(e *env, args []string) int {
+		pos := args
+		if len(pos) < 2 {
+			return usageError(e, "needs a path and a value")
+		}
+		return writeConfigChange(e, wf, func(tx *report.Tx) (report.ConfigChange, error) {
+			return tx.SetConfig(pos[0], pos[1:], renames, *force)
+		})
 	}
-	pos := flags.Args()
-	if len(pos) < 2 {
-		return badUsage(e, "config set")
-	}
-	return writeConfigChange(e, of, wf, "config set", func(tx *report.Tx) (report.ConfigChange, error) {
-		return tx.SetConfig(pos[0], pos[1:], renames, *force)
-	})
 }
 
 // configUnsetVerb removes keys from the report config.
-func configUnsetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "config unset")
+func configUnsetVerb(flags *pflag.FlagSet) runner {
 	force := flags.Bool("force", false, "go back to the default severities even when findings use a level they lack")
 	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
+	return func(e *env, args []string) int {
+		pos := args
+		if len(pos) == 0 {
+			return usageError(e, "needs a path")
+		}
+		return writeConfigChange(e, wf, func(tx *report.Tx) (report.ConfigChange, error) {
+			return tx.UnsetConfig(*force, pos...)
+		})
 	}
-	pos := flags.Args()
-	if len(pos) == 0 {
-		return badUsage(e, "config unset")
-	}
-	return writeConfigChange(e, of, wf, "config unset", func(tx *report.Tx) (report.ConfigChange, error) {
-		return tx.UnsetConfig(*force, pos...)
-	})
 }
 
 // writeConfigChange runs a config write and prints the config and every
 // finding it rewrote. A --rename that doesn't fit the lists is a usage
 // error.
-func writeConfigChange(e *env, of outputFlags, wf writeFlags, name string, change func(*report.Tx) (report.ConfigChange, error)) int {
-	out, err := of.output(e, findingColumns)
+func writeConfigChange(e *env, wf writeFlags, change func(*report.Tx) (report.ConfigChange, error)) int {
+	out, err := e.output(findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
-	r := openReport(e, *of.report)
+	r := openReport(e)
 	if r == nil {
 		return cli.ExitProblems
 	}
 	defer r.Close()
-	w, ok := newWrite(e, out, r, wf, name, []string{report.ConfigID})
+	w, ok := newWrite(e, out, r, wf, []string{report.ConfigID})
 	if !ok {
 		return cli.ExitUsage
 	}
 	ch, err := change(w.tx)
 	if re, ok := errors.AsType[*report.RenameError](err); ok {
-		fmt.Fprintf(e.stderr, "rpt: %v\n", re)
-		return badUsage(e, name)
+		return usageError(e, "%v", re)
 	}
 	if err != nil {
 		w.refuse(err, report.ConfigFile, 0)

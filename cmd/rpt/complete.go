@@ -28,107 +28,30 @@ const (
 	dirs    = cobra.ShellCompDirectiveFilterDirs
 )
 
-// flagsOf learns a built-in's flags by running it with a probe: its flag
-// parsing hands them over and stops before any work.
-func flagsOf(e *env, v verb) *pflag.FlagSet {
-	var fs *pflag.FlagSet
-	probe := &env{stdin: strings.NewReader(""), stdout: discard{}, stderr: discard{}, log: e.log, probe: &fs}
-	v(probe, nil)
-	return fs
-}
-
-type discard struct{}
-
-func (discard) Write(p []byte) (int, error) { return len(p), nil }
-
-// completer completes one built-in: name is "finding set" or "validate".
-func completer(e *env, name string, v verb) cobra.CompletionFunc {
+// completer completes one built-in's arguments: name is "finding set" or
+// "validate". Cobra has parsed the flags typed so far, so --report is
+// known, and offers the flag names itself.
+func completer(e *env, name string) cobra.CompletionFunc {
 	return func(_ *cobra.Command, args []string, word string) ([]string, cobra.ShellCompDirective) {
-		fs := flagsOf(e, v)
-		c := &completion{name: name, word: word}
-		// Split what's typed into flags and positional arguments.
-		reportDir := ""
-		for i := 0; i < len(args); i++ {
-			a := args[i]
-			if a == "--" {
-				c.pos = append(c.pos, args[i+1:]...)
-				break
-			}
-			if !strings.HasPrefix(a, "-") || a == "-" {
-				c.pos = append(c.pos, a)
-				continue
-			}
-			fname, val, hasVal := strings.Cut(strings.TrimLeft(a, "-"), "=")
-			f := lookup(fs, fname, a)
-			if f == nil || hasVal || f.Value.Type() == "bool" {
-				if f != nil && f.Name == "report" && hasVal {
-					reportDir = val
-				}
-				continue
-			}
-			if i+1 < len(args) {
-				if f.Name == "report" {
-					reportDir = args[i+1]
-				}
-				i++
-				continue
-			}
-			c.flag = f.Name // the word is this flag's value
-		}
-		if r, err := openQuiet(reportDir); err == nil {
+		c := &completion{name: name, word: word, pos: args}
+		if r, err := openQuiet(e.report); err == nil {
 			defer r.Close()
 			c.r = r
-		}
-		switch {
-		case c.flag != "":
-			return c.flagValue()
-		case strings.HasPrefix(word, "-") && fs != nil:
-			var out []string
-			fs.VisitAll(func(f *pflag.Flag) {
-				if !f.Hidden && f.Name != "json" && f.Name != "report" { // cobra offers the root's own
-					out = append(out, "--"+f.Name+"\t"+f.Usage)
-				}
-			})
-			if name == "validate" {
-				out = append(out, "-\tthe records on stdin")
-			}
-			return c.filter(out), noFiles
 		}
 		return c.args()
 	}
 }
 
-// nounCompleter offers a noun's actions. Cobra would too, but not once a
-// flag such as --report comes before the noun.
-func nounCompleter(subs []sub) cobra.CompletionFunc {
-	return func(_ *cobra.Command, args []string, word string) ([]string, cobra.ShellCompDirective) {
-		for i := 0; i < len(args); i++ {
-			if args[i] == "--report" {
-				i++
-				continue
-			}
-			if !strings.HasPrefix(args[i], "-") {
-				return nil, noFiles // past the action
-			}
+// flagCompleter completes the value of one flag.
+func flagCompleter(e *env, flag string) cobra.CompletionFunc {
+	return func(_ *cobra.Command, _ []string, word string) ([]string, cobra.ShellCompDirective) {
+		c := &completion{word: word, flag: flag}
+		if r, err := openQuiet(e.report); err == nil {
+			defer r.Close()
+			c.r = r
 		}
-		c := &completion{word: word}
-		var cands []string
-		for _, s := range subs {
-			cands = append(cands, s.name)
-		}
-		return c.filter(cands), noFiles
+		return c.flagValue()
 	}
-}
-
-// lookup finds the flag a typed argument names, long or short.
-func lookup(fs *pflag.FlagSet, name, typed string) *pflag.Flag {
-	if fs == nil {
-		return nil
-	}
-	if !strings.HasPrefix(typed, "--") && len(name) == 1 {
-		return fs.ShorthandLookup(name)
-	}
-	return fs.Lookup(name)
 }
 
 // openQuiet opens the report completion works on, logging nothing.
@@ -257,7 +180,7 @@ func (c *completion) args() ([]string, cobra.ShellCompDirective) {
 			cands = commandNames()
 		} else if b, ok := builtins[at(0)]; ok && n == 1 {
 			for _, s := range b.subs {
-				cands = append(cands, s.name)
+				cands = append(cands, s.name())
 			}
 		}
 	case "completion":
@@ -487,31 +410,29 @@ func pluginCompleter(bin string) cobra.CompletionFunc {
 
 // completionVerb prints the completion script for a shell. The script
 // calls rpt __complete on each Tab press, so it never goes stale.
-func completionVerb(e *env, args []string) int {
-	flags, _ := newFlags(e, "completion")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
+func completionVerb(flags *pflag.FlagSet) runner {
+	return func(e *env, args []string) int {
+		if len(args) != 1 {
+			return usageError(e, "needs one shell: bash, zsh, fish or powershell")
+		}
+		root := newRoot(e, new(int))
+		var err error
+		switch args[0] {
+		case "bash":
+			err = root.GenBashCompletionV2(e.stdout, true)
+		case "zsh":
+			err = root.GenZshCompletion(e.stdout)
+		case "fish":
+			err = root.GenFishCompletion(e.stdout, true)
+		case "powershell":
+			err = root.GenPowerShellCompletionWithDesc(e.stdout)
+		default:
+			return usageError(e, "unknown shell %q: bash, zsh, fish or powershell", args[0])
+		}
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		return cli.ExitOK
 	}
-	if flags.NArg() != 1 {
-		return badUsage(e, "completion")
-	}
-	root := newRoot(e, nil, globals{}, false)
-	var err error
-	switch flags.Arg(0) {
-	case "bash":
-		err = root.GenBashCompletionV2(e.stdout, true)
-	case "zsh":
-		err = root.GenZshCompletion(e.stdout)
-	case "fish":
-		err = root.GenFishCompletion(e.stdout, true)
-	case "powershell":
-		err = root.GenPowerShellCompletionWithDesc(e.stdout)
-	default:
-		return badUsage(e, "completion")
-	}
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return cli.ExitOK
 }

@@ -4,6 +4,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"slices"
 	"strings"
 
+	"charm.land/fang/v2"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -25,42 +27,53 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-// env is one invocation's streams. Verbs never touch os.Stdin, os.Stdout
-// or os.Stderr directly, so tests can run them in-process.
+// env is one invocation: its streams and global flags. Commands never
+// touch os.Stdin, os.Stdout or os.Stderr directly, so tests can run them
+// in-process.
 type env struct {
 	stdin          io.Reader
 	stdout, stderr io.Writer
 	log            *slog.Logger
 	command        string // the command running, as problems name it: "scope match"
-	// probe, when set, makes the verb's flag parsing hand over its flags
-	// and stop, so completion learns them without running the verb.
-	probe **pflag.FlagSet
+	report         string // --report, or "" to find the report
+	reportSet      bool   // --report was given
+	json           bool   // --json
 	// diag prints problems compiler-style when stderr is a terminal; nil
 	// otherwise, when they are text lines.
 	diag *cli.Diagnostics
+	// usage is set by usageError: the command was called wrongly.
+	usage error
 }
 
-// A verb runs one built-in and returns its exit code. Only main calls
-// os.Exit, so deferred calls in verbs always run.
-type verb func(e *env, args []string) int
+// A runner runs a built-in with its arguments, its flags already parsed,
+// and returns its exit code. Only main calls os.Exit, so deferred calls
+// in runners always run.
+type runner func(e *env, args []string) int
 
-// A builtin is one built-in command: its function and the description
-// rpt help prints. A command is built in only if it defines or enforces the
-// report format; built-ins are checked before plugins, so no plugin can
-// shadow one.
+// A verb declares a built-in's flags and returns its runner.
+type verb func(flags *pflag.FlagSet) runner
+
+// A builtin is one built-in command. A command is built in only if it
+// defines or enforces the report format; built-ins are checked before
+// plugins, so no plugin can shadow one.
 type builtin struct {
-	run  verb
-	desc sdk.Command // Kind and Name are filled in by rpt help; Usage gains each sub's usage
-	subs []sub       // subcommands, in the order usage lists them
+	cmd
+	desc sdk.Command // what rpt help and --describe print; Usage is filled in from cmd
+	subs []cmd       // a noun's actions, in the order usage lists them
 }
 
-// A sub is a subcommand of a built-in: rpt <command> <name> [args].
-type sub struct {
-	name    string
-	run     verb
-	usage   string
+// A cmd is how a command (or a noun's action) is called: cobra's Use,
+// its name and arguments; the forms it takes when there are several;
+// longer help when the summary isn't enough; and its verb, nil for a noun.
+type cmd struct {
+	use     string
 	summary string
+	verb    verb
+	forms   []string
+	long    string
 }
+
+func (c cmd) name() string { return strings.Fields(c.use)[0] }
 
 // builtins maps each built-in command's name to it. It is the command
 // table: the cobra tree is built from it.
@@ -68,69 +81,69 @@ var builtins map[string]builtin
 
 func init() {
 	builtins = map[string]builtin{
-		"assemble":   {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
-		"completion": {completionVerb, sdk.Command{Summary: "Print the shell completion script for bash, zsh, fish or powershell", Usage: "rpt completion bash|zsh|fish|powershell"}, nil},
-		"config": {nounVerb("config"), sdk.Command{Summary: "Get, set and unset the report config, plugin settings included", Usage: "rpt config <action>", Output: "records"}, []sub{
-			{"get", configGetVerb, "rpt config get [--lines] [path], or rpt config get --merged x-<plugin>", "Print the config, or one value of it"},
-			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>...", "Change one value of the config"},
-			{"unset", configUnsetVerb, "rpt config unset [--force] [--if-rev rev] [--dry-run] <path>...", "Remove values from the config"},
+		"assemble":   {cmd{use: "assemble", verb: assembleVerb}, sdk.Command{Summary: "Print the whole report as one record for renderers", Output: "records"}, nil},
+		"completion": {cmd{use: "completion bash|zsh|fish|powershell", verb: completionVerb}, sdk.Command{Summary: "Print the shell completion script for bash, zsh, fish or powershell"}, nil},
+		"config": {cmd{use: "config"}, sdk.Command{Summary: "Get, set and unset the report config, plugin settings included", Output: "records"}, []cmd{
+			{use: "get [path]", summary: "Print the config, or one value of it", verb: configGetVerb, forms: []string{"rpt config get [--lines] [path]", "rpt config get --merged x-<plugin>"}},
+			{use: "set <path> <value>...", summary: "Change one value of the config", verb: configSetVerb},
+			{use: "unset <path>...", summary: "Remove values from the config", verb: configUnsetVerb},
 		}},
-		"evidence": {nounVerb("evidence"), sdk.Command{Summary: "Get, add, set, unset and remove the evidence findings and pages list and link; prune removes files nothing references", Usage: "rpt evidence <action>", Input: "records", Output: "records"}, []sub{
-			{"get", evidenceGetVerb, "rpt evidence get [owner...], or rpt evidence get --orphans", "Print the evidence findings and pages reference, or the files nothing references"},
-			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--link section [--text caption]] [--if-rev rev] [--dry-run] <owner> <file>..., or rpt evidence add [--dry-run] < records.jsonl", "Copy files into the report and list or link them"},
-			{"set", evidenceSetVerb, "rpt evidence set [--if-rev rev] [--dry-run] <owner> <ref> caption|path <value>", "Change a reference's caption, or move its file"},
-			{"unset", evidenceUnsetVerb, "rpt evidence unset [--if-rev rev] [--dry-run] <owner> <ref> caption", "Empty a reference's caption"},
-			{"remove", evidenceRemoveVerb, "rpt evidence remove [--yes] [--drop-text] [--if-rev rev] [--dry-run] <owner> <ref>", "Remove a reference; the file stays for prune"},
-			{"prune", evidencePruneVerb, "rpt evidence prune [--yes] [--dry-run]", "Delete the evidence files nothing references"},
+		"evidence": {cmd{use: "evidence"}, sdk.Command{Summary: "Get, add, set, unset and remove the evidence findings and pages list and link; prune removes files nothing references", Input: "records", Output: "records"}, []cmd{
+			{use: "get [owner...]", summary: "Print the evidence findings and pages reference, or the files nothing references", verb: evidenceGetVerb, forms: []string{"rpt evidence get [owner...]", "rpt evidence get --orphans"}},
+			{use: "add <owner> <file>...", summary: "Copy files into the report and list or link them", verb: evidenceAddVerb, forms: []string{"rpt evidence add [--as name] [--link section [--text caption]] <owner> <file>...", "rpt evidence add < records.jsonl"}},
+			{use: "set <owner> <ref> caption|path <value>", summary: "Change a reference's caption, or move its file", verb: evidenceSetVerb},
+			{use: "unset <owner> <ref> caption", summary: "Empty a reference's caption", verb: evidenceUnsetVerb},
+			{use: "remove <owner> <ref>", summary: "Remove a reference; the file stays for prune", verb: evidenceRemoveVerb},
+			{use: "prune", summary: "Delete the evidence files nothing references", verb: evidencePruneVerb},
 		}},
-		"finding": {nounVerb("finding"), sdk.Command{Summary: "Get, add, set, unset and remove findings", Usage: "rpt finding <action>", Input: "records", Output: "records"}, []sub{
-			{"get", findingGetVerb, "rpt finding get [--lines] [--assets] [id...]", "Print findings, or those with the IDs given"},
-			{"add", findingAddVerb, "rpt finding add [--scaffold] [--dry-run] < records.jsonl, or rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold] [--dry-run]", "Add findings from records on stdin or from flags"},
-			{"set", findingSetVerb, "rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>...", "Change one value of a finding"},
-			{"unset", findingUnsetVerb, "rpt finding unset [--if-rev rev] [--dry-run] <id> <path>...", "Remove values from a finding"},
-			{"remove", findingRemoveVerb, "rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>...", "Remove findings"},
+		"finding": {cmd{use: "finding"}, sdk.Command{Summary: "Get, add, set, unset and remove findings", Input: "records", Output: "records"}, []cmd{
+			{use: "get [id...]", summary: "Print findings, or those with the IDs given", verb: findingGetVerb},
+			{use: "add", summary: "Add findings from records on stdin or from flags", verb: findingAddVerb, forms: []string{"rpt finding add [--scaffold] < records.jsonl", "rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold]"}},
+			{use: "set <id> <path> <value>...", summary: "Change one value of a finding", verb: findingSetVerb,
+				long: "Change one value of a finding. The path is a frontmatter key, sections.<key> or x-<plugin>.<key>. Each value is YAML: high, S-12 '{scope: S-20, port: 443}', \"9.1\"; several make a list. A section's text comes from stdin when no value is given."},
+			{use: "unset <id> <path>...", summary: "Remove values from a finding", verb: findingUnsetVerb},
+			{use: "remove <id>...", summary: "Remove findings", verb: findingRemoveVerb},
 		}},
-		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
-		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
-		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new [--like report [--with-pages]] [--json] <dir>"}, nil},
-		"page": {nounVerb("page"), sdk.Command{Summary: "Get, add, set, unset and remove pages of report-level prose", Usage: "rpt page <action>", Input: "records", Output: "records"}, []sub{
-			{"get", pageGetVerb, "rpt page get [--lines] [--assets] [id...]", "Print pages, or those with the IDs given"},
-			{"add", pageAddVerb, "rpt page add [--dry-run] < records.jsonl, or rpt page add --title t [--id P-NNN] [--dry-run]", "Add pages from records on stdin or from flags"},
-			{"set", pageSetVerb, "rpt page set [--if-rev rev] [--dry-run] <id> <path> <value>...", "Change one value of a page"},
-			{"unset", pageUnsetVerb, "rpt page unset [--if-rev rev] [--dry-run] <id> <path>...", "Remove values from a page"},
-			{"remove", pageRemoveVerb, "rpt page remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>...", "Remove pages"},
+		"help": {cmd{use: "help [command [sub]]", verb: helpVerb}, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Output: "records"}, nil},
+		"ls":   {cmd{use: "ls [dir]", verb: lsVerb, forms: []string{"rpt ls [dir]", "rpt ls --current [--report dir]"}}, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Output: "records"}, nil},
+		"new":  {cmd{use: "new <dir>", verb: newVerb}, sdk.Command{Summary: "Create an empty report in a new or empty folder"}, nil},
+		"page": {cmd{use: "page"}, sdk.Command{Summary: "Get, add, set, unset and remove pages of report-level prose", Input: "records", Output: "records"}, []cmd{
+			{use: "get [id...]", summary: "Print pages, or those with the IDs given", verb: pageGetVerb},
+			{use: "add", summary: "Add pages from records on stdin or from flags", verb: pageAddVerb, forms: []string{"rpt page add < records.jsonl", "rpt page add --title t [--id P-NNN]"}},
+			{use: "set <id> <path> <value>...", summary: "Change one value of a page", verb: pageSetVerb},
+			{use: "unset <id> <path>...", summary: "Remove values from a page", verb: pageUnsetVerb},
+			{use: "remove <id>...", summary: "Remove pages", verb: pageRemoveVerb},
 		}},
-		"scope": {nounVerb("scope"), sdk.Command{Summary: "Get, add, set, unset and remove scope rows; match attributes finding targets to them", Usage: "rpt scope <action>", Input: "records", Output: "records"}, []sub{
-			{"get", scopeGetVerb, "rpt scope get [--lines] [id...]", "Print scope rows, or those with the IDs given"},
-			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]... [--dry-run]", "Add scope rows from records on stdin or from flags"},
-			{"set", scopeSetVerb, "rpt scope set [--force|--cleanup] [--if-rev rev] [--dry-run] <id> <column> <value>", "Change one column of a scope row"},
-			{"unset", scopeUnsetVerb, "rpt scope unset [--if-rev rev] [--dry-run] <id> <column>...", "Empty columns of a scope row"},
-			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>...", "Remove scope rows"},
-			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl", "Attribute the targets of findings on stdin to scope rows"},
+		"scope": {cmd{use: "scope"}, sdk.Command{Summary: "Get, add, set, unset and remove scope rows; match attributes finding targets to them", Input: "records", Output: "records"}, []cmd{
+			{use: "get [id...]", summary: "Print scope rows, or those with the IDs given", verb: scopeGetVerb},
+			{use: "add", summary: "Add scope rows from records on stdin or from flags", verb: scopeAddVerb, forms: []string{"rpt scope add < records.jsonl", "rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]..."}},
+			{use: "set <id> <column> <value>", summary: "Change one column of a scope row", verb: scopeSetVerb},
+			{use: "unset <id> <column>...", summary: "Empty columns of a scope row", verb: scopeUnsetVerb},
+			{use: "remove <id>...", summary: "Remove scope rows", verb: scopeRemoveVerb},
+			{use: "match", summary: "Attribute the targets of findings on stdin to scope rows", verb: scopeMatchVerb, forms: []string{"rpt scope match [--drop-out-of-scope] < records.jsonl"}},
 		}},
-		"validate": {validateVerb, sdk.Command{Summary: "Check the report, or the records on stdin, and print the problems", Usage: "rpt validate [--json] [--report dir] [id...], or rpt validate - < records.jsonl", Input: "records", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
-		"version":  {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
+		"validate": {cmd{use: "validate [id...]", verb: validateVerb, forms: []string{"rpt validate [id...]", "rpt validate - < records.jsonl"}}, sdk.Command{Summary: "Check the report, or the records on stdin, and print the problems", Input: "records", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
+		"version":  {cmd{use: "version", verb: versionVerb}, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Output: "records"}, nil},
 	}
 	for name, b := range builtins {
-		for _, s := range b.subs {
-			b.desc.Usage += " | " + s.usage
+		b.summary = b.desc.Summary
+		b.desc.Usage = usage("rpt", b.cmd)
+		if b.subs != nil {
+			b.desc.Usage = "rpt " + name + " <action>"
+			for _, s := range b.subs {
+				b.desc.Usage += " | " + usage("rpt "+name, s)
+			}
 		}
 		builtins[name] = b
 	}
 }
 
-// usageOf returns the usage line for a command or "command sub" name.
-func usageOf(name string) string {
-	f := strings.Fields(name)
-	b := builtins[f[0]]
-	if len(f) > 1 {
-		for _, s := range b.subs {
-			if s.name == f[1] {
-				return s.usage
-			}
-		}
+// usage is a command's usage line for rpt help: its forms, or its use.
+func usage(parent string, c cmd) string {
+	if c.forms != nil {
+		return strings.Join(c.forms, ", or ")
 	}
-	return b.desc.Usage
+	return parent + " " + c.use
 }
 
 // The global flags every command takes, before or after its name.
@@ -150,56 +163,46 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		defer e.diag.Totals()
 	}
 	g, rest, err := splitGlobals(args)
-	if err != nil {
-		fmt.Fprintf(stderr, "rpt: %v\n", err)
+	switch {
+	case err != nil: // cobra reports the bad flag
+	case len(rest) == 0 && !g.help:
+		help := *e
+		help.stdout = stderr
+		execute(&help, []string{"--help"})
 		return cli.ExitUsage
+	case len(rest) == 0:
+	case len(rest) == 2 && isBuiltin(rest[0]) && rest[1] == "--describe":
+		return describeBuiltin(e, builtins[rest[0]])
+	case !isBuiltin(rest[0]) && !strings.HasPrefix(rest[0], "__complete"):
+		return dispatch(e, rest[0], rest[1:], g)
 	}
-	if len(rest) == 0 {
-		if g.help {
-			return fangHelp(e, stdout, nil)
-		}
-		fangHelp(e, stderr, nil)
-		return cli.ExitUsage
-	}
-	if name := rest[0]; !isBuiltin(name) && !strings.HasPrefix(name, "__complete") {
-		return dispatch(e, name, rest[1:], g)
-	}
-	return execute(e, g, rest)
+	return execute(e, args)
 }
 
-// execute runs a built-in (or cobra's hidden __complete) through the cobra
-// tree, handing the global flags given before its name on to it.
-func execute(e *env, g globals, args []string) int {
-	var code int
-	root := newRoot(e, &code, g, strings.HasPrefix(args[0], "__complete"))
+// execute runs a built-in (or cobra's hidden __complete, or help) through
+// the cobra tree, with fang's help and errors.
+func execute(e *env, args []string) int {
+	code := cli.ExitOK
+	root := newRoot(e, &code)
 	root.SetArgs(args)
 	root.SetIn(e.stdin)
 	root.SetOut(e.stdout)
 	root.SetErr(e.stderr)
-	if err := root.Execute(); err != nil {
-		fmt.Fprintf(e.stderr, "rpt: %v\n", err)
+	err := fang.Execute(context.Background(), root,
+		fang.WithoutVersion(), fang.WithoutCompletions(), fang.WithoutManpage(),
+		fang.WithColorSchemeFunc(fang.AnsiColorScheme), fang.WithErrorHandler(errorHandler(e)))
+	if err != nil {
 		return cli.ExitUsage
 	}
 	return code
 }
 
-// globals are rpt's own flags, given before the command's name.
+// globals are rpt's own flags, given before the command's name, as a
+// plugin gets them.
 type globals struct {
 	report     string
 	reportSet  bool
 	json, help bool
-}
-
-// args renders the globals as flags a built-in parses itself.
-func (g globals) args() []string {
-	var out []string
-	if g.reportSet {
-		out = append(out, "--report", g.report)
-	}
-	if g.json {
-		out = append(out, "--json")
-	}
-	return out
 }
 
 // splitGlobals takes the global flags off the front of args and returns
@@ -226,42 +229,34 @@ func splitGlobals(args []string) (globals, []string, error) {
 		}
 		args = args[1:]
 	}
-	if g.help && len(args) > 0 {
-		args = append(args, "--help")
-	}
 	return g, args, nil
 }
 
-// newRoot builds the cobra tree from the command table. With plugins, it
-// also holds a stub for each rpt-* on PATH that no built-in shadows, in
-// its own group, for help and completion; running one execs the plugin.
-func newRoot(e *env, code *int, g globals, plugins bool) *cobra.Command {
+// newRoot builds the cobra tree from the command table, with a stub for
+// each rpt-* on PATH that no built-in shadows, in its own group, for help
+// and completion. Running a command sets code.
+func newRoot(e *env, code *int) *cobra.Command {
 	root := &cobra.Command{
-		Use:           "rpt",
-		SilenceUsage:  true,
-		SilenceErrors: true,
+		Use:   "rpt",
+		Short: "Write penetration-test reports as plain files",
+		Long:  "Write penetration-test reports as plain files.\n\nAny other command runs the rpt-<command> plugin on PATH; 'rpt help' lists every command as records.",
 		// SuggestionsFor uses this; cobra sets it only for its own errors.
 		SuggestionsMinimumDistance: 2,
 	}
 	root.CompletionOptions.DisableDefaultCmd = true
-	root.PersistentFlags().Bool("json", false, jsonUsage)
-	root.PersistentFlags().String("report", "", reportUsage)
-	root.AddGroup(&cobra.Group{ID: "builtin", Title: "Commands:"}, &cobra.Group{ID: "plugin", Title: "Plugin commands:"})
-	root.SetUsageTemplate(rootUsage)
-	root.SetHelpTemplate("{{.UsageString}}")
+	root.PersistentFlags().BoolVar(&e.json, "json", false, jsonUsage)
+	root.PersistentFlags().StringVar(&e.report, "report", "", reportUsage)
+	_ = root.RegisterFlagCompletionFunc("report", flagCompleter(e, "report"))
+	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
+		return usageErr{command: strings.TrimSpace(strings.TrimPrefix(c.CommandPath(), "rpt")), msg: err.Error()}
+	})
+	root.AddGroup(&cobra.Group{ID: "builtin", Title: "Commands"}, &cobra.Group{ID: "plugin", Title: "Plugin commands"})
 	for _, name := range slices.Sorted(maps.Keys(builtins)) {
 		b := builtins[name]
-		c := adapt(e, code, g, name, b.run, b.desc)
+		c := command(e, code, name, b.cmd)
 		c.GroupID = "builtin"
-		if len(b.subs) == 0 {
-			c.ValidArgsFunction = completer(e, name, b.run)
-		} else {
-			c.ValidArgsFunction = nounCompleter(b.subs)
-		}
 		for _, s := range b.subs {
-			sc := adapt(e, code, g, name+" "+s.name, s.run, sdk.Command{Summary: s.usage})
-			sc.ValidArgsFunction = completer(e, name+" "+s.name, s.run)
-			c.AddCommand(sc)
+			c.AddCommand(command(e, code, name+" "+s.name(), s))
 		}
 		if name == "help" {
 			root.SetHelpCommand(c)
@@ -269,132 +264,91 @@ func newRoot(e *env, code *int, g globals, plugins bool) *cobra.Command {
 		}
 		root.AddCommand(c)
 	}
-	if plugins {
-		for _, p := range findPlugins() {
-			if p.Shadowed {
-				continue
-			}
-			root.AddCommand(&cobra.Command{
-				Use: p.Name, Short: "the plugin " + p.Path, GroupID: "plugin", DisableFlagParsing: true,
-				ValidArgsFunction: pluginCompleter(p.Path),
-				Run:               func(_ *cobra.Command, args []string) { *code = dispatch(e, p.Name, args, g) },
-			})
+	for _, p := range findPlugins() {
+		if p.Shadowed {
+			continue
 		}
+		root.AddCommand(&cobra.Command{
+			Use: p.Name, Short: "the plugin " + p.Path, GroupID: "plugin", DisableFlagParsing: true,
+			ValidArgsFunction: pluginCompleter(p.Path),
+			Run: func(_ *cobra.Command, args []string) {
+				*code = dispatch(e, p.Name, args, globals{report: e.report, reportSet: e.reportSet, json: e.json})
+			},
+		})
 	}
 	return root
 }
 
-const rootUsage = `usage: rpt <command> [args]
-{{range .Groups}}{{$id := .ID}}{{$cmds := false}}{{range $.Commands}}{{if and (eq .GroupID $id) .IsAvailableCommand}}{{$cmds = true}}{{end}}{{end}}{{if $cmds}}
-{{.Title}}{{range $.Commands}}{{if and (eq .GroupID $id) .IsAvailableCommand}}
-  {{rpad .Name .NamePadding}} {{.Short}}{{end}}{{end}}
-{{end}}{{end}}
-Flags:
-{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}
-
-Run 'rpt help <command>' for a command's usage, and 'rpt help' to list every command as records.
-Any other command runs the rpt-<command> plugin on PATH.
-`
-
-// adapt makes a built-in a cobra command. The built-in parses its own
-// flags, so cobra leaves them alone and passes every argument on, with
-// the global flags given before the command's name in front. --help and
-// --describe are answered here.
-func adapt(e *env, code *int, g globals, name string, v verb, desc sdk.Command) *cobra.Command {
-	f := strings.Fields(name)
-	return &cobra.Command{
-		Use: f[len(f)-1], Short: desc.Summary, DisableFlagParsing: true,
-		Run: func(_ *cobra.Command, args []string) {
-			e := &env{stdin: e.stdin, stdout: e.stdout, stderr: e.stderr, log: e.log, diag: e.diag, command: name}
-			switch {
-			case len(args) == 1 && args[0] == "--describe" && len(f) == 1:
-				*code = describeBuiltin(e, builtins[name])
-			case wantsHelp(args):
-				*code = fangHelp(e, e.stdout, f)
-			default:
-				*code = v(e, append(g.args(), args...))
-			}
-		},
+// command makes one built-in, or one of a noun's actions, a cobra command.
+// name is its path below rpt: "finding set".
+func command(e *env, code *int, name string, c cmd) *cobra.Command {
+	cc := &cobra.Command{Use: c.use, Short: c.summary, Long: c.long}
+	if len(c.forms) > 1 {
+		cc.Example = "  " + strings.Join(c.forms, "\n  ")
 	}
-}
-
-// wantsHelp reports whether args ask for help: -h or --help before any --.
-func wantsHelp(args []string) bool {
-	for _, a := range args {
-		switch a {
-		case "--":
-			return false
-		case "-h", "--help":
-			return true
+	v := c.verb
+	if v == nil {
+		v = nounVerb(c.name())
+	} else {
+		cc.ValidArgsFunction = completer(e, name)
+	}
+	cc.Flags().SortFlags = false
+	run := v(cc.Flags())
+	cc.RunE = func(cc *cobra.Command, args []string) error {
+		e.command, e.reportSet = name, cc.Flags().Changed("report")
+		*code = run(e, args)
+		return e.usage
+	}
+	cc.Flags().VisitAll(func(f *pflag.Flag) {
+		if f.Value.Type() != "bool" {
+			_ = cc.RegisterFlagCompletionFunc(f.Name, flagCompleter(e, f.Name))
 		}
-	}
-	return false
+	})
+	return cc
 }
 
-// A flagSet is a built-in's flags. Parse reports a bad flag with the
-// usage, as pflag does only when it exits on errors itself.
-type flagSet struct {
-	*pflag.FlagSet
-	e *env
-}
+// usageErr is a command called wrongly: rpt prints why, points at the
+// command's help and exits 2.
+type usageErr struct{ command, msg string }
 
-func (f *flagSet) Parse(args []string) error {
-	if f.e.probe != nil {
-		*f.e.probe = f.FlagSet
-		return errProbed
-	}
-	err := f.FlagSet.Parse(args)
-	if err != nil && !errors.Is(err, pflag.ErrHelp) { // pflag printed the usage for --help
-		fmt.Fprintf(f.e.stderr, "rpt: %v\n", err)
-		f.Usage()
-	}
-	return err
-}
+func (u usageErr) Error() string { return u.msg }
 
-// errProbed stops a verb run only to learn its flags.
-var errProbed = errors.New("flags probed")
-
-// outputFlags are the global flags as one built-in parsed them.
-type outputFlags struct {
-	json   *bool
-	report *string
-}
-
-// badUsage prints the usage line the command table gives a command (or
-// "command sub"), and returns the usage exit code. It is the only place commands
-// print their usage, so it never drifts from what rpt help lists.
-func badUsage(e *env, verb string) int {
-	fmt.Fprintln(e.stderr, "usage: "+usageOf(verb))
+// usageError records that the running command was called wrongly, and
+// returns the usage exit code.
+func usageError(e *env, format string, a ...any) int {
+	e.usage = usageErr{command: e.command, msg: fmt.Sprintf(format, a...)}
 	return cli.ExitUsage
 }
 
-// newFlags returns a FlagSet for command name ("scope match" for a
-// subcommand) holding the global flags. On a bad flag, or --help, it
-// prints the command's usage line from the command table and its flags.
-// Flags may come before, among or after the arguments; everything after
-// -- is an argument.
-func newFlags(e *env, name string) (*flagSet, outputFlags) {
-	flags := &flagSet{pflag.NewFlagSet(name, pflag.ContinueOnError), e}
-	flags.SetOutput(e.stderr)
-	flags.SortFlags = false
-	flags.Usage = func() {
-		badUsage(e, name)
-		flags.PrintDefaults()
-	}
-	return flags, outputFlags{
-		json:   flags.Bool("json", false, jsonUsage),
-		report: flags.String("report", "", reportUsage),
+// errorHandler prints an error cobra or a command returned: fang's style
+// on a terminal, two plain lines elsewhere. A usage error points at the
+// command's --help.
+func errorHandler(e *env) fang.ErrorHandler {
+	return func(w io.Writer, styles fang.Styles, err error) {
+		help := "rpt --help"
+		if u, ok := errors.AsType[usageErr](err); ok && u.command != "" {
+			help = "rpt " + u.command + " --help"
+		}
+		if !isTerminal(e.stderr) {
+			fmt.Fprintf(w, "rpt: %v\nRun '%s' for usage.\n", err, help)
+			return
+		}
+		fmt.Fprintln(w, styles.ErrorHeader.String())
+		fmt.Fprintln(w, styles.ErrorText.Render(err.Error()+"."))
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, styles.ErrorText.UnsetWidth().Render("Run")+styles.Program.Flag.Render(" "+help+" ")+styles.ErrorText.UnsetWidth().UnsetMargins().UnsetTransform().Render("for usage."))
+		fmt.Fprintln(w)
 	}
 }
 
-// output builds the verb's writer from the shared flags.
-func (o outputFlags) output(e *env, columns []cli.Column) (*cli.Output, error) {
-	return cli.NewOutput(e.stdout, isTerminal(e.stdout), *o.json, columns)
+// output builds the command's writer from the global flags.
+func (e *env) output(columns []cli.Column) (*cli.Output, error) {
+	return cli.NewOutput(e.stdout, isTerminal(e.stdout), e.json, columns)
 }
 
 // openReport finds and opens the report, logging why when it can't.
-func openReport(e *env, flagValue string) *report.Report {
-	dir, err := report.Root(flagValue)
+func openReport(e *env) *report.Report {
+	dir, err := report.Root(e.report)
 	if err != nil {
 		e.log.Error(err.Error())
 		return nil

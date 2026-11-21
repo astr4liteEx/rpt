@@ -11,7 +11,7 @@ import (
 func TestFindingNounNeedsAnAction(t *testing.T) {
 	for _, args := range [][]string{{"finding"}, {"finding", "list"}} {
 		code, out, errOut := runIn(t, "", args...)
-		if code != 2 || out != "" || !strings.Contains(errOut, "usage: rpt finding <action>") {
+		if code != 2 || out != "" || !strings.Contains(errOut, "Run 'rpt finding --help' for usage.") {
 			t.Errorf("rpt %v: exit %d, stdout %q, stderr %q", args, code, out, errOut)
 		}
 	}

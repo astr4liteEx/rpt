@@ -156,7 +156,7 @@ func TestFindingsAddFlagsNeedTitleAndSeverity(t *testing.T) {
 	dir := reportCopy(t)
 	for _, args := range [][]string{{"--title", "T"}, {"--severity", "high"}, {"--target", "S-12"}} {
 		code, _, errOut := runIn(t, "", append([]string{"finding", "add", "--report", dir}, args...)...)
-		if code != 2 || !strings.Contains(errOut, "usage: rpt finding add") {
+		if code != 2 || !strings.Contains(errOut, "Run 'rpt finding add --help' for usage.") {
 			t.Errorf("%v: exit %d, stderr %q; want 2 and usage", args, code, errOut)
 		}
 	}

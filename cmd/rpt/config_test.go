@@ -48,7 +48,7 @@ func TestConfigSetBadRenameIsUsage(t *testing.T) {
 		{"format", "2", "--rename", "a=b"},
 	} {
 		code, out, errOut := runIn(t, "", append([]string{"config", "set", "--report", dir}, args...)...)
-		if code != 2 || out != "" || !strings.Contains(errOut, "usage: rpt config set") {
+		if code != 2 || out != "" || !strings.Contains(errOut, "Run 'rpt config set --help' for usage.") {
 			t.Errorf("%v: exit %d, stdout %q, stderr %q", args, code, out, errOut)
 		}
 	}

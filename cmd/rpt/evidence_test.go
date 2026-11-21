@@ -65,7 +65,7 @@ func TestEvidenceAdd(t *testing.T) {
 func TestEvidenceAddAs(t *testing.T) {
 	dir := reportCopy(t)
 	a, b := source(t, "a.txt", "a"), source(t, "b.txt", "b")
-	if code, _, errOut := runIn(t, "", "evidence", "add", "--report", dir, "--as", "x.txt", "F-001", a, b); code != 2 || !strings.Contains(errOut, "usage: rpt evidence add") {
+	if code, _, errOut := runIn(t, "", "evidence", "add", "--report", dir, "--as", "x.txt", "F-001", a, b); code != 2 || !strings.Contains(errOut, "Run 'rpt evidence add --help' for usage.") {
 		t.Errorf("--as with two files: exit %d, stderr %q; want 2", code, errOut)
 	}
 	if code, _, errOut := runIn(t, "", "evidence", "add", "--report", dir, "--as", "Raw Output.TXT", "F-001", a); code != 0 {

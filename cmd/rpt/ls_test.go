@@ -149,7 +149,7 @@ func TestLsCurrentUsage(t *testing.T) {
 	root := lsTree(t)
 	for _, args := range [][]string{{"--current", root}, {"--report", root}, {"--report", root, root}} {
 		code, out, errOut := runIn(t, "", append([]string{"ls"}, args...)...)
-		if code != 2 || out != "" || !strings.Contains(errOut, "usage: rpt ls") {
+		if code != 2 || out != "" || !strings.Contains(errOut, "Run 'rpt ls --help' for usage.") {
 			t.Errorf("%v: exit %d, stdout %q, stderr %q; want 2 and usage", args, code, out, errOut)
 		}
 	}

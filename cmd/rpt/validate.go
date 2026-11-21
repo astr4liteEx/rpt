@@ -13,6 +13,7 @@ import (
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
+	"github.com/spf13/pflag"
 )
 
 var problemColumns = []cli.Column{
@@ -24,53 +25,51 @@ var problemColumns = []cli.Column{
 // named, and prints one problem record per broken rule. It exits 1 if any
 // problem is an error, 0 otherwise: it is the gate before assemble. With
 // -, it checks the records on stdin instead (validateStream).
-func validateVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "validate")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	ids := flags.Args()
-	stream := slices.Equal(ids, []string{"-"})
-	if !stream && slices.Contains(ids, "-") {
-		return badUsage(e, "validate")
-	}
-	out, err := of.output(e, problemColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-	if stream {
-		return validateStream(e, out, r)
-	}
+func validateVerb(flags *pflag.FlagSet) runner {
+	return func(e *env, args []string) int {
+		ids := args
+		stream := slices.Equal(ids, []string{"-"})
+		if !stream && slices.Contains(ids, "-") {
+			return usageError(e, "- can't be given with IDs")
+		}
+		out, err := e.output(problemColumns)
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
+		r := openReport(e)
+		if r == nil {
+			return cli.ExitProblems
+		}
+		defer r.Close()
+		if stream {
+			return validateStream(e, out, r)
+		}
 
-	problems, err := r.Validate()
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	problems = append(problems, newSchemaChecker().problems(gatherNames(r, nil), ruleLevels(r))...)
-	sortProblems(problems)
-	if len(ids) > 0 {
-		var missing []error
-		if problems, missing, err = r.ProblemsFor(problems, ids); err != nil {
-			return reportErrors(e, out, err)
+		problems, err := r.Validate()
+		if err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
 		}
-		for _, m := range missing {
-			where := report.ScopeFile
-			if errors.Is(m, report.ErrNoFinding) {
-				where = report.FindingsDir
-			} else if errors.Is(m, report.ErrNoPage) {
-				where = report.PagesDir
+		problems = append(problems, newSchemaChecker().problems(gatherNames(r, nil), ruleLevels(r))...)
+		sortProblems(problems)
+		if len(ids) > 0 {
+			var missing []error
+			if problems, missing, err = r.ProblemsFor(problems, ids); err != nil {
+				return reportErrors(e, out, err)
 			}
-			problems = append(problems, sdk.Problem{Path: where, Rule: ruleExists, Level: sdk.Error, Message: m.Error()})
+			for _, m := range missing {
+				where := report.ScopeFile
+				if errors.Is(m, report.ErrNoFinding) {
+					where = report.FindingsDir
+				} else if errors.Is(m, report.ErrNoPage) {
+					where = report.PagesDir
+				}
+				problems = append(problems, sdk.Problem{Path: where, Rule: ruleExists, Level: sdk.Error, Message: m.Error()})
+			}
 		}
+		return printProblems(e, out, problems)
 	}
-	return printProblems(e, out, problems)
 }
 
 // printProblems prints problems and returns 1 if any is an error.
@@ -296,36 +295,34 @@ func validateStream(e *env, out *cli.Output, r *report.Report) int {
 // assembleVerb writes the whole report as one report record on one JSON
 // line, on a terminal too. It never refuses: whatever it had to leave out
 // is a warning on stderr. Run rpt validate first to gate on problems.
-func assembleVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "assemble")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	if flags.NArg() != 0 {
-		return badUsage(e, "assemble")
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-
-	out, _ := cli.NewOutput(e.stdout, false, true, nil) // JSON Lines on a terminal too
-	rep, warnings, err := r.Assemble()
-	if err != nil {
-		return reportErrors(e, out, err)
-	}
-	if err := out.Write(rep); err != nil {
-		e.log.Error("write report: " + err.Error())
-		return cli.ExitProblems
-	}
-	for _, w := range warnings {
-		if err := e.problem(out, w); err != nil {
-			e.log.Error(err.Error())
+func assembleVerb(flags *pflag.FlagSet) runner {
+	return func(e *env, args []string) int {
+		if len(args) != 0 {
+			return usageError(e, "takes no arguments")
+		}
+		r := openReport(e)
+		if r == nil {
 			return cli.ExitProblems
 		}
+		defer r.Close()
+
+		out, _ := cli.NewOutput(e.stdout, false, true, nil) // JSON Lines on a terminal too
+		rep, warnings, err := r.Assemble()
+		if err != nil {
+			return reportErrors(e, out, err)
+		}
+		if err := out.Write(rep); err != nil {
+			e.log.Error("write report: " + err.Error())
+			return cli.ExitProblems
+		}
+		for _, w := range warnings {
+			if err := e.problem(out, w); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		return cli.ExitOK
 	}
-	return cli.ExitOK
 }
 
 // ruleLevels are the rule levels rpt.yaml sets, if it can be read.

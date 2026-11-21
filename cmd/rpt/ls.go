@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+
 	"github.com/spf13/pflag"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
@@ -17,62 +18,58 @@ var locationColumns = []cli.Column{
 // default. With --current it prints the one report every other verb would
 // act on instead. Problems reading a report are warnings: the listing
 // exits 0, and rpt validate is the check.
-func lsVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "ls")
+func lsVerb(flags *pflag.FlagSet) runner {
 	current := flags.Bool("current", false, "print the report other verbs would act on from here")
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	reportSet := false
-	flags.Visit(func(f *pflag.Flag) { reportSet = reportSet || f.Name == "report" })
-	if flags.NArg() > 1 || *current && flags.NArg() > 0 || reportSet && !*current {
-		return badUsage(e, "ls")
-	}
-	dir := "."
-	if flags.NArg() == 1 {
-		dir = flags.Arg(0)
-	}
-	out, err := of.output(e, locationColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	var (
-		found []sdk.Location
-		errs  []error
-	)
-	if *current {
-		loc, locErrs, err := report.Current(*of.report)
+	return func(e *env, args []string) int {
+		if len(args) > 1 || *current && len(args) > 0 || e.reportSet && !*current {
+			return usageError(e, "takes one folder, or --current and no folder; --report goes only with --current")
+		}
+		dir := "."
+		if len(args) == 1 {
+			dir = args[0]
+		}
+		out, err := e.output(locationColumns)
 		if err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
-		found, errs = []sdk.Location{loc}, locErrs
-	} else {
-		found, errs = report.Find(dir)
-	}
-	if !*current && found == nil && len(errs) == 1 {
-		if _, ok := errors.AsType[*report.FileError](errs[0]); !ok {
-			e.log.Error(errs[0].Error())
-			return cli.ExitProblems
-		}
-	}
-	for _, err := range errs {
-		if fe, ok := errors.AsType[*report.FileError](err); ok {
-			e.log.Warn(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
+		var (
+			found []sdk.Location
+			errs  []error
+		)
+		if *current {
+			loc, locErrs, err := report.Current(e.report)
+			if err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+			found, errs = []sdk.Location{loc}, locErrs
 		} else {
-			e.log.Warn(err.Error())
+			found, errs = report.Find(dir)
 		}
-	}
-	for _, loc := range found {
-		if err := out.Write(loc); err != nil {
+		if !*current && found == nil && len(errs) == 1 {
+			if _, ok := errors.AsType[*report.FileError](errs[0]); !ok {
+				e.log.Error(errs[0].Error())
+				return cli.ExitProblems
+			}
+		}
+		for _, err := range errs {
+			if fe, ok := errors.AsType[*report.FileError](err); ok {
+				e.log.Warn(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
+			} else {
+				e.log.Warn(err.Error())
+			}
+		}
+		for _, loc := range found {
+			if err := out.Write(loc); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		if err := out.Flush(); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
+		return cli.ExitOK
 	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return cli.ExitOK
 }

@@ -79,7 +79,7 @@ func TestSetUsageErrors(t *testing.T) {
 		{"unknown ID", []string{"F-404", "severity", "high"}, 1, "no such finding: F-404", "problem exists\n"},
 		{"refused key", []string{"F-003", "kind", "scope"}, 1, "key can't be set: kind: kind is not stored in the file", "problem write\n"},
 		{"empty title", []string{"F-003", "title", ""}, 1, `bad value: title: must not be empty`, "problem write\n"},
-		{"missing value", []string{"F-003", "severity"}, 2, "usage: rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>...", ""},
+		{"missing value", []string{"F-003", "severity"}, 2, "Run 'rpt finding set --help' for usage.", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

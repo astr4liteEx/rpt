@@ -48,7 +48,7 @@ func TestScopeAddRefusesWhatTheHeaderLacks(t *testing.T) {
 		}
 	}
 	dir := reportCopy(t)
-	if code, _, errOut := runIn(t, "", "scope", "add", "--report", dir, "--port", "22"); code != 2 || !strings.Contains(errOut, "usage: rpt scope add") {
+	if code, _, errOut := runIn(t, "", "scope", "add", "--report", dir, "--port", "22"); code != 2 || !strings.Contains(errOut, "Run 'rpt scope add --help' for usage.") {
 		t.Errorf("no --host: exit %d, stderr %q; want 2 and usage", code, errOut)
 	}
 }
@@ -179,7 +179,7 @@ func TestScopeRemoveCleanupAsks(t *testing.T) {
 }
 
 func TestScopeNounNeedsAnAction(t *testing.T) {
-	if code, _, errOut := runIn(t, "", "scope", "--report", fixture); code != 2 || !strings.Contains(errOut, "usage: rpt scope <action>") {
+	if code, _, errOut := runIn(t, "", "scope", "--report", fixture); code != 2 || !strings.Contains(errOut, "Run 'rpt scope --help' for usage.") {
 		t.Errorf("exit %d, stderr %q", code, errOut)
 	}
 }

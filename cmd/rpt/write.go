@@ -2,13 +2,13 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
+	"github.com/spf13/pflag"
 )
 
 // Rules for refused and unfinished writes.
@@ -28,7 +28,7 @@ type writeFlags struct {
 
 // addWriteFlags adds --dry-run, and with named (the command changes things
 // it names by ID) --if-rev.
-func addWriteFlags(f *flagSet, named bool) writeFlags {
+func addWriteFlags(f *pflag.FlagSet, named bool) writeFlags {
 	w := writeFlags{dryRun: f.Bool("dry-run", false, "check the write and print what it would give, and write nothing")}
 	if named {
 		w.ifRev = f.StringArray("if-rev", nil, "refuse the write if the thing changed since you read this rev: ID=rev, or the rev alone when one thing is named (repeatable)")
@@ -62,7 +62,7 @@ type writeItem struct {
 
 // newWrite starts a write on r for a command naming the things in named.
 // A bad --if-rev is a usage error: it prints why and returns ok false.
-func newWrite(e *env, out *cli.Output, r *report.Report, wf writeFlags, usageName string, named []string) (*write, bool) {
+func newWrite(e *env, out *cli.Output, r *report.Report, wf writeFlags, named []string) (*write, bool) {
 	w := &write{e: e, out: out, tx: r.Begin(), dryRun: *wf.dryRun}
 	if wf.ifRev == nil {
 		return w, true
@@ -77,12 +77,10 @@ func newWrite(e *env, out *cli.Output, r *report.Report, wf writeFlags, usageNam
 		case !ok && len(named) == 1:
 			id, rev = named[0], v
 		case !ok:
-			fmt.Fprintf(e.stderr, "rpt: --if-rev %s: name the thing as ID=rev when the command names more than one\n", v)
-			badUsage(e, usageName)
+			usageError(e, "--if-rev %s: name the thing as ID=rev when the command names more than one", v)
 			return nil, false
 		case !slices.Contains(named, id):
-			fmt.Fprintf(e.stderr, "rpt: --if-rev %s: %s isn't one of the things this command changes\n", v, id)
-			badUsage(e, usageName)
+			usageError(e, "--if-rev %s: %s isn't one of the things this command changes", v, id)
 			return nil, false
 		}
 		w.tx.IfRev[id] = rev
