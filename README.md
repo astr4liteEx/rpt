@@ -7,7 +7,7 @@
 [![CI](https://github.com/astr4liteEx/rpt/actions/workflows/ci.yml/badge.svg)](https://github.com/astr4liteEx/rpt/actions/workflows/ci.yml)
 [![Go Reference](https://pkg.go.dev/badge/github.com/astr4liteEx/rpt/sdk.svg)](https://pkg.go.dev/github.com/astr4liteEx/rpt/sdk)
 ![Go 1.27](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)
-![Linux](https://img.shields.io/badge/platform-linux-lightgrey?logo=linux&logoColor=white)
+![Linux | macOS | Windows](https://img.shields.io/badge/platform-linux%20%7C%20macos%20%7C%20windows-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](LICENSE)
 
 [Overview](#overview) • [Install](#install) • [Quick start](#quick-start) • [Commands](#commands) • [Plugins](#plugins) • [Companion projects](#companion-projects) • [Documentation](#documentation)
@@ -41,7 +41,7 @@ acme-external/
 
 ## Install
 
-**From a release:** download `rpt_<version>_linux_<arch>.tar.gz` (amd64 or arm64), check it against `SHA256SUMS`, and put `rpt` on your `PATH`.
+**From a release:** download `rpt_<version>_<os>_<arch>.tar.gz` (`linux` or `darwin`, `amd64` or `arm64`; a `.zip` for `windows`), check it against `SHA256SUMS`, and put `rpt` on your `PATH`. The archives are reproducible: building the tagged commit with `scripts/release.sh` gives the same bytes.
 
 **With [gah](https://github.com/get-gah/gah):** installs the latest release to `~/.local/bin` (add `--tag=<version>` for a specific one):
 
@@ -62,7 +62,7 @@ scripts/install.sh
 ```
 
 > [!IMPORTANT]
-> rpt supports Linux only.
+> rpt is developed and tested on Linux. The macOS and Windows builds are provided but not tested; on Windows a plugin runs as a child process rather than replacing rpt.
 
 **Shell completion:** Tab completes commands, actions, flags, IDs with their titles or hosts, severity levels, config keys and evidence references, read fresh from the report each time; a plugin completes its own arguments. Load the script for your shell:
 
@@ -110,11 +110,11 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 | Command | What it does |
 | --- | --- |
-| `rpt new <dir>` | Creates an empty report in a new or empty folder. `--like <report>` takes another report's `rpt.yaml` and `scope.csv` columns, and `--with-pages` its pages too, IDs and evidence kept, for a house setup with boilerplate methodology. `--json` prints the new report's `location` record. |
+| `rpt new <dir>` | Creates an empty report in a new or empty folder and prints its `location` record. `--like <report>` takes another report's `rpt.yaml` and `scope.csv` columns, and `--with-pages` its pages too, IDs and evidence kept, for a house setup with boilerplate methodology. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
-| `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (line and column) and section sits in it, for checkers that load files or report problems by position. `--assets` adds every file the finding lists or links, so `rpt finding get --assets F-003 \| jq 'del(.id)' \| rpt finding add --report ../other` copies it to another report, evidence and all. |
-| `rpt finding add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section (`--no-scaffold` leaves them out); `--scaffold` adds those headings to stdin records too. It checks only the form: whether the severity is one of the report's is `rpt validate`'s to say. |
+| `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (`lines.keys`: line and column) and section sits in it, for checkers that load files or report problems by position. `--assets` adds every file the finding lists or links, so `rpt finding get --assets F-003 \| jq 'del(.id)' \| rpt finding add --report ../other` copies it to another report, evidence and all. |
+| `rpt finding add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section. A `--target` is a scope ID (`S-14`) or a map (`'{scope: S-20, port: 22}'`). A severity that isn't one of the report's is refused. |
 | `rpt finding set <id> <path> <value>...` | Changes one value, given as YAML. The path is a frontmatter key, `sections.<key>` (the text from stdin when no value is given, adding the section if it's missing) or `x-<plugin>.<key>`. Several values make a list: `targets S-12 '{scope: S-20, port: 443}'`. Setting `id` renames the finding, and its file when the name starts with the old ID. Only the lines that change are rewritten. |
 | `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
 | `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
@@ -151,13 +151,13 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 - Problems on stderr are compiler-style: `error[rule] message`, `--> path:line`, the source line with a caret under the column when known, then the totals.
 - `NO_COLOR` or `TERM=dumb` drops the colour and keeps the layout. Piped output is never styled.
 
-**Flags.** Flags are GNU-style (`--json`, not `-json`) and may come before, among or after the arguments. `--report` and `--json` work on every command, before or after its name. A value that starts with `-` goes after `--`.
+**Flags.** Flags are GNU-style (`--json`, not `-json`). `--report` and `--json` work on every command, before or after its name. Most commands take flags before, among or after the arguments; the `set` commands take them before the ID, because what follows the ID are values and a value may start with `-`. One of the command's own flags among those values is refused rather than written; put `--` before the ID to write it as a value.
 
 **Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which one that is, run `rpt ls --current`. To see which reports a folder holds, run `rpt ls`.
 
 **Problems.** A broken file, an unknown ID or a bad input line is a `problem` record in the output, after the good records, and a line on stderr. In a terminal table you get the stderr line only. Each problem names the `command` that found it. A command that reads records stops at an error-level problem on its input: it writes nothing, passes the problems on and exits 1. Warnings never stop anything.
 
-**Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file, or a failure such as a write that didn't happen. `2` means a usage error, and only that: wrong flags or arguments.
+**Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file, a declined confirmation, or a failure such as a write that didn't happen. `2` means a usage error, and only that: wrong flags or arguments, or `remove` without `--yes` off a terminal. `3` means a file changed while rpt was writing it, such as an editor saving at that moment, and nothing was written: run the command again. (A stale `--if-rev` is a `rev` problem, exit 1.) A plugin's own exit code passes through `rpt <plugin>`; `126` means the plugin couldn't be started.
 
 > [!TIP]
 > Every command that changes a report keeps the author's comments, quoting and line endings, and is all or nothing: it checks everything first, writes every file it touches or none, and refuses if a file changed while it worked. Use them from scripts in place of editing files by hand.
@@ -250,6 +250,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 ```sh
 go test ./...
 scripts/check.sh   # everything CI runs: vet, staticcheck, race tests, govulncheck and a check of the release binary
+scripts/release.sh --snapshot   # the release archives for every platform, from HEAD, into dist/
 ```
 
 The README's GIFs are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes in [`docs/demo/`](docs/demo). To re-record one (`quick-start`, `validate` or `pipeline`):

@@ -53,7 +53,7 @@ func TestIfRev(t *testing.T) {
 
 func TestRemoveNeedsYesOffATerminal(t *testing.T) {
 	dir := fixture(t)
-	if code, _, errOut := rpt(t, "", "finding", "remove", "F-002"); code != 1 || !strings.Contains(errOut, "--yes") {
+	if code, _, errOut := rpt(t, "", "finding", "remove", "F-002"); code != 2 || !strings.Contains(errOut, "--yes") {
 		t.Errorf("exit %d %q", code, errOut)
 	}
 	if read(t, filepath.Join(dir, "findings/tls-weak.md")) == "<absent>" {

@@ -234,8 +234,13 @@ func (e *env) write(w *writeFlags, named func(*report.Model) map[string]string, 
 	if len(b.refused) > 0 {
 		return e.problems(b.refused)
 	}
-	if len(b.removing) > 0 && !w.yes && !w.dryRun && !e.confirm(b.removing) {
-		return errDeclined
+	if len(b.removing) > 0 && !w.yes && !w.dryRun {
+		if !isTerminal(e.stdin) || !isTerminal(e.stderr) {
+			return usagef("removing needs --yes when stdin or stderr isn't a terminal")
+		}
+		if !e.confirm(b.removing) {
+			return errDeclined
+		}
 	}
 	if err := m.Save(w.dryRun); err != nil {
 		return err
@@ -287,12 +292,8 @@ func (e *env) checkRevs(ifRev []string, revs map[string]string) error {
 }
 
 // confirm asks on stderr whether to remove what, reading the answer from
-// stdin. Off a terminal it refuses, pointing at --yes.
+// stdin, both terminals.
 func (e *env) confirm(what []string) bool {
-	if !isTerminal(e.stdin) || !isTerminal(e.stderr) {
-		e.log.Error("removing needs --yes when stdin or stderr isn't a terminal")
-		return false
-	}
 	var lines []string
 	for _, w := range what {
 		lines = append(lines, cli.CleanLine(w))

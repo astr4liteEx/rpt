@@ -27,6 +27,7 @@ func TestMain(m *testing.M) {
 	}
 	rptBin = filepath.Join(dir, "rpt")
 	if out, err := exec.Command("go", "build", "-o", rptBin, "../cmd/rpt").CombinedOutput(); err != nil {
+		os.RemoveAll(dir)
 		panic(fmt.Sprintf("build rpt: %v\n%s", err, out))
 	}
 	code := m.Run()

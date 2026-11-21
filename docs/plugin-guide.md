@@ -8,7 +8,7 @@ Decide what the plugin is, since that decides which protocol sections bind it:
 
 - **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt. It doesn't know the report's scope, so each target gets a `host` (and `port`, `protocol`) and no `scope`; `rpt scope match` attributes them.
 - **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
-- **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from the report record's `report.sections`, so it needs only stdin, after a redaction filter too.
+- **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from the report record's `sections`, so it needs only stdin, after a redaction filter too.
 - **Checker**: emits `problem` records under its own rule names, each with `command` set to its own name, located with `$RPT_BIN finding get --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
 
 Done when the plugin has a command name that is not an rpt built-in (`rpt help --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
@@ -45,7 +45,7 @@ The [`sdk`](../sdk) package implements the protocol; use it instead of re-derivi
 | Tests | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
 | Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line. A writer or renderer passes `sdk.StopAtError()`: the first error-level problem comes with `sdk.ErrStopped`, to pass on before exiting 1 |
 | Writing a record | `sdk.Emit(stdout, v)`: one deterministic JSON line |
-| Typed records | `sdk.Finding`, `sdk.Page`, `sdk.ScopeRow`, `sdk.Config`, `sdk.Evidence`, `sdk.Problem`, `sdk.Report` (with `ReportFinding`, `ReportPage`, `ReportTarget`, `ReportSection`, `Asset`), `sdk.Target`, `sdk.Command`, `sdk.Location`, `sdk.VersionInfo`; unknown members ride in `Extra` |
+| Typed records | `sdk.Finding`, `sdk.Page`, `sdk.ScopeRow`, `sdk.Config`, `sdk.Evidence`, `sdk.Problem`, `sdk.Report` (its findings and pages are `Finding` and `Page`, with `Assets`; each `Target` has its scope `Row`; `Section` is a heading), `sdk.Lines` (one shape for every `--lines`), `sdk.Command` (a `Description` with a name), `sdk.Location`, `sdk.VersionInfo`; every record type has `RecordKind()` and the `Kind…` constants name them, so `sdk.Emit` fills an empty `kind`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
 | Settings | `sdk.Settings("<command>", &settings)` over the defaults already in `settings`, then parse flags |
 | Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again) |

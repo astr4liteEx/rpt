@@ -24,7 +24,7 @@
     },
     "rule": {
       "type": "string",
-      "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, targets, requiredSections, evidence, config, pageID, pageTitle, pageOrder, requiredPages, pluginSchema, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Other commands use readable (a file that can't be read), exists (no such ID) and input (a stdin line that isn't a record); rpt validate - uses duplicate for a second record with an ID already in the stream, and evidence for an asset it can't take in; a refused write uses rev (changed since read), write (anything else refused) and, for a write that stopped partway, notWritten. Plugins may emit problems under rule names of their own."
+      "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, targets, requiredSections, evidence, config, pageID, pageTitle, pageOrder, requiredPages, pluginSchema, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Other commands use readable (a file that can't be read), exists (no such ID) and input (a stdin line that isn't a record); rpt validate - uses duplicate for a second record with an ID already in the stream; a refused write uses rev (changed since read) and write (anything else refused). Plugins may emit problems under rule names of their own."
     },
     "level": {
       "enum": [
