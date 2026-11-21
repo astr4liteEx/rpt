@@ -372,6 +372,10 @@ type Command struct {
 	Output   string   `json:"output,omitzero"`
 	Roles    []string `json:"roles,omitzero"`
 	Shadowed bool     `json:"shadowed,omitzero"` // a plugin a built-in of the same name hides
+	// Requires is what a plugin said it works with; Incompatible marks one
+	// this rpt isn't, which rpt help lists only with --all.
+	Requires     *Requires `json:"requires,omitzero"`
+	Incompatible bool      `json:"incompatible,omitzero"`
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

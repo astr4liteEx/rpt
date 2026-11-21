@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
@@ -55,8 +56,10 @@ func describePlugins(e *env) []sdk.Command {
 		d := descs[i]
 		p.Summary, p.Usage, p.Version, p.Input, p.Output = d.Summary, d.Usage, d.Version, d.Input, d.Output
 		p.Roles = d.Roles
+		p.Requires = d.Requires
+		p.Incompatible = !d.Requires.Fits(report.SchemaVersion, report.FormatVersion)
 		p.Extra = d.Extra
-		for _, own := range []string{"kind", "name", "source", "path", "shadowed"} {
+		for _, own := range []string{"kind", "name", "source", "path", "shadowed", "incompatible"} {
 			delete(p.Extra, own) // the record's own members aren't the plugin's to set
 		}
 	}

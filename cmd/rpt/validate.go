@@ -53,6 +53,8 @@ func validateVerb(e *env, args []string) int {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
+	problems = append(problems, newSchemaChecker().problems(gatherNames(r, nil), ruleLevels(r))...)
+	sortProblems(problems)
 	if len(ids) > 0 {
 		var missing []error
 		if problems, missing, err = r.ProblemsFor(problems, ids); err != nil {
@@ -117,6 +119,9 @@ func validateStream(e *env, out *cli.Output, r *report.Report) int {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
+	sc := newSchemaChecker()
+	baseline = append(baseline, sc.problems(gatherNames(r, nil), ruleLevels(r))...)
+	var recs []sdk.Rec
 	w := &write{e: e, out: out, tx: r.Begin(), dryRun: true}
 	var incoming [][]byte // error-level problems on stdin
 	claims := map[string]claim{}
@@ -130,6 +135,7 @@ func validateStream(e *env, out *cli.Output, r *report.Report) int {
 			e.log.Error(err.Error())
 			return cli.ExitProblems
 		}
+		recs = append(recs, rec)
 		if rec.Kind == "problem" {
 			if isError(rec) {
 				incoming = append(incoming, rec.Raw)
@@ -232,6 +238,8 @@ func validateStream(e *env, out *cli.Output, r *report.Report) int {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
+	staged = append(staged, sc.problems(gatherNames(view, recs), ruleLevels(view))...)
+	sortProblems(staged)
 	// Scope problems sit on a row's line: find the stdin row there.
 	rowAt := map[int]claim{}
 	if rows, _ := view.ScopeWithLines(); len(scopeClaims) > 0 {
@@ -318,4 +326,13 @@ func assembleVerb(e *env, args []string) int {
 		}
 	}
 	return cli.ExitOK
+}
+
+// ruleLevels are the rule levels rpt.yaml sets, if it can be read.
+func ruleLevels(r *report.Report) map[string]sdk.Level {
+	cfg, err := r.Config()
+	if err != nil {
+		return nil
+	}
+	return cfg.Rules
 }

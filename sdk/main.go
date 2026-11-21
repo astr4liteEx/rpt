@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 )
 
 // Description is what a plugin prints for --describe: one JSON object on
@@ -28,8 +29,55 @@ type Description struct {
 	// RoleRenderer. A plugin can hold several; empty is "not said".
 	Roles []string `json:"roles,omitzero"`
 
+	// Schemas are JSON Schemas (draft 2020-12) for the x- names the plugin
+	// owns, which rpt validate checks. Requires says which rpt the plugin
+	// works with.
+	Schemas  *Schemas  `json:"schemas,omitzero"`
+	Requires *Requires `json:"requires,omitzero"`
+
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Schemas are the JSON Schemas a plugin declares for what it owns, by
+// noun. A plugin named <command> owns x-<command> (its config section)
+// and the names starting x-<command>- (keys, columns and record kinds); a
+// schema for any other name is ignored. A $ref may point inside the
+// schema or at one of rpt's schemas by its $id, nowhere else.
+type Schemas struct {
+	// Finding, Page and Scope map each frontmatter key or scope column to
+	// a schema for its value; a scope value is the CSV text.
+	Finding map[string]jsontext.Value `json:"finding,omitzero"`
+	Page    map[string]jsontext.Value `json:"page,omitzero"`
+	Scope   map[string]jsontext.Value `json:"scope,omitzero"`
+	// Config is the schema for the plugin's whole x-<command> section of
+	// rpt.yaml.
+	Config jsontext.Value `json:"config,omitzero"`
+	// Kinds maps each x- record kind to a schema for the whole record.
+	Kinds map[string]jsontext.Value `json:"kinds,omitzero"`
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Requires lists the rpt versions a plugin works with. A list left out
+// fits any; otherwise rpt's own number must be in it.
+type Requires struct {
+	SchemaVersion []int `json:"schema_version,omitzero"` // record schemas, VersionInfo.SchemaVersion
+	Format        []int `json:"format,omitzero"`         // report format, VersionInfo.Format
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Fits reports whether a plugin requiring r works with an rpt writing
+// schemaVersion and reading format.
+func (r *Requires) Fits(schemaVersion, format int) bool {
+	if r == nil {
+		return true
+	}
+	return (len(r.SchemaVersion) == 0 || slices.Contains(r.SchemaVersion, schemaVersion)) &&
+		(len(r.Format) == 0 || slices.Contains(r.Format, format))
 }
 
 // The roles a plugin can declare in Description.Roles. Each is a promise

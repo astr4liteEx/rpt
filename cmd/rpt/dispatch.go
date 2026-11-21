@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -39,9 +40,24 @@ func dispatch(e *env, name string, args []string, g globals) int {
 		e.log.Error(err.Error())
 		return cli.ExitProblems
 	}
+	if len(args) == 0 || !slices.Contains([]string{"--describe", "--help", "-h", "__complete", "__completeNoDesc"}, args[0]) {
+		warnIncompatible(e, name, bin, env)
+	}
 	err = execPlugin(bin, args, env)
 	e.log.Error(fmt.Sprintf("start plugin: %v", err), "path", bin)
 	return cli.ExitPluginFailed
+}
+
+// warnIncompatible warns, once, before running a plugin whose requires
+// this rpt doesn't fit. A plugin that doesn't answer --describe in time
+// is run without a word: rpt help reports that.
+func warnIncompatible(e *env, name, bin string, env []string) {
+	d, err := askDescription(bin, env)
+	if err != nil || d.Requires.Fits(report.SchemaVersion, report.FormatVersion) {
+		return
+	}
+	e.log.Warn(fmt.Sprintf("plugin %s may not work with this rpt: it requires schema_version %v and format %v; this rpt writes schema_version %d and reads format %d",
+		name, d.Requires.SchemaVersion, d.Requires.Format, report.SchemaVersion, report.FormatVersion))
 }
 
 // pluginEnv is rpt's environment plus what plugins may read: RPT_BIN (this

@@ -22,7 +22,10 @@ var commandColumns = []cli.Column{
 func verbSource(m map[string]any) string {
 	src, _ := m["source"].(string)
 	if shadowed, _ := m["shadowed"].(bool); shadowed {
-		return src + " (shadowed)"
+		src += " (shadowed)"
+	}
+	if incompatible, _ := m["incompatible"].(bool); incompatible {
+		src += " (incompatible)"
 	}
 	return src
 }
@@ -67,7 +70,7 @@ func isBuiltin(name string) bool {
 // rpt <command> [sub] --help does; a plugin is asked for its --help.
 func helpVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "help")
-	flags.Bool("all", false, "list every command, hidden ones too")
+	all := flags.Bool("all", false, "list every command, plugins this rpt isn't compatible with too")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -90,6 +93,9 @@ func helpVerb(e *env, args []string) int {
 		list = append(list, d)
 	}
 	for _, v := range append(list, describePlugins(e)...) {
+		if v.Incompatible && !*all {
+			continue
+		}
 		if err := out.Write(v); err != nil {
 			e.log.Error(err.Error())
 			return cli.ExitProblems

@@ -15,11 +15,26 @@
     "input": {"$ref": "#/$defs/dataType", "description": "The data the command takes. Absent: a built-in takes none; a plugin didn't say."},
     "output": {"$ref": "#/$defs/dataType", "description": "The data the command gives. Absent: a built-in gives none; a plugin didn't say."},
     "roles": {"$ref": "#/$defs/roles", "description": "What the command is. Absent: a built-in holds none; a plugin didn't say."},
-    "shadowed": {"type": "boolean", "description": "True for a plugin that a built-in of the same name hides: rpt <name> never runs it."}
+    "shadowed": {"type": "boolean", "description": "True for a plugin that a built-in of the same name hides: rpt <name> never runs it."},
+    "requires": {"$ref": "#/$defs/requires"},
+    "incompatible": {"type": "boolean", "description": "True for a plugin whose requires this rpt doesn't fit: rpt help lists it only with --all, and running it warns."}
   },
   "required": ["kind", "name", "source"],
   "additionalProperties": true,
   "$defs": {
+    "requires": {"type": "object", "description": "The rpt versions a plugin works with. A list left out fits any; otherwise rpt's own number must be in it.", "properties": {"schema_version": {"type": "array", "items": {"type": "integer"}, "description": "Record schema versions, as rpt version gives schema_version."}, "format": {"type": "array", "items": {"type": "integer"}, "description": "Report format versions, as rpt version gives format."}}, "additionalProperties": true},
+    "schemas": {
+      "type": "object",
+      "description": "JSON Schemas (draft 2020-12) for the x- names the plugin owns, which rpt validate checks under the pluginSchema rule. A plugin named <command> owns x-<command> (its config section) and names starting x-<command>-; a schema for any other name is ignored with a warning. A $ref may point inside the schema or at one of rpt's schemas by $id, nowhere else.",
+      "properties": {
+        "finding": {"type": "object", "additionalProperties": {"type": ["object", "boolean"]}, "description": "Frontmatter key -> schema for its value."},
+        "page": {"type": "object", "additionalProperties": {"type": ["object", "boolean"]}, "description": "Page frontmatter key -> schema for its value."},
+        "scope": {"type": "object", "additionalProperties": {"type": ["object", "boolean"]}, "description": "scope.csv column -> schema for its value, the CSV text."},
+        "config": {"type": ["object", "boolean"], "description": "Schema for the plugin's whole x-<command> section of rpt.yaml."},
+        "kinds": {"type": "object", "additionalProperties": {"type": ["object", "boolean"]}, "description": "x- record kind -> schema for the whole record."}
+      },
+      "additionalProperties": true
+    },
     "description": {
       "type": "object",
       "description": "What a command prints for --describe: one JSON object on one line, then exit 0. Every plugin and every built-in answers it.",
@@ -29,7 +44,9 @@
         "version": {"type": "string", "description": "A plugin's own version."},
         "input": {"$ref": "#/$defs/dataType", "description": "The data the command takes. Absent: not said."},
         "output": {"$ref": "#/$defs/dataType", "description": "The data the command gives. Absent: not said."},
-        "roles": {"$ref": "#/$defs/roles", "description": "What the command is. Absent: not said."}
+        "roles": {"$ref": "#/$defs/roles", "description": "What the command is. Absent: not said."},
+        "schemas": {"$ref": "#/$defs/schemas"},
+        "requires": {"$ref": "#/$defs/requires"}
       },
       "required": ["summary"],
       "additionalProperties": true

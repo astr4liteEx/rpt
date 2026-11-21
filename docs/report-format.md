@@ -153,6 +153,7 @@ A page has an `id` (`P-` and at least three digits), a `title`, an optional `evi
 | `pageTitle` | error | Every page has a title. |
 | `pageOrder` | error | Every entry in `pages` is `findings` or a page that exists. |
 | `requiredPages` | error | Every page in `required_pages` exists, and its body isn't empty. |
+| `pluginSchema` | error | Every `x-` frontmatter key, scope column and config section a plugin on `PATH` declares a schema for fits it ([plugin protocol](plugin-protocol.md)). A plugin or schema rpt can't use is a warning at path `.`. |
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
 | `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define, other than an `x-<plugin>` section. |

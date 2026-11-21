@@ -51,7 +51,29 @@ Declare only roles whose promise the plugin keeps every run. Absent means "not s
 {"summary":"Lint finding files with rumdl","usage":"rpt lint [file...]","output":"records","roles":["checker"]}
 ```
 
-rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries every member of the answer into the plugin's `command` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
+rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries every member of the answer into the plugin's `command` record, unknown ones too, except `schemas` and the members that are rpt's: `kind`, `name`, `source`, `path`, `shadowed` and `incompatible`.
+
+### `requires`
+
+`requires` says which rpt the plugin works with: `{"schema_version": [2], "format": [2]}`, the record schema versions and report formats it handles (as `rpt version` gives them). A list left out fits any. When this rpt's number isn't in a list, `rpt help` hides the plugin, and `rpt help --all` lists it with `incompatible: true`. `rpt <command>` still runs it, after one warning on stderr.
+
+### `schemas`
+
+A plugin that writes `x-` names declares JSON Schemas for their values, and `rpt validate` checks them:
+
+```json
+{"summary":"Export findings to the Acme API","schemas":{
+  "finding":{"x-api-export-id":{"type":"string"}},
+  "config":{"type":"object","properties":{"url":{"type":"string"}}}}}
+```
+
+- `finding`, `page`, `scope`: each frontmatter key or scope column the plugin owns, to a schema for its value. A scope value is the CSV text, a string.
+- `config`: the schema for the plugin's whole `x-<command>` section of `rpt.yaml`.
+- `kinds`: each `x-` record kind, to a schema for the whole record (checked by `rpt validate -`).
+
+Schemas are draft 2020-12; a `$schema` naming another draft is refused. A `$ref` may point inside the schema or at one of rpt's schemas by its `$id` (`https://github.com/astr4liteEx/rpt/schema/scope.schema.json`); rpt never follows any other, so a `file://` or web ref makes the schema unusable. A plugin named `<command>` owns `x-<command>` and the names starting `x-<command>-`; a schema for any other name is ignored, with a warning. When two plugins own a name (`api` and `api-export` both declaring `x-api-export-id`), both schemas apply, with a warning.
+
+`rpt validate` asks for `--describe` only from the plugins that could own an `x-` name the report uses, so a report with none runs no plugins. A value that breaks a schema is a `pluginSchema` error at the key's file and line, naming the place inside the value and the plugin: `x-api-export-id: /0: got number, want string (schema from api-export)`. A plugin that fails or times out, or a schema that doesn't compile, is a `pluginSchema` warning at path `.`, and the names involved go unchecked. An `x-` name no plugin on `PATH` owns is not checked and not reported, so a report moved to a machine without the plugin stays quiet.
 
 ## Records
 
