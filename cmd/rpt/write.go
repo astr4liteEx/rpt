@@ -17,6 +17,7 @@ const (
 	ruleWrite      = "write"      // the write would break a rule; nothing was written
 	ruleNotWritten = "notWritten" // a write stopped partway; run it again to finish
 	ruleEvidence   = "evidence"   // an asset to take in is missing or unreadable
+	ruleDuplicate  = "duplicate"  // validate -: a second record with an ID already in the stream
 )
 
 // writeFlags are the flags every write command takes.

@@ -505,3 +505,38 @@ func (tx *Tx) renameHeading(h Headings, key, to string) ([]sdk.Finding, error) {
 	}
 	return out, nil
 }
+
+// ReplaceConfig writes c as rpt.yaml: its keys in the usual order, then
+// its plugin sections by name. rpt validate - uses it to see a stream's
+// config record. Nothing else changes, so findings keep their headings.
+func (tx *Tx) ReplaceConfig(c sdk.Config) error {
+	b, err := json.Marshal(c)
+	if err != nil {
+		return err
+	}
+	var m map[string]jsontext.Value
+	if err := json.Unmarshal(b, &m); err != nil {
+		return err
+	}
+	var ff findingFile
+	keys := slices.Clone(configKeys)
+	for _, k := range slices.Sorted(maps.Keys(m)) {
+		if !slices.Contains(configKeys, k) && !slices.Contains([]string{"kind", "rev", "lines"}, k) {
+			keys = append(keys, k)
+		}
+	}
+	for _, k := range keys {
+		v, ok := m[k]
+		if !ok {
+			continue
+		}
+		n, err := toNode(v)
+		if err != nil {
+			return fmt.Errorf("%w: %s: %v", ErrBadValue, k, err)
+		}
+		if err := ff.setEntry(k, n); err != nil {
+			return fmt.Errorf("%w: %s: %v", ErrBadValue, k, err)
+		}
+	}
+	return tx.putConfig(ff)
+}

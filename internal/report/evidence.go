@@ -23,7 +23,7 @@ func (r *Report) EvidenceInfo(f sdk.Finding, p string) (fs.FileInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	info, err := r.root.Stat(rel)
+	info, err := r.stat(rel)
 	if err != nil {
 		return nil, fmt.Errorf("evidence %q of %s: %w", p, f.Path, err)
 	}

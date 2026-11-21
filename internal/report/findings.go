@@ -108,7 +108,7 @@ func (r *Report) Findings() ([]sdk.Finding, error) {
 // FindingsWithLines is Findings with each finding's Lines set: its file's
 // absolute path and where its frontmatter keys and sections sit in it.
 func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
-	entries, err := fs.ReadDir(r.root.FS(), FindingsDir)
+	entries, err := fs.ReadDir(r.fsys(), FindingsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -125,7 +125,7 @@ func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
 			continue
 		}
 		rel := path.Join(FindingsDir, e.Name())
-		src, err := r.root.ReadFile(rel)
+		src, err := r.readFile(rel)
 		if err != nil {
 			errs = append(errs, &FileError{Path: rel, Err: err})
 			continue

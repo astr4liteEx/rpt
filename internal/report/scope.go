@@ -38,7 +38,7 @@ var scopeColumnsReserved = []string{"kind", "rev", "lines"}
 // ScopeWithLines is Scope with each row's Lines set: scope.csv's absolute
 // path and the line the row starts on.
 func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
-	src, err := r.root.ReadFile(ScopeFile)
+	src, err := r.readFile(ScopeFile)
 	if err != nil {
 		return nil, fmt.Errorf("read scope: %w", err)
 	}

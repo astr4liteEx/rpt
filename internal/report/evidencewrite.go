@@ -96,7 +96,7 @@ func (r *Report) owners() ([]owner, []error, error) {
 		dir  string
 		page bool
 	}{{FindingsDir, false}, {PagesDir, true}} {
-		ents, err := fs.ReadDir(r.root.FS(), d.dir)
+		ents, err := fs.ReadDir(r.fsys(), d.dir)
 		if errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
@@ -108,7 +108,7 @@ func (r *Report) owners() ([]owner, []error, error) {
 				continue
 			}
 			rel := path.Join(d.dir, e.Name())
-			src, err := r.root.ReadFile(rel)
+			src, err := r.readFile(rel)
 			if err != nil {
 				errs = append(errs, &FileError{Path: rel, Err: err})
 				continue
@@ -229,7 +229,7 @@ func (r *Report) assets(o owner, existing bool) []sdk.Asset {
 // lists and links, one per source and ref; any that leaves the report is
 // left out.
 func (r *Report) AssetsOf(rel string) ([]sdk.Asset, error) {
-	src, err := r.root.ReadFile(rel)
+	src, err := r.readFile(rel)
 	if err != nil {
 		return nil, &FileError{Path: rel, Err: err}
 	}
@@ -249,7 +249,7 @@ func (r *Report) reference(o owner, ref, source string) sdk.Evidence {
 		return e
 	}
 	e.Path, e.File = rel, filepath.Join(r.abs, filepath.FromSlash(rel))
-	info, err := r.root.Stat(rel)
+	info, err := r.stat(rel)
 	e.Exists = err == nil && info.Mode().IsRegular()
 	if e.Exists {
 		e.MediaType = r.mediaType(rel)
@@ -260,7 +260,7 @@ func (r *Report) reference(o owner, ref, source string) sdk.Evidence {
 // mediaType is the media type of the report file at rel: from its first
 // bytes, or from its extension when they say only text or binary.
 func (r *Report) mediaType(rel string) string {
-	f, err := r.root.Open(rel)
+	f, err := r.open(rel)
 	if err != nil {
 		return ""
 	}
@@ -289,7 +289,7 @@ func (r *Report) orphans(refs []sdk.Evidence) ([]sdk.Evidence, error) {
 	}
 	var out []sdk.Evidence
 	for _, dir := range []string{EvidenceDir, PageEvidenceDir} {
-		err := fs.WalkDir(r.root.FS(), dir, func(p string, d fs.DirEntry, err error) error {
+		err := fs.WalkDir(r.fsys(), dir, func(p string, d fs.DirEntry, err error) error {
 			if errors.Is(err, fs.ErrNotExist) && p == dir {
 				return fs.SkipAll
 			}
@@ -699,7 +699,7 @@ func (tx *Tx) evidenceNames(dir, id string, srcs []string, as string) ([]string,
 		if c, ok := tx.files[path.Join(dir, name)]; ok && c.touched && !c.remove {
 			return true
 		}
-		_, err := tx.r.root.Lstat(path.Join(dir, name))
+		_, err := tx.r.lstat(path.Join(dir, name))
 		return exists || !errors.Is(err, fs.ErrNotExist)
 	}
 	if as != "" {

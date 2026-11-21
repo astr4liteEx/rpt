@@ -33,6 +33,8 @@ type Report struct {
 	// configSrc, when set, is rpt.yaml as a write will leave it: Config
 	// reads it instead of the file.
 	configSrc []byte
+	// over, in a view of a write, is the write's staged files.
+	over map[string]*change
 }
 
 // configBytes returns rpt.yaml's bytes.
@@ -40,7 +42,7 @@ func (r *Report) configBytes() ([]byte, error) {
 	if r.configSrc != nil {
 		return r.configSrc, nil
 	}
-	return r.root.ReadFile(ConfigFile)
+	return r.readFile(ConfigFile)
 }
 
 // Open opens the report folder at dir.

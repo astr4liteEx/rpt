@@ -34,6 +34,7 @@ fi
 # The fixture has one planted problem: a finding citing scope ID S-99.
 code=0
 got=$("$tmp/rpt" validate --report testdata/fixture) || code=$?
+got=$(printf '%s\n' "$got" | sed 's/,"rev":"[0-9a-f]*"//') # the file's rev changes with its bytes
 want='{"kind":"problem","path":"findings/tls-weak.md","line":5,"rule":"scopeIDsExist","level":"error","message":"S-99 is not in scope.csv","command":"validate"}'
 if [ "$code" != 1 ] || [ "$got" != "$want" ]; then
 	echo "rpt validate on the fixture: exit $code, output $got; want exit 1 and only the planted S-99 problem" >&2

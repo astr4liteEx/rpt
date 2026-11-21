@@ -172,7 +172,7 @@ func (tx *Tx) inReport(file string) (string, error) {
 			continue
 		}
 		rel = filepath.ToSlash(rel)
-		info, err := tx.r.root.Stat(rel)
+		info, err := tx.r.stat(rel)
 		if err != nil {
 			return "", err
 		}

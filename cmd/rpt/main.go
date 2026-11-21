@@ -100,7 +100,7 @@ func init() {
 			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
-		"validate": {validateVerb, sdk.Command{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
+		"validate": {validateVerb, sdk.Command{Summary: "Check the report, or the records on stdin, and print the problems", Usage: "rpt validate [--json] [--report dir] [id...], or rpt validate - < records.jsonl", Input: "records", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
 		"version":  {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
 	}
 	for name, b := range builtins {

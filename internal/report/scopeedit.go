@@ -278,3 +278,13 @@ func (tx *Tx) changeRow(id, col, value string, mode Cited) (ScopeChange, error) 
 	ch.Row = row
 	return ch, nil
 }
+
+// ReplaceScope puts row in place of the scope row with its ID, leaving
+// findings citing it as they are. rpt validate - uses it to see a
+// stream's replacements, so the row's place in scope.csv isn't kept.
+func (tx *Tx) ReplaceScope(row sdk.ScopeRow) (sdk.ScopeRow, error) {
+	if _, err := tx.RemoveScope(row.ID, CitedForce); err != nil {
+		return sdk.ScopeRow{}, err
+	}
+	return tx.AddScope(row)
+}

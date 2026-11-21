@@ -28,7 +28,7 @@ func (r *Report) NextID() (string, error) {
 	highest := 0
 	// A file named F-NNN-... counts too, so the ID of a file that doesn't
 	// parse is never given out again.
-	if ents, err := fs.ReadDir(r.root.FS(), FindingsDir); err == nil {
+	if ents, err := fs.ReadDir(r.fsys(), FindingsDir); err == nil {
 		for _, ent := range ents {
 			if m := fileID.FindStringSubmatch(ent.Name()); m != nil {
 				if n, err := strconv.Atoi(m[1]); err == nil && n > highest {

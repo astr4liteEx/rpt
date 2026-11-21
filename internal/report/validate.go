@@ -75,6 +75,21 @@ func (r *Report) Validate() ([]sdk.Problem, error) {
 			v.problems[i].Level = lv
 		}
 	}
+	// Problems in a finding, page or rpt.yaml carry its rev.
+	revs := map[string]string{}
+	for i, p := range v.problems {
+		if p.Path != ConfigFile && !(path.Ext(p.Path) == ".md" && (path.Dir(p.Path) == FindingsDir || path.Dir(p.Path) == PagesDir)) {
+			continue
+		}
+		rev, ok := revs[p.Path]
+		if !ok {
+			if src, err := r.readFile(p.Path); err == nil {
+				rev = Rev(src)
+			}
+			revs[p.Path] = rev
+		}
+		v.problems[i].Rev = rev
+	}
 	slices.SortStableFunc(v.problems, func(a, b sdk.Problem) int {
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line),
 			cmp.Compare(a.Rule, b.Rule), cmp.Compare(a.Message, b.Message))
@@ -358,7 +373,7 @@ func (ff findingSrc) bodyLine(off int) int {
 
 // findingFiles reads every finding file in name order.
 func (r *Report) findingFiles() ([]findingSrc, error) {
-	entries, err := fs.ReadDir(r.root.FS(), FindingsDir)
+	entries, err := fs.ReadDir(r.fsys(), FindingsDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -372,7 +387,7 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 			continue
 		}
 		rel := path.Join(FindingsDir, e.Name())
-		src, err := r.root.ReadFile(rel)
+		src, err := r.readFile(rel)
 		if err != nil {
 			out = append(out, findingSrc{rel: rel, err: &FileError{Path: rel, Err: err}})
 			continue
@@ -457,4 +472,74 @@ func (v *validation) checkPages() {
 			v.add(p.Path, p.Lines.Body, RuleRequiredPages, sdk.Error, "required page %s is empty", id)
 		}
 	}
+}
+
+// ProblemsFor keeps the problems about the findings, pages and scope rows
+// with the given IDs: those in each finding's or page's file, and those on
+// each scope row's line. It returns each ID the report doesn't have as
+// missing, with the error saying so.
+func (r *Report) ProblemsFor(problems []sdk.Problem, ids []string) (kept []sdk.Problem, missing []error, err error) {
+	paths := map[string]bool{}
+	rows := map[int]bool{}
+	var scope []sdk.ScopeRow
+	for _, id := range ids {
+		id = CanonicalID(id)
+		switch {
+		case strings.HasPrefix(id, "F-"):
+			rel, ok := r.FindingPath(id)
+			if !ok {
+				missing = append(missing, fmt.Errorf("%w: %s", ErrNoFinding, id))
+			}
+			paths[rel] = ok
+		case strings.HasPrefix(id, "P-"):
+			rel, ok := r.PagePath(id)
+			if !ok {
+				missing = append(missing, fmt.Errorf("%w: %s", ErrNoPage, id))
+			}
+			paths[rel] = ok
+		default:
+			if scope == nil {
+				if scope, err = r.ScopeWithLines(); err != nil && scope == nil {
+					return nil, nil, err
+				}
+			}
+			i := slices.IndexFunc(scope, func(row sdk.ScopeRow) bool { return strings.EqualFold(row.ID, id) })
+			if i < 0 {
+				missing = append(missing, fmt.Errorf("%w: %s", ErrNoScopeRow, id))
+				continue
+			}
+			rows[scope[i].Lines.Row] = true
+		}
+	}
+	kept = slices.DeleteFunc(slices.Clone(problems), func(p sdk.Problem) bool {
+		return !paths[p.Path] && !(p.Path == ScopeFile && rows[p.Line])
+	})
+	return kept, missing, nil
+}
+
+// FindingPath returns the file of the finding id, if the report has it.
+func (r *Report) FindingPath(id string) (string, bool) {
+	if id == "" {
+		return "", false
+	}
+	rel, err := r.locate(id)
+	return rel, err == nil
+}
+
+// PagePath returns the file of the page id, if the report has it.
+func (r *Report) PagePath(id string) (string, bool) {
+	if id == "" {
+		return "", false
+	}
+	rel, err := r.Begin().locatePage(id)
+	return rel, err == nil
+}
+
+// HasScopeRow reports whether scope.csv has a row with the given ID.
+func (r *Report) HasScopeRow(id string) bool {
+	if id == "" {
+		return false
+	}
+	rows, _ := r.Scope()
+	return slices.ContainsFunc(rows, func(row sdk.ScopeRow) bool { return strings.EqualFold(row.ID, id) })
 }

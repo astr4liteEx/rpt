@@ -23,8 +23,7 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 // take IDs one after another.
 func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 	r := tx.r
-	cfg, err := r.Config()
-	if err != nil {
+	if _, err := r.Config(); err != nil {
 		return sdk.Finding{}, err
 	}
 	if err := checkRecord(rec); err != nil {
@@ -32,6 +31,7 @@ func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 	}
 	id := rec.ID
 	if id == "" {
+		var err error
 		if id, err = tx.nextID(); err != nil {
 			return sdk.Finding{}, err
 		}
@@ -44,6 +44,35 @@ func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 		return sdk.Finding{}, err
 	} else if exists {
 		return sdk.Finding{}, fmt.Errorf("%w: %s already exists", ErrBadValue, rel)
+	}
+	f, err := tx.writeFinding(rec, rel)
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	tx.newIDs[id] = true
+	return f, nil
+}
+
+// ReplaceFinding writes rec over the finding with its ID, in that
+// finding's file, as add would write it. rpt validate - uses it to see a
+// stream's replacements.
+func (tx *Tx) ReplaceFinding(rec sdk.Finding) (sdk.Finding, error) {
+	if err := checkRecord(rec); err != nil {
+		return sdk.Finding{}, err
+	}
+	rel, err := tx.r.locate(rec.ID)
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	return tx.writeFinding(rec, rel)
+}
+
+// writeFinding takes rec's assets in and writes it as the finding file rel.
+func (tx *Tx) writeFinding(rec sdk.Finding, rel string) (sdk.Finding, error) {
+	id := rec.ID
+	cfg, err := tx.r.Config()
+	if err != nil {
+		return sdk.Finding{}, err
 	}
 	keys := slices.Sorted(maps.Keys(rec.Sections))
 	texts := make([]*string, len(keys))
@@ -72,7 +101,6 @@ func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 	if err := tx.put(rel, out, rankFinding); err != nil {
 		return sdk.Finding{}, err
 	}
-	tx.newIDs[id] = true
 	f.Lines = nil
 	return f, nil
 }

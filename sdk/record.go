@@ -209,6 +209,9 @@ type Problem struct {
 	Level   Level  `json:"level"`
 	Message string `json:"message"`
 	Command string `json:"command,omitzero"` // the command that found it; never changed downstream
+	// Rev is the revision of the finding, page or rpt.yaml the problem is
+	// in, as the check read it; pass it as --if-rev to a fix.
+	Rev string `json:"rev,omitzero"`
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

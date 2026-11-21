@@ -55,7 +55,7 @@ func (r *Report) Pages() ([]sdk.Page, error) {
 
 // PagesWithLines is Pages with each page's Lines set.
 func (r *Report) PagesWithLines() ([]sdk.Page, error) {
-	entries, err := fs.ReadDir(r.root.FS(), PagesDir)
+	entries, err := fs.ReadDir(r.fsys(), PagesDir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
@@ -69,7 +69,7 @@ func (r *Report) PagesWithLines() ([]sdk.Page, error) {
 			continue
 		}
 		rel := path.Join(PagesDir, e.Name())
-		src, err := r.root.ReadFile(rel)
+		src, err := r.readFile(rel)
 		if err != nil {
 			errs = append(errs, &FileError{Path: rel, Err: err})
 			continue
@@ -191,7 +191,7 @@ func (tx *Tx) nextPageID() (string, error) {
 			}
 		}
 	}
-	if ents, err := fs.ReadDir(tx.r.root.FS(), PagesDir); err == nil {
+	if ents, err := fs.ReadDir(tx.r.fsys(), PagesDir); err == nil {
 		for _, e := range ents {
 			if m := pageFileID.FindStringSubmatch(e.Name()); m != nil {
 				count("P-" + m[1])
@@ -260,6 +260,34 @@ func (tx *Tx) AddPage(rec sdk.Page) (sdk.Page, error) {
 	} else if exists {
 		return sdk.Page{}, bad("%s already exists", rel)
 	}
+	p, err := tx.writePage(id, rel, rec)
+	if err != nil {
+		return sdk.Page{}, err
+	}
+	tx.newIDs[id] = true
+	return p, nil
+}
+
+// ReplacePage writes rec over the page with its ID, in that page's file,
+// as add would write it. rpt validate - uses it to see a stream's
+// replacements.
+func (tx *Tx) ReplacePage(rec sdk.Page) (sdk.Page, error) {
+	if strings.TrimSpace(rec.Title) == "" {
+		return sdk.Page{}, fmt.Errorf("%w: title is required", ErrBadValue)
+	}
+	id := CanonicalID(rec.ID)
+	rel, err := tx.locatePage(id)
+	if err != nil {
+		return sdk.Page{}, err
+	}
+	return tx.writePage(id, rel, rec)
+}
+
+// writePage takes rec's assets in and writes it as the page file rel.
+func (tx *Tx) writePage(id, rel string, rec sdk.Page) (sdk.Page, error) {
+	bad := func(format string, a ...any) error {
+		return fmt.Errorf("%w: %s", ErrBadValue, fmt.Sprintf(format, a...))
+	}
 	ev, err := tx.takeAssets(id, rel, PageEvidenceDir, rec.Evidence, []*string{&rec.Body}, rec.Assets)
 	if err != nil {
 		return sdk.Page{}, err
@@ -309,7 +337,6 @@ func (tx *Tx) AddPage(rec sdk.Page) (sdk.Page, error) {
 	if err := tx.put(rel, out, rankPage); err != nil {
 		return sdk.Page{}, err
 	}
-	tx.newIDs[id] = true
 	p.Lines = nil
 	return p, nil
 }

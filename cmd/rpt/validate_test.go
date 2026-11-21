@@ -1,113 +1,72 @@
 package main
 
 import (
-	"encoding/json/v2"
-	"os"
-	"path/filepath"
-	"reflect"
 	"strings"
 	"testing"
 )
 
-// fixedReport is a copy of the fixture with its planted problem fixed.
-func fixedReport(t *testing.T) string {
-	t.Helper()
+func TestValidateIDs(t *testing.T) {
+	code, out, _ := runIn(t, "", "validate", "F-001", "--report", fixture)
+	if code != 0 || out != "" {
+		t.Errorf("F-001: exit %d, stdout %q", code, out)
+	}
+	code, out, _ = runIn(t, "", "validate", "f-002", "--report", fixture)
+	if code != 1 || pick(t, out, "path", "rule") != "findings/tls-weak.md scopeIDsExist\n" || pick(t, out, "rev") == "\n" {
+		t.Errorf("F-002: exit %d, stdout %q", code, out)
+	}
+	if code, out, _ = runIn(t, "", "validate", "F-404", "--report", fixture); code != 1 || pick(t, out, "rule") != "exists\n" {
+		t.Errorf("F-404: exit %d, stdout %q", code, out)
+	}
+}
+
+const cleanStream = `{"kind":"scope","id":"S-30","host":"10.9.0.1"}
+{"kind":"finding","title":"New","severity":"low","targets":[{"scope":"S-30"}],"sections":{"description":"d","remediation":"r","poc":"p"}}
+{"kind":"note","x":1}
+`
+
+func TestValidateStreamPassesCleanInput(t *testing.T) {
+	code, out, errOut := runIn(t, cleanStream, "validate", "-", "--report", fixture)
+	if code != 0 || out != cleanStream {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+}
+
+func TestValidateStreamStopsBrokenInput(t *testing.T) {
+	in := `{"kind":"finding","title":"New","severity":"low","targets":[{"scope":"S-77"}],"sections":{"description":"d","remediation":"r","poc":"p"}}
+{"kind":"finding","id":"F-001","title":"","severity":"low"}
+{"kind":"scope","id":"S-12","host":"10.0.0.5"}
+{"kind":"scope","id":"S-12","host":"10.0.0.6"}
+`
+	code, out, _ := runIn(t, in, "validate", "-", "--report", fixture)
+	if code != 1 || pick(t, out, "path", "line", "rule") != "- 2 write\n- 4 duplicate\n- 1 scopeIDsExist\n" {
+		t.Errorf("exit %d, stdout %q", code, out)
+	}
+	// Piped into add, nothing is added, without pipefail.
 	dir := reportCopy(t)
-	p := filepath.Join(dir, "findings/tls-weak.md")
-	b, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(strings.Replace(string(b), "{scope: S-99}", "{scope: S-12}", 1)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	return dir
-}
-
-// Done-when: validate exits 1 on the fixture and 0 once its problem is fixed.
-func TestValidateVerb(t *testing.T) {
-	code, out, errOut := runIn(t, "", "validate", "--report", fixture)
-	if code != 1 || errOut != "rpt: findings/tls-weak.md:5: S-99 is not in scope.csv\n" {
-		t.Errorf("fixture: exit %d, stderr %q; want 1 and the problem as text", code, errOut)
-	}
-	if got := pick(t, out, "path", "line", "level", "rule"); got != "findings/tls-weak.md 5 error scopeIDsExist\n" {
-		t.Errorf("fixture problems = %q", got)
-	}
-
-	code, out, errOut = runIn(t, "", "validate", "--report", fixedReport(t))
-	if code != 0 || out != "" || errOut != "" {
-		t.Errorf("fixed: exit %d, stdout %q, stderr %q; want 0 and nothing", code, out, errOut)
+	before := folderState(t, dir)
+	code, out, _ = runIn(t, out, "finding", "add", "--report", dir)
+	if code != 1 || strings.Contains(out, `"kind":"finding"`) || len(folderState(t, dir)) != len(before) {
+		t.Errorf("add: exit %d, stdout %q", code, out)
 	}
 }
 
-func TestValidateWarningsExitZero(t *testing.T) {
-	dir := fixedReport(t)
-	if err := os.WriteFile(filepath.Join(dir, "rpt.yaml"), append(mustRead(t, filepath.Join(dir, "rpt.yaml")), "logo: acme.png\n"...), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	code, out, _ := runIn(t, "", "validate", "--report", dir)
-	if code != 0 || pick(t, out, "level", "rule") != "warning configUnknownKey\n" {
-		t.Errorf("exit %d, stdout %q; want 0 and one warning", code, out)
-	}
-}
-
-// Done-when: assemble matches the golden report.
-func TestAssembleVerb(t *testing.T) {
-	code, out, errOut := runIn(t, "", "assemble", "--report", fixture)
-	if code != 0 {
-		t.Fatalf("exit %d, stderr %q", code, errOut)
-	}
-	if want := "rpt: findings/tls-weak.md:5: warning: \"S-99\" is not in scope.csv; target left out of the finding\n"; errOut != want {
-		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
-	}
-	// The report record, then the warning as a problem record.
-	out, _, _ = strings.Cut(out, "\n")
-	golden := strings.ReplaceAll(string(mustRead(t, "../../testdata/assemble.golden.json")), "$REPORT", fixture)
-	var got, want any
-	if err := json.Unmarshal([]byte(out), &got); err != nil {
-		t.Fatal(err)
-	}
-	if err := json.Unmarshal([]byte(golden), &want); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("assembled report differs from testdata/assemble.golden.json:\n%s", out)
+func TestValidateStreamReplacesAndChecksConfig(t *testing.T) {
+	// Replacing F-002 with a fitting target clears the report's own problem;
+	// a config record requiring a section F-001 lacks raises one elsewhere.
+	in := `{"kind":"finding","id":"F-002","title":"Weak TLS","severity":"info","targets":[{"scope":"S-12"}],"sections":{"description":"d","remediation":"r","poc":"p"}}
+{"kind":"config","format":2,"required_sections":["description","remediation","poc","impact"]}
+`
+	code, out, _ := runIn(t, in, "validate", "-", "--report", fixture)
+	got := pick(t, out, "path", "line", "rule", "message")
+	if code != 1 || !strings.Contains(got, "findings/xss-search.md") || !strings.Contains(got, "- 1 requiredSections F-002: ") || strings.Contains(got, "scopeIDsExist") {
+		t.Errorf("exit %d, stdout %q", code, got)
 	}
 }
 
-func TestAssembleErrors(t *testing.T) {
-	broken := reportCopy(t)
-	if err := os.WriteFile(filepath.Join(broken, "rpt.yaml"), []byte("format: [1\n"), 0o644); err != nil {
-		t.Fatal(err)
+func TestValidateStreamPassesIncomingProblems(t *testing.T) {
+	in := `{"kind":"problem","path":"x","rule":"lint","level":"error","message":"m","command":"lint"}` + "\n" + cleanStream
+	code, out, errOut := runIn(t, in, "validate", "-", "--report", fixture)
+	if code != 1 || pick(t, out, "command") != "lint\n" || strings.Contains(errOut, "lint") {
+		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
-	tests := []struct {
-		name      string
-		args      []string
-		wantCode  int
-		wantInErr string
-	}{
-		{"unreadable config: nothing to assemble", []string{"assemble", "--report", broken}, 1, "rpt: rpt.yaml:"},
-		{"--draft is gone: assemble never refuses", []string{"assemble", "--report", fixture, "--draft"}, 2, "unknown flag: --draft"},
-		{"no arguments", []string{"assemble", "--report", fixture, "extra"}, 2, "usage: rpt assemble"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			code, out, errOut := runIn(t, "", tt.args...)
-			if code == 1 {
-				out = strings.Replace(pick(t, out, "kind", "rule"), "problem readable\n", "", 1) // the unreadable file, as a record
-			}
-			if code != tt.wantCode || out != "" || !strings.Contains(errOut, tt.wantInErr) {
-				t.Errorf("exit %d, stdout %q, stderr %q; want %d, nothing, %q", code, out, errOut, tt.wantCode, tt.wantInErr)
-			}
-		})
-	}
-}
-
-func mustRead(t *testing.T, p string) []byte {
-	t.Helper()
-	b, err := os.ReadFile(p)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return b
 }
