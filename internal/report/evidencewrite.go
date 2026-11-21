@@ -156,7 +156,7 @@ func (tx *Tx) AddEvidence(id string, srcs []string, as string) (sdk.Finding, err
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	f, err := parseFinding(rel, src, r.headings())
+	f, err := parseFinding(rel, src, tx.headings())
 	if err != nil {
 		return sdk.Finding{}, err
 	}

@@ -194,7 +194,7 @@ func (tx *Tx) Unset(id string, paths ...string) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	h := tx.r.headings()
+	h := tx.headings()
 	return tx.edit(id, rel, func(ff *findingFile) error {
 		for _, p := range paths {
 			var err error

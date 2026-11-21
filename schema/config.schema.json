@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/config.schema.json",
+  "title": "rpt config record",
+  "description": "The report config, rpt.yaml, as in effect: an absent severities, required_sections or sections key gives the defaults. Plugin sections (x-<plugin>) appear as extra members; other keys rpt doesn't define are left out. rpt config get <path> gives only that member (with kind and rev). Schema version 2.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "config"},
+    "format": {"type": "integer", "description": "The report format version."},
+    "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."},
+    "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Each fixed section's key (description, remediation, poc) and the heading this report gives it."},
+    "required_sections": {"type": "array", "items": {"type": "string"}, "description": "The sections every finding must have and fill in: a fixed section's key, or a custom section's heading."},
+    "rules": {"type": "object", "additionalProperties": {"enum": ["error", "warning"]}, "description": "Rule name to the level its problems take, overriding the rule's own; absent rules keep theirs."},
+    "rev": {"type": "string", "description": "rpt.yaml's revision. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the config changed since this read."},
+    "lines": {
+      "type": "object",
+      "description": "Where each top-level key sits in rpt.yaml. Given by rpt config get --lines.",
+      "properties": {
+        "file": {"type": "string", "description": "Absolute path of rpt.yaml, in the form rpt opened the report by, symlinks not resolved."},
+        "keys": {"type": "object", "additionalProperties": {"$ref": "finding.schema.json#/$defs/position"}}
+      },
+      "required": ["keys"],
+      "additionalProperties": true
+    }
+  },
+  "required": ["kind"],
+  "patternProperties": {"^x-": {"description": "A plugin's settings, kept and edited by rpt, never read by it."}},
+  "additionalProperties": true
+}

@@ -14,7 +14,7 @@ func TestHelpListsCommands(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nevidence\nfinding\nhelp\nls\nnew\nscope\nsections\nseverities\nvalidate\nversion\n"
+	want := "assemble\nconfig\nevidence\nfinding\nhelp\nls\nnew\nscope\nvalidate\nversion\n"
 	if names != want {
 		t.Errorf("commands listed\n got: %q\nwant: %q", names, want)
 	}
@@ -142,6 +142,10 @@ func TestSingleDashLongFlagsAreGone(t *testing.T) {
 func TestUsageMatchesTable(t *testing.T) {
 	misuse := map[string][][]string{
 		"assemble":       {{"extra"}, {"--no-such-flag"}},
+		"config":         {{}, {"extra"}, {"--no-such-flag"}},
+		"config get":     {{"a", "b"}, {"--merged"}, {"--merged", "severities"}, {"--no-such-flag"}},
+		"config set":     {{}, {"format"}, {"--rename", "x", "severities", "[a]"}, {"--no-such-flag"}},
+		"config unset":   {{}, {"--no-such-flag"}},
 		"evidence":       {{"extra"}, {"--no-such-flag"}},
 		"evidence add":   {{}, {"F-001"}, {"--no-such-flag"}},
 		"evidence prune": {{"extra"}, {"--no-such-flag"}},
@@ -161,8 +165,6 @@ func TestUsageMatchesTable(t *testing.T) {
 		"scope set":      {{}, {"S-12", "port"}, {"S-12", "port", "1", "--force", "--cleanup"}, {"--no-such-flag"}},
 		"scope unset":    {{}, {"S-12"}, {"--no-such-flag"}},
 		"scope remove":   {{}, {"S-12", "--yes", "--force", "--cleanup"}, {"--no-such-flag"}},
-		"sections":       {{"extra"}, {"--no-such-flag"}},
-		"severities":     {{"extra"}, {"--no-such-flag"}},
 		"validate":       {{"extra"}, {"--no-such-flag"}},
 		"version":        {{"extra"}, {"--no-such-flag"}},
 	}

@@ -77,7 +77,7 @@ func (tx *Tx) edit(id, rel string, change func(*findingFile) error) (sdk.Finding
 		return sdk.Finding{}, fmt.Errorf("%w: %s: %v", ErrBadValue, rel, err)
 	}
 	out := ff.bytes()
-	f, err := parseFinding(rel, out, tx.r.headings())
+	f, err := parseFinding(rel, out, tx.headings())
 	if err != nil {
 		return sdk.Finding{}, fmt.Errorf("%w: the change would break %s: %v", ErrBadValue, rel, err)
 	}

@@ -63,6 +63,36 @@ type Position struct {
 	Column int `json:"column"`
 }
 
+// Config is a "config" record: the report config, rpt.yaml, as in effect:
+// an absent severities, required_sections or sections key gives the
+// defaults. Plugin sections (x-<plugin>) are in Extra; other keys rpt
+// doesn't define are left out.
+type Config struct {
+	Kind             string            `json:"kind"`
+	Format           int               `json:"format,omitzero"`
+	Severities       []Severity        `json:"severities,omitzero"`        // most severe first
+	Sections         map[string]string `json:"sections,omitzero"`          // fixed section key -> its heading
+	RequiredSections []string          `json:"required_sections,omitzero"` // section keys, or a custom section's heading
+	Rules            map[string]Level  `json:"rules,omitzero"`             // rule name -> the level its problems take
+	// Rev is rpt.yaml's revision; pass it back as --if-rev.
+	Rev string `json:"rev,omitzero"`
+	// Lines is where each top-level key sits in rpt.yaml, set by rpt
+	// config get --lines.
+	Lines *ConfigLines `json:"lines,omitzero"`
+
+	// Extra holds the x-<plugin> sections and any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// ConfigLines is where a config's keys sit in rpt.yaml.
+type ConfigLines struct {
+	File string              `json:"file,omitzero"` // rpt.yaml's absolute path, symlinks kept
+	Keys map[string]Position `json:"keys"`          // top-level key -> where it sits
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // Evidence is an "evidence" record rpt evidence emits: one reference a
 // finding makes to an evidence file, or, with --orphans, a file under
 // findings/evidence/ that nothing references (no Finding, Ref or Source).
@@ -158,7 +188,7 @@ type ReportMeta struct {
 
 	// Sections are the report's sections in the order rpt writes them:
 	// the fixed ones with this report's headings, then the custom ones it
-	// requires, as rpt sections gives them. A finding's sections are keyed
+	// requires, as rpt config get gives them. A finding's sections are keyed
 	// by Key; Heading is what a reader sees.
 	Sections []ReportSection `json:"sections"`
 

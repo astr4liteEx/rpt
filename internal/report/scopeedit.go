@@ -51,7 +51,7 @@ func (tx *Tx) citations() ([]citation, error) {
 		if !exists {
 			continue
 		}
-		g, err := parseFindingBytes(f.Path, src, tx.r.headings())
+		g, err := parseFindingBytes(f.Path, src, tx.headings())
 		if err != nil {
 			continue
 		}

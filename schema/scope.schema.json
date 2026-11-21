@@ -18,7 +18,7 @@
   "$defs": {
     "lines": {
       "type": "object",
-      "description": "Where the row sits in scope.csv. Given by rpt scope --lines; rpt scope add ignores it.",
+      "description": "Where the row sits in scope.csv. Given by rpt scope get --lines; rpt scope add ignores it.",
       "properties": {
         "row": {"type": "integer", "minimum": 1, "description": "The 1-based line of scope.csv the row starts on. A quoted field can span lines, and blank lines are skipped, so count from here, not from the row's position."},
         "file": {"type": "string", "description": "Absolute path of scope.csv, in the form rpt opened the report by, symlinks not resolved."}

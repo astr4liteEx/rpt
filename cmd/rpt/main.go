@@ -62,6 +62,11 @@ var builtins map[string]builtin
 func init() {
 	builtins = map[string]builtin{
 		"assemble": {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
+		"config": {nounVerb("config"), sdk.Command{Summary: "Get, set and unset the report config, plugin settings included", Usage: "rpt config <action>", Output: "records"}, []sub{
+			{"get", configGetVerb, "rpt config get [--lines] [path], or rpt config get --merged x-<plugin>"},
+			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>..."},
+			{"unset", configUnsetVerb, "rpt config unset [--force] [--if-rev rev] [--dry-run] <path>..."},
+		}},
 		"evidence": {evidenceVerb, sdk.Command{Summary: "List the findings' evidence files; add copies files in, prune removes unreferenced ones", Usage: "rpt evidence [--orphans] [--json] [--report dir]", Output: "records"}, []sub{
 			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--if-rev rev] [--dry-run] <id> <file>..."},
 			{"prune", evidencePruneVerb, "rpt evidence prune [--dry-run]"},
@@ -84,10 +89,8 @@ func init() {
 			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
-		"sections":   {sectionsVerb, sdk.Command{Summary: "List the report's sections", Usage: "rpt sections [--json]", Output: "records"}, nil},
-		"severities": {severitiesVerb, sdk.Command{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
-		"validate":   {validateVerb, sdk.Command{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
-		"version":    {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
+		"validate": {validateVerb, sdk.Command{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
+		"version":  {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
 	}
 	for name, b := range builtins {
 		for _, s := range b.subs {

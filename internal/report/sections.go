@@ -47,7 +47,7 @@ func (r *Report) SetSection(id, key, text string) (sdk.Finding, error) {
 // SetSection is Report.SetSection as part of the write tx.
 func (tx *Tx) SetSection(id, key, text string) (sdk.Finding, error) {
 	r := tx.r
-	h := r.headings()
+	h := tx.headings()
 	key = h.key(strings.TrimSpace(key))
 	text = strings.TrimRight(strings.TrimLeft(string(normaliseNewlines([]byte(text))), "\n"), " \t\n")
 	if n := len(sectionSpans([]byte(text), h)); n > 0 {

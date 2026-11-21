@@ -30,7 +30,7 @@ func (tx *Tx) Delete(id string) (sdk.Finding, error) {
 	if err := tx.checkRev(id, rel, Rev(src)); err != nil {
 		return sdk.Finding{}, err
 	}
-	f, err := parseFinding(rel, src, tx.r.headings())
+	f, err := parseFinding(rel, src, tx.headings())
 	if err != nil {
 		return sdk.Finding{}, err
 	}

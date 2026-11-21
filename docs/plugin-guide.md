@@ -19,7 +19,7 @@ Print the description object and exit 0, before any other work. Declare `input` 
 
 ## 3. Write the work
 
-Read and write records as the protocol's Records section says; reach the report only through `$RPT_BIN` (falling back to `rpt`). Done when every record kind the plugin reads or writes has been checked against its schema, member by member. If the plugin has settings, read them as the protocol's Settings section says: the user's `config.yaml`, then its own section of the report's `.rpt-plugins.yaml`, then flags.
+Read and write records as the protocol's Records section says; reach the report only through `$RPT_BIN` (falling back to `rpt`). Done when every record kind the plugin reads or writes has been checked against its schema, member by member. If the plugin has settings, read them as the protocol's Settings section says: read them merged with `$RPT_BIN config get --merged x-<plugin>`, over the plugin's defaults, then parse flags.
 
 ## 4. Prove it
 

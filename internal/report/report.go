@@ -30,6 +30,17 @@ var DefaultRequiredSections = []string{"description", "remediation", "poc"}
 type Report struct {
 	root *os.Root
 	abs  string // the folder's absolute path, for assembled asset paths
+	// configSrc, when set, is rpt.yaml as a write will leave it: Config
+	// reads it instead of the file.
+	configSrc []byte
+}
+
+// configBytes returns rpt.yaml's bytes.
+func (r *Report) configBytes() ([]byte, error) {
+	if r.configSrc != nil {
+		return r.configSrc, nil
+	}
+	return r.root.ReadFile(ConfigFile)
 }
 
 // Open opens the report folder at dir.
@@ -89,22 +100,27 @@ type Config struct {
 	// so problems can point at it.
 	KeyLines map[string]int
 
-	// UnknownKeys lists top-level keys rpt doesn't define, for validate to
-	// warn about. They are never copied into an assembled report.
+	// Rules maps a rule name to the level its problems take instead of
+	// the rule's own.
+	Rules map[string]sdk.Level
+
+	// UnknownKeys lists top-level keys rpt doesn't define, other than
+	// x-<plugin> sections, for validate to warn about. They are never copied into an assembled report.
 	UnknownKeys []string
 }
 
 // Config reads the report config.
 func (r *Report) Config() (Config, error) {
-	src, err := r.root.ReadFile(ConfigFile)
+	src, err := r.configBytes()
 	if err != nil {
 		return Config{}, fmt.Errorf("read report config: %w", err)
 	}
 	var raw struct {
 		Format           int `yaml:"format"`
 		Severities       []sdk.Severity
-		RequiredSections []string          `yaml:"required_sections"`
-		Sections         map[string]string `yaml:"sections"`
+		RequiredSections []string             `yaml:"required_sections"`
+		Sections         map[string]string    `yaml:"sections"`
+		Rules            map[string]sdk.Level `yaml:"rules"`
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(normaliseNewlines(src), &doc); err != nil {
@@ -118,6 +134,7 @@ func (r *Report) Config() (Config, error) {
 		Severities:       raw.Severities,
 		RequiredSections: raw.RequiredSections,
 		Sections:         raw.Sections,
+		Rules:            raw.Rules,
 		Headings:         newHeadings(raw.Sections),
 		KeyLines:         keyLines(&doc),
 	}
@@ -131,7 +148,11 @@ func (r *Report) Config() (Config, error) {
 	} else if cfg.RequiredSections == nil {
 		cfg.RequiredSections = []string{}
 	}
-	cfg.UnknownKeys = unknownKeys(&doc, "format", "severities", "required_sections", "sections")
+	for _, k := range unknownKeys(&doc, configKeys...) {
+		if !isPluginKey(k) {
+			cfg.UnknownKeys = append(cfg.UnknownKeys, k)
+		}
+	}
 	return cfg, nil
 }
 

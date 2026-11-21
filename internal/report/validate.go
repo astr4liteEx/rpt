@@ -64,6 +64,12 @@ func (r *Report) Validate() ([]sdk.Problem, error) {
 	if !slices.ContainsFunc(files, func(ff findingSrc) bool { return ff.err != nil }) {
 		v.evidenceUnlinked()
 	}
+	// rpt.yaml's rules: give rules other levels.
+	for i, p := range v.problems {
+		if lv, ok := v.cfg.Rules[p.Rule]; ok && v.cfgOK && (lv == sdk.Error || lv == sdk.Warning) {
+			v.problems[i].Level = lv
+		}
+	}
 	slices.SortStableFunc(v.problems, func(a, b sdk.Problem) int {
 		return cmp.Or(cmp.Compare(a.Path, b.Path), cmp.Compare(a.Line, b.Line),
 			cmp.Compare(a.Rule, b.Rule), cmp.Compare(a.Message, b.Message))
@@ -127,6 +133,11 @@ func (v *validation) checkConfig() {
 	checkList("severities", cfg.Severities, bad)
 	checkList("required_sections", cfg.RequiredSections, bad)
 	checkSections(cfg, bad)
+	for _, rule := range slices.Sorted(maps.Keys(cfg.Rules)) {
+		if lv := cfg.Rules[rule]; lv != sdk.Error && lv != sdk.Warning {
+			bad("rules", "rules gives %s the level %q; use error or warning", rule, lv)
+		}
+	}
 	for _, k := range cfg.UnknownKeys {
 		v.add(ConfigFile, line(k), RuleConfigUnknownKey, sdk.Warning, "unknown key %q is ignored and never reaches the report", k)
 	}

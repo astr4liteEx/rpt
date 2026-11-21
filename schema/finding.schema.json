@@ -27,7 +27,7 @@
         "column": {"type": "integer", "minimum": 1}
       },
       "required": ["line", "column"],
-      "additionalProperties": false
+      "additionalProperties": true
     },
     "lines": {
       "type": "object",

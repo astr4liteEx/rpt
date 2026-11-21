@@ -25,6 +25,10 @@ severities: [critical, high, medium, low, info]
 required_sections: [description, remediation, poc]
 sections:
   remediation: Recommendation
+rules:
+  textBeforeHeading: error
+x-spag:
+  dictionary: en-GB
 ```
 
 | Key | Required | Meaning |
@@ -33,8 +37,10 @@ sections:
 | `severities` | no | The allowed levels, most severe first. It is also the order findings are sorted in. Default: `critical, high, medium, low, info`. Any names work, e.g. `[urgent, normal]`. |
 | `required_sections` | no | Sections every finding must have, non-empty. Default: `description, remediation, poc`. `[]` requires none. A fixed section is listed by its key or its heading; a custom one by its exact text. |
 | `sections` | no | Renames fixed sections: maps `description`, `remediation` or `poc` to the heading this report uses for it. Unnamed ones keep their default heading. Records and renderers still see the fixed key, whatever the heading. |
+| `rules` | no | Gives `rpt validate` rules (and plugin rules) another level: `error` or `warning`. A rule not listed keeps its own. |
+| `x-<plugin>` | no | A plugin's settings, kept and edited by `rpt config`, never read by rpt and never copied into the assembled report. |
 
-Other keys are warned about by `rpt validate` and never reach the assembled report.
+Change it with `rpt config set` and `rpt config unset` rather than by hand: a new fixed heading is then written into every finding, and `--rename` keeps findings on a renamed severity or custom section. Other keys are warned about by `rpt validate` and never reach the assembled report.
 
 ## `scope.csv`
 
@@ -102,7 +108,7 @@ Unknown keys in a target are kept, like unknown frontmatter keys. A finding foun
 
 A parser plugin doesn't know the report's scope, so it writes targets with a `host` and no `scope`. `rpt scope match` attributes each one to the most specific row that covers it: one asset before a range, a narrower CIDR before a wider one, any CIDR before a `*.domain`, a longer `*.domain` before a shorter one, then a row with a port, then a row with a protocol, then the lower ID. It drops the host when that row is one asset. `rpt finding add` refuses a target without a scope ID.
 
-The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt finding add` and `rpt sections set` write the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
+The body is split into sections at `##` headings. `## Description`, `## Remediation` and `## Proof of concept` are the fixed sections (keys `description`, `remediation`, `poc`), unless `sections` in `rpt.yaml` renames them. A fixed heading matches whatever its case: `## Proof Of Concept` is `poc`. Any other `##` heading is kept under its own text, exactly. `rpt finding add` and `rpt finding set <id> sections.<key>` write the report's headings. `##` lines inside code fences are not headings. Text before the first heading belongs to no section. Images and links to report files count as evidence and are checked the same way.
 
 The file name is free. `rpt finding add` names new files `F-NNN-<title-slug>.md`.
 
@@ -110,7 +116,7 @@ Evidence files can sit anywhere inside the report, but `findings/evidence/` is w
 
 ## `rpt validate` rules
 
-`rpt validate` prints one problem per broken rule, with the file and line, and exits 1 if any is an error. The rule names are stable, so scripts and CI can filter on them.
+`rpt validate` prints one problem per broken rule, with the file and line, and exits 1 if any is an error. The levels below are the defaults; `rules` in `rpt.yaml` changes them. The rule names are stable, so scripts and CI can filter on them.
 
 | Rule | Level | Checks |
 | --- | --- | --- |
@@ -122,10 +128,10 @@ Evidence files can sit anywhere inside the report, but `findings/evidence/` is w
 | `targets` | error | Every finding has at least one target; each names a scope row, and fits it: a host only inside a range row, and the row's port and protocol if it has them. |
 | `requiredSections` | error | Every finding has each required section, and it isn't empty. |
 | `evidence` | error | Every evidence file and linked file stays inside the report, exists, and is a regular file. |
-| `config` | error | `format` is 2; `severities` and `required_sections` have no empty or repeated names, and `severities` isn't empty; `sections` renames only fixed sections, to non-empty headings, no two alike. |
+| `config` | error | `format` is 2; `severities` and `required_sections` have no empty or repeated names, and `severities` isn't empty; `sections` renames only fixed sections, to non-empty headings, no two alike; `rules` gives only `error` or `warning`. |
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
-| `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define. |
+| `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define, other than an `x-<plugin>` section. |
 | `evidenceUnlinked` | warning | A file in `findings/evidence/` that no finding lists or links to. Not checked while a finding file is unreadable. |
 
 Plugins can check more by emitting problems under their own rule names.

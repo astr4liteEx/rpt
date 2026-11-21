@@ -105,7 +105,6 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt finding set <id> <path> <value>...` | Changes one value, given as YAML. The path is a frontmatter key, `sections.<key>` (the text from stdin when no value is given, adding the section if it's missing) or `x-<plugin>.<key>`. Several values make a list: `targets S-12 '{scope: S-20, port: 443}'`. Setting `id` renames the finding, and its file when the name starts with the old ID. Only the lines that change are rewritten. |
 | `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
 | `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
-| `rpt sections` | Lists the report's sections: the fixed ones with their headings, then the custom ones it requires. |
 | `rpt scope get [id...]` | Prints scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
 | `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-NNN`, counting the IDs findings cite as well as the rows. |
 | `rpt scope set <id> <column> <value>` | Changes one cell of a row. Setting `id` renames the row and every finding target citing it. A change that leaves a citing target unfit (a new port, say) is refused unless you pass `--force` (leave it) or `--cleanup` (drop it). |
@@ -115,7 +114,9 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt evidence [--orphans]` | Lists every evidence file the findings list or link to, with its absolute path and whether it exists. `--orphans` adds the files in `findings/evidence/` that nothing references. |
 | `rpt evidence add <id> <file>...` | Copies files into `findings/evidence/` as `<id>-<name>.<ext>` and lists them in the finding's evidence. `--as <name>` names a single copy. |
 | `rpt evidence prune` | Removes the files in `findings/evidence/` that nothing references. `--dry-run` only lists them. |
-| `rpt severities` | Lists the report's severity levels, most severe first. |
+| `rpt config get [path]` | Prints the report config as one record: severities, section headings, required sections, rule levels and plugin settings, defaults filled in. A path gives only that member; `--merged x-<plugin>` lays a plugin's report section over its user settings file. |
+| `rpt config set <path> <value>...` | Changes one config value. `--rename old=new` with a new `severities` or `required_sections` list rewrites every finding using the old name; dropping a level findings still use needs `--force`. Setting `sections.<key>` (a fixed section's heading) rewrites that heading in every finding. |
+| `rpt config unset <path>...` | Removes config keys; severities, sections and required sections go back to the defaults. |
 | `rpt validate` | Checks the report and prints its problems. Exits 1 on any error. |
 | `rpt assemble` | Prints the whole report as one JSON record for renderers. |
 | `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed. With a command, prints its usage, as `rpt <command> --help` does. |

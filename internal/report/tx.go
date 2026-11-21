@@ -74,6 +74,7 @@ type Tx struct {
 	files  map[string]*change
 	newIDs map[string]bool // finding IDs this write adds
 	nextN  int             // the next finding number; 0 until first needed
+	h      Headings        // section headings a config change in this write sets; nil if none
 }
 
 // A change is one file as the write found it and as it will leave it.
