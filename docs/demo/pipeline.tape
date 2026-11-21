@@ -17,7 +17,7 @@ Type "rpt verbs"
 Sleep 300ms
 Enter
 Sleep 2.5s
-Type "rpt parse-scan < ../scan.csv | rpt scope match --drop-out-of-scope | rpt findings add"
+Type "rpt parse-scan < ../scan.csv | rpt scope match --drop-out-of-scope | rpt finding add"
 Sleep 300ms
 Enter
 Sleep 4s

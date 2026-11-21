@@ -64,13 +64,13 @@ scripts/install.sh
 
 ## Quick start
 
-`rpt new` creates an empty report. Add scope rows with `rpt scope add`, pipe finding records into `rpt findings add`, and `rpt validate` checks the result:
+`rpt new` creates an empty report. Add scope rows with `rpt scope add`, pipe finding records into `rpt finding add`, and `rpt validate` checks the result:
 
-![rpt new creates a report, rpt scope add adds two scope rows, rpt findings add imports three findings and rpt validate reports it clean](docs/demo/quick-start.gif)
+![rpt new creates a report, rpt scope add adds two scope rows, rpt finding add imports three findings and rpt validate reports it clean](docs/demo/quick-start.gif)
 
-When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt findings set` fixes that one line, and `rpt assemble` then counts the findings per severity:
+When something is wrong, `rpt validate` names the file, the line and the rule. Here a finding cites a scope row that doesn't exist; `rpt finding set` fixes that one line, and `rpt assemble` then counts the findings per severity:
 
-![rpt validate reports S-99 missing from scope.csv, rpt findings set points F-002's target at S-14, and rpt validate passes](docs/demo/validate.gif)
+![rpt validate reports S-99 missing from scope.csv, rpt finding set points F-002's target at S-14, and rpt validate passes](docs/demo/validate.gif)
 
 To try it yourself, starting from one blank finding and filling it in:
 
@@ -79,7 +79,7 @@ rpt new acme-external         # rpt.yaml, an empty scope.csv and findings/
 cd acme-external
 
 rpt scope add --host 10.0.0.5 --port 443 --protocol tcp            # row S-1
-rpt findings add --title "SQL injection in login" --severity high --target S-1
+rpt finding add --title "SQL injection in login" --severity high --target S-1
 
 rpt validate                  # F-001's Description, Remediation and Proof of concept are empty
 $EDITOR findings/F-001-sql-injection-in-login.md
@@ -100,13 +100,12 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
-| `rpt findings [--lines]` | Lists findings. `--lines` adds each finding file's absolute path and where each frontmatter key and section sits in it, for checkers that load files or report problems by line. |
-| `rpt findings add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section; `--scaffold` adds those headings to stdin records too. |
-| `rpt findings set <id> <key> <value>` | Changes one frontmatter value, given as YAML. Only that line of the file changes. |
-| `rpt findings unset <id> <key>...` | Removes frontmatter keys. A finding's `id`, `title`, `targets` and `severity` can't be removed. |
-| `rpt findings delete <id>...` | Removes findings. Their evidence files stay. |
+| `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (line and column) and section sits in it, for checkers that load files or report problems by position. |
+| `rpt finding add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section (`--no-scaffold` leaves them out); `--scaffold` adds those headings to stdin records too. It checks only the form: whether the severity is one of the report's is `rpt validate`'s to say. |
+| `rpt finding set <id> <path> <value>...` | Changes one value, given as YAML. The path is a frontmatter key, `sections.<key>` (the text from stdin when no value is given, adding the section if it's missing) or `x-<plugin>.<key>`. Several values make a list: `targets S-12 '{scope: S-20, port: 443}'`. Setting `id` renames the finding, and its file when the name starts with the old ID. Only the lines that change are rewritten. |
+| `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
+| `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
 | `rpt sections` | Lists the report's sections: the fixed ones with their headings, then the custom ones it requires. |
-| `rpt sections set <id> <key>` | Replaces one section's text in a finding with stdin, adding the section if it's missing. |
 | `rpt scope [id...]` | Lists scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
 | `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-N`. |
 | `rpt scope delete <id>...` | Removes scope rows. A row a finding cites is refused unless you pass `--force`. |
@@ -139,11 +138,11 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 When a command isn't built in, `rpt <command>` runs `rpt-<command>` from your `PATH` and passes it the arguments unchanged. A `--report` given before the plugin's name reaches it as `$RPT_REPORT_DIR`. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
 
-![rpt verbs lists an importer after the built-ins; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt findings add](docs/demo/pipeline.gif)
+![rpt verbs lists an importer after the built-ins; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt finding add](docs/demo/pipeline.gif)
 
 ```sh
 set -o pipefail
-rpt parse-scan < scan.csv | rpt scope match --drop-out-of-scope | rpt findings add
+rpt parse-scan < scan.csv | rpt scope match --drop-out-of-scope | rpt finding add
 ```
 
 `parse-scan` is a small demo importer from [`docs/demo/setup.sh`](docs/demo/setup.sh); rpt doesn't ship it. For ready-made plugins, see [rpt-plugins](#companion-projects).
@@ -190,7 +189,7 @@ func main() {
 Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
-> A shell pipeline's exit status is that of its last command. A parser that reports its failure as an error-level `problem` record stops `rpt findings add` from writing anything; one that just dies partway through can still leave a partial import, and without `set -o pipefail` the pipeline looks fine. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt findings add < out.jsonl`.
+> A shell pipeline's exit status is that of its last command. A parser that reports its failure as an error-level `problem` record stops `rpt finding add` from writing anything; one that just dies partway through can still leave a partial import, and without `set -o pipefail` the pipeline looks fine. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt finding add < out.jsonl`.
 
 ## Companion projects
 

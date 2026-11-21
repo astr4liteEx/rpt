@@ -365,7 +365,10 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 			continue
 		}
 		head, body, _ := splitFrontmatter(normaliseNewlines(src)) // parseFinding already succeeded on it
-		lines := f.Lines.Frontmatter
+		lines := map[string]int{}
+		for k, pos := range f.Lines.Frontmatter {
+			lines[k] = pos.Line
+		}
 		f.Lines = nil
 		out = append(out, findingSrc{rel: rel, f: f, keyLines: lines, body: body, first: bodyFirstLine(head)})
 	}

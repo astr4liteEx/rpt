@@ -112,7 +112,7 @@ func TestAddNames(t *testing.T) {
 func TestAddRefuses(t *testing.T) {
 	tests := []struct{ name, rec string }{
 		{"no title", `{"kind":"finding","targets":[],"severity":"low"}`},
-		{"unknown severity", `{"kind":"finding","title":"t","targets":[],"severity":"urgent"}`},
+		{"no severity", `{"kind":"finding","title":"t","targets":[]}`},
 		{"malformed id", `{"kind":"finding","id":"F-7","title":"t","targets":[],"severity":"low"}`},
 		{"id already taken", `{"kind":"finding","id":"F-003","title":"t","targets":[],"severity":"low"}`},
 		{"target without scope", `{"kind":"finding","title":"t","targets":[{"port":22}],"severity":"low"}`},
@@ -131,5 +131,14 @@ func TestAddRefuses(t *testing.T) {
 				t.Error("a refused record changed the folder")
 			}
 		})
+	}
+}
+
+// A severity the report doesn't define is rpt validate's to report, not
+// add's (ADR 0008).
+func TestAddChecksFormOnly(t *testing.T) {
+	r, _ := openCopy(t)
+	if _, err := r.Add(record(t, `{"kind":"finding","title":"t","severity":"urgent"}`)); err != nil {
+		t.Errorf("err = %v, want the finding added", err)
 	}
 }

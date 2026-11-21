@@ -84,36 +84,36 @@ func TestRun(t *testing.T) {
 		{name: "no command prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "usage: rpt <command>"},
 		{name: "unknown command exits 2", args: []string{"frobnicate"}, wantCode: 2, wantOut: exactly(""), wantInErr: `unknown command "frobnicate"`},
 		{
-			name:     "findings into a pipe is JSON Lines",
-			args:     []string{"findings", "--report", fixture},
+			name:     "finding get into a pipe is JSON Lines",
+			args:     []string{"finding", "get", "--report", fixture},
 			wantCode: 0, wantOut: jsonl("F-003", "F-002", "F-001"),
 		},
 		{
-			name:     "findings finds the report through RPT_REPORT_DIR",
-			args:     []string{"findings"},
+			name:     "finding get finds the report through RPT_REPORT_DIR",
+			args:     []string{"finding", "get"},
 			env:      fixture,
 			wantCode: 0, wantOut: ids("F-003\nF-002\nF-001\n"),
 		},
 		{
 			name:     "a broken finding is reported, the rest still printed, exit 1",
-			args:     []string{"findings"},
+			args:     []string{"finding", "get"},
 			env:      "BROKEN",
 			wantCode: 1, wantOut: ids("F-003\nF-002\nF-001\n\n"), // then the problem record
 			wantInErr: "rpt: findings/broken.md:3: ",
 		},
 		{
 			name:     "--format is gone: use jq",
-			args:     []string{"findings", "--report", fixture, "--format", "{{.id}}"},
+			args:     []string{"finding", "get", "--report", fixture, "--format", "{{.id}}"},
 			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --format",
 		},
 		{
 			name:     "an unknown flag is a usage error",
-			args:     []string{"findings", "--nope"},
+			args:     []string{"finding", "get", "--nope"},
 			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --nope",
 		},
 		{
 			name:     "no report anywhere exits 1",
-			args:     []string{"findings"},
+			args:     []string{"finding", "get"},
 			wantCode: 1, wantOut: exactly(""), wantInErr: "rpt: no report",
 		},
 	}

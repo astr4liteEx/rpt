@@ -10,7 +10,7 @@ import (
 func TestDeleteVerb(t *testing.T) {
 	dir := reportCopy(t)
 	// One unknown ID: nothing is deleted.
-	code, out, errOut := runIn(t, "", "findings", "delete", "F-003", "F-404", "F-001", "--report", dir)
+	code, out, errOut := runIn(t, "", "finding", "remove", "--yes", "F-003", "F-404", "F-001", "--report", dir)
 	if code != 1 || pick(t, out, "kind", "rule") != "problem exists\n" || !strings.Contains(errOut, "no such finding: F-404") {
 		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and one exists problem", code, out, errOut)
 	}
@@ -18,7 +18,7 @@ func TestDeleteVerb(t *testing.T) {
 		t.Errorf("left %v, want all three", left)
 	}
 
-	code, out, errOut = runIn(t, "", "findings", "delete", "F-003", "F-001", "--report", dir)
+	code, out, errOut = runIn(t, "", "finding", "remove", "--yes", "F-003", "F-001", "--report", dir)
 	if got := pick(t, out, "id", "path"); code != 0 || got != "F-003 findings/sqli-login.md\nF-001 findings/xss-search.md\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q; want the two deleted findings", code, got, errOut)
 	}
@@ -30,8 +30,8 @@ func TestDeleteVerb(t *testing.T) {
 
 func TestDeleteUsage(t *testing.T) {
 	dir := reportCopy(t)
-	code, _, errOut := runIn(t, "", "findings", "delete", "--report", dir)
-	if code != 2 || !strings.Contains(errOut, "usage: rpt findings delete [--if-rev id=rev]... [--dry-run] <id>...") {
+	code, _, errOut := runIn(t, "", "finding", "remove", "--yes", "--report", dir)
+	if code != 2 || !strings.Contains(errOut, "usage: rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>...") {
 		t.Errorf("exit %d, stderr %q; want 2 and usage", code, errOut)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "findings/sqli-login.md")); err != nil {

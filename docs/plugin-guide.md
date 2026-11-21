@@ -9,7 +9,7 @@ Decide what the plugin is, since that decides which protocol sections bind it:
 - **Source**: produces records from outside input (a scanner parser). Writes `finding` records; never needs stdin from rpt. It doesn't know the report's scope, so each target gets a `host` (and `port`, `protocol`) and no `scope`; `rpt scope match` attributes them.
 - **Filter**: reads records on stdin, writes records on stdout (scoring, redaction). Pass-through rules apply.
 - **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from the report record's `report.sections`, so it needs only stdin, after a redaction filter too.
-- **Checker**: emits `problem` records under its own rule names, located with `$RPT_BIN findings --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
+- **Checker**: emits `problem` records under its own rule names, located with `$RPT_BIN finding get --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
 
 Done when the plugin has a verb name that is not an rpt built-in (`rpt help --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
 
@@ -30,7 +30,7 @@ Run every check; the plugin is done when all pass:
 - [ ] A record of a kind the plugin doesn't handle comes out byte-identical (filters).
 - [ ] An unknown member on a record the plugin changes survives (filters).
 - [ ] The plugin works with no `RPT_*` variable set.
-- [ ] Findings it writes go into a scratch copy of a report with `rpt findings add`, and `rpt validate` on that copy reports no new errors (sources).
+- [ ] Findings it writes go into a scratch copy of a report with `rpt finding add`, and `rpt validate` on that copy reports no new errors (sources).
 - [ ] With the plugin on `PATH`, `rpt help` lists it with `source` `plugin`, its summary, IO and roles, not shadowed, and `rpt <verb>` runs it.
 - [ ] It reads the report only through rpt: no parsing of finding files, `rpt.yaml` or `scope.csv` (stock and community plugins). Loading a whole finding file read-only at the path rpt gives, to lint or scan it, is allowed. If it can't do its job without that, stop and file a feature request for rpt instead (the protocol's "Ask, don't re-derive").
 

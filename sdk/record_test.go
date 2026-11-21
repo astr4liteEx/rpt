@@ -36,8 +36,8 @@ func TestRecordsRoundTrip(t *testing.T) {
 		{
 			name: "finding lines are a declared member, before unknown ones",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/findings/a.md"}}`,
-			want: `{"kind":"finding","title":"t","targets":[],"severity":"low","lines":{"file":"/r/findings/a.md","frontmatter":{"id":2,"title":3},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
+			in:   `{"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":{"line":2,"column":1},"title":{"line":3,"column":1}},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/findings/a.md"}}`,
+			want: `{"kind":"finding","title":"t","targets":[],"severity":"low","lines":{"file":"/r/findings/a.md","frontmatter":{"id":{"line":2,"column":1},"title":{"line":3,"column":1}},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
 		},
 		{
 			name: "problem column",

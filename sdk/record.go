@@ -15,7 +15,7 @@ const (
 	Info     Severity = "info"
 )
 
-// Finding is a "finding" record: one finding in a report, as rpt findings,
+// Finding is a "finding" record: one finding in a report, as rpt finding get,
 // parser plugins and rpt kb emit it.
 type Finding struct {
 	Kind     string            `json:"kind"`
@@ -27,19 +27,19 @@ type Finding struct {
 	Rev      string            `json:"rev,omitzero"`  // the file's revision; pass it back as --if-rev
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
-	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt findings add ignores it
+	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt finding get --lines; rpt finding add ignores it
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Lines is where a finding's parts sit in its file, as rpt findings
+// Lines is where a finding's parts sit in its file, as rpt finding get
 // --lines gives them: 1-based lines of the file as stored, so a checker can
 // locate a problem without parsing the file itself.
 type Lines struct {
 	File        string                  `json:"file,omitzero"`     // the finding file's absolute path, symlinks kept
-	Frontmatter map[string]int          `json:"frontmatter"`       // top-level key -> its line
+	Frontmatter map[string]Position     `json:"frontmatter"`       // top-level key -> where it sits
 	Sections    map[string]SectionLines `json:"sections,omitzero"` // keyed like Finding.Sections
 
 	// Extra holds any unknown members.
@@ -54,6 +54,13 @@ type SectionLines struct {
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Position is a place in a file: a 1-based line, and the 1-based byte in
+// that line.
+type Position struct {
+	Line   int `json:"line"`
+	Column int `json:"column"`
 }
 
 // Evidence is an "evidence" record rpt evidence emits: one reference a
@@ -206,7 +213,7 @@ type ReportTarget struct {
 // A parser plugin, which doesn't know the report's scope, sets Host (and
 // Port and Protocol) and leaves Scope empty; rpt scope match fills Scope
 // from the most specific matching row and drops a Host the row makes
-// redundant. rpt findings add refuses a target without Scope.
+// redundant. rpt finding add refuses a target without Scope.
 type Target struct {
 	Scope    string `json:"scope,omitzero"` // a scope row's ID
 	Host     string `json:"host,omitzero"`

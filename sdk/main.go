@@ -84,7 +84,7 @@ func Main(p Plugin) {
 	os.Exit(Run(p, os.Args[1:], os.Stdin, os.Stdout, os.Stderr))
 }
 
-// Bin is the rpt to call back into, such as `Bin() findings --json`:
+// Bin is the rpt to call back into, such as `Bin() finding get --json`:
 // $RPT_BIN when rpt started the plugin, so it gets the same rpt version,
 // otherwise "rpt" from PATH. A plugin never requires being started by rpt.
 func Bin() string {

@@ -3,12 +3,16 @@ package report
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"regexp"
 	"strconv"
 )
 
 // findingID is the form every finding ID takes: F- and at least three digits.
 var findingID = regexp.MustCompile(`^F-([0-9]{3,})$`)
+
+// fileID matches a finding file named for its ID: F-NNN.md or F-NNN-....
+var fileID = regexp.MustCompile(`^F-([0-9]{3,})(?:-.*)?\.md$`)
 
 // ValidID reports whether id is a well-formed finding ID.
 func ValidID(id string) bool { return findingID.MatchString(id) }
@@ -22,6 +26,17 @@ func (r *Report) NextID() (string, error) {
 		return "", err
 	}
 	highest := 0
+	// A file named F-NNN-... counts too, so the ID of a file that doesn't
+	// parse is never given out again.
+	if ents, err := fs.ReadDir(r.root.FS(), FindingsDir); err == nil {
+		for _, ent := range ents {
+			if m := fileID.FindStringSubmatch(ent.Name()); m != nil {
+				if n, err := strconv.Atoi(m[1]); err == nil && n > highest {
+					highest = n
+				}
+			}
+		}
+	}
 	for _, f := range list {
 		m := findingID.FindStringSubmatch(f.ID)
 		if m == nil {

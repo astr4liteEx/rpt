@@ -12,7 +12,7 @@ Type "rpt validate"
 Sleep 300ms
 Enter
 Sleep 3s
-Type "rpt findings set F-002 targets '[{scope: S-14}]'"
+Type "rpt finding set F-002 targets S-14"
 Sleep 300ms
 Enter
 Sleep 2s

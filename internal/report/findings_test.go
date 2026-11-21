@@ -173,19 +173,19 @@ func TestFindingsWithLinesLocatesKeysAndSections(t *testing.T) {
 	type sl = sdk.SectionLines
 	want := map[string]*sdk.Lines{
 		"F-003": {
-			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 4, "severity": 5, "evidence": 6, "cvss": 7},
+			Frontmatter: map[string]sdk.Position{"id": {Line: 2, Column: 1}, "title": {Line: 3, Column: 1}, "targets": {Line: 4, Column: 1}, "severity": {Line: 5, Column: 1}, "evidence": {Line: 6, Column: 1}, "cvss": {Line: 7, Column: 1}},
 			Sections: map[string]sl{
 				"description": {Heading: 10, Text: 12}, "remediation": {Heading: 14, Text: 16}, "poc": {Heading: 18, Text: 20},
 			},
 		},
 		"F-002": { // a comment line sits between title and targets
-			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 5, "severity": 6},
+			Frontmatter: map[string]sdk.Position{"id": {Line: 2, Column: 1}, "title": {Line: 3, Column: 1}, "targets": {Line: 5, Column: 1}, "severity": {Line: 6, Column: 1}},
 			Sections: map[string]sl{
 				"description": {Heading: 9, Text: 11}, "remediation": {Heading: 13, Text: 15}, "poc": {Heading: 17, Text: 19},
 			},
 		},
 		"F-001": { // CRLF line ends
-			Frontmatter: map[string]int{"id": 2, "title": 3, "targets": 4, "severity": 5},
+			Frontmatter: map[string]sdk.Position{"id": {Line: 2, Column: 1}, "title": {Line: 3, Column: 1}, "targets": {Line: 4, Column: 1}, "severity": {Line: 5, Column: 1}},
 			Sections: map[string]sl{
 				"description": {Heading: 8, Text: 10}, "remediation": {Heading: 12, Text: 14},
 				"poc": {Heading: 16, Text: 18}, "References": {Heading: 20, Text: 22},
@@ -225,7 +225,7 @@ func TestFindingsWithLinesEdgeCases(t *testing.T) {
 	got := list[len(list)-1].Lines
 	got.File = "" // checked in TestFindingsWithLinesLocatesKeysAndSections
 	want := &sdk.Lines{
-		Frontmatter: map[string]int{"id": 2},
+		Frontmatter: map[string]sdk.Position{"id": {Line: 2, Column: 1}},
 		Sections: map[string]sdk.SectionLines{
 			"Custom":      {Heading: 6, Text: 10}, // setext heading; text keeps its indent
 			"remediation": {Heading: 12},          // empty: no text line

@@ -105,7 +105,7 @@ func TestScopeMatch(t *testing.T) {
 
 // The stage's Done-when: findings piped through scope match.
 func TestFindingsThroughScopeMatch(t *testing.T) {
-	code, findings, errOut := runIn(t, "", "findings", "--report", fixture, "--json")
+	code, findings, errOut := runIn(t, "", "finding", "get", "--report", fixture, "--json")
 	if code != 0 {
 		t.Fatalf("findings exit %d: %s", code, errOut)
 	}

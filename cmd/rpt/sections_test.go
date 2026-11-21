@@ -39,7 +39,7 @@ func TestSectionsVerb(t *testing.T) {
 	}
 }
 
-func TestSectionsSet(t *testing.T) {
+func TestSetSectionFromStdin(t *testing.T) {
 	crlf := func(s string) string { return strings.ReplaceAll(s, "\n", "\r\n") }
 	// xss-search.md is F-001, saved with CRLF line ends.
 	head := "---\nid: F-001\ntitle: Reflected XSS in search\ntargets: [{scope: S-14, port: 8443, protocol: tcp}]\nseverity: medium\n---\n\n## Description\n\n" +
@@ -57,7 +57,7 @@ func TestSectionsSet(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := reportCopy(t)
-			code, out, errOut := runIn(t, tt.stdin, "sections", "set", "--report", dir, "F-001", tt.key)
+			code, out, errOut := runIn(t, tt.stdin, "finding", "set", "--report", dir, "F-001", "sections."+tt.key)
 			if code != 0 || errOut != "" {
 				t.Fatalf("exit %d, stderr %q", code, errOut)
 			}
@@ -72,7 +72,7 @@ func TestSectionsSet(t *testing.T) {
 	}
 }
 
-func TestSectionsSetRefuses(t *testing.T) {
+func TestSetSectionRefuses(t *testing.T) {
 	tests := []struct {
 		name, file, stdin, wantErr string
 	}{
@@ -90,7 +90,7 @@ func TestSectionsSetRefuses(t *testing.T) {
 				}
 			}
 			before := folderState(t, dir)
-			code, _, errOut := runIn(t, tt.stdin, "sections", "set", "--report", dir, id, "remediation")
+			code, _, errOut := runIn(t, tt.stdin, "finding", "set", "--report", dir, id, "sections.remediation")
 			if code != 1 || !strings.Contains(errOut, tt.wantErr) {
 				t.Errorf("exit %d, stderr %q; want 1 and %q", code, errOut, tt.wantErr)
 			}

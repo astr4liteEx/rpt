@@ -3,7 +3,6 @@ package report
 import (
 	"errors"
 	"fmt"
-	"slices"
 
 	"go.yaml.in/yaml/v3"
 
@@ -18,84 +17,20 @@ var (
 	ErrBadValue     = errors.New("bad value")
 )
 
-// refusedKeys can't be set: IDs are permanent, sections are edited by hand,
-// and kind, path and lines aren't stored in the file.
+// refusedKeys can't be set as top-level keys: sections are set one at a
+// time as sections.<key>, and kind, path, rev and lines aren't stored in
+// the file. Setting id renames the finding.
 var refusedKeys = map[string]string{
-	"id":       "finding IDs are permanent",
 	"kind":     "kind is not stored in the file",
 	"path":     "path is where the file is",
 	"rev":      "rev is the file's revision; rpt sets it on records",
-	"sections": "edit section text in the file",
+	"sections": "set one section as sections.<key>",
 	"lines":    "lines are where the file's parts sit",
 }
 
-// Set changes one top-level frontmatter key of the finding with the given
-// ID, and returns the finding as now stored. value
-// is YAML. Nothing else in the file changes.
-func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
-	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Set(id, key, value) })
-}
-
-// Set is Report.Set as part of the write tx.
-func (tx *Tx) Set(id, key, value string) (sdk.Finding, error) {
-	r := tx.r
-	if why, ok := refusedKeys[key]; ok {
-		return sdk.Finding{}, fmt.Errorf("%w: %s: %s", ErrRefusedKey, key, why)
-	}
-	if now, ok := formerKeys[key]; ok {
-		return sdk.Finding{}, fmt.Errorf("%w: %s: it is from report format 1; set %s", ErrRefusedKey, key, now)
-	}
-	val, err := parseValue(value)
-	if err != nil {
-		return sdk.Finding{}, fmt.Errorf("%w: %s: %v", ErrBadValue, key, err)
-	}
-	cfg, err := r.Config()
-	if err != nil {
-		return sdk.Finding{}, err
-	}
-	if err := checkValue(key, val, cfg.Severities); err != nil {
-		return sdk.Finding{}, err
-	}
-	rel, err := r.locate(id)
-	if err != nil {
-		return sdk.Finding{}, err
-	}
-	return tx.edit(id, rel, func(ff *findingFile) error { return ff.setEntry(key, val) })
-}
-
-// unsetRefused are the keys Unset refuses: a finding needs the first four,
-// and the rest aren't stored in the file.
-var unsetRefused = []string{"id", "title", "targets", "severity", "kind", "path", "rev", "sections", "lines"}
-
-// Unset removes top-level frontmatter keys from the finding with the given
-// ID, and returns the finding as now stored. Keys it doesn't have are no
-// change. A refused key stops every change. Nothing else in the file
-// changes.
-func (r *Report) Unset(id string, keys ...string) (sdk.Finding, error) {
-	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Unset(id, keys...) })
-}
-
-// Unset is Report.Unset as part of the write tx.
-func (tx *Tx) Unset(id string, keys ...string) (sdk.Finding, error) {
-	for _, k := range keys {
-		if slices.Contains(unsetRefused, k) {
-			return sdk.Finding{}, fmt.Errorf("%w: %s: a finding needs it, or rpt sets it", ErrRefusedUnset, k)
-		}
-	}
-	rel, err := tx.r.locate(id)
-	if err != nil {
-		return sdk.Finding{}, err
-	}
-	f, err := tx.edit(id, rel, func(ff *findingFile) error {
-		for _, k := range keys {
-			if err := ff.removeEntry(k); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return f, err
-}
+// unsetRefused are the keys Unset refuses: a finding needs id, title and
+// severity, and the rest aren't stored in the file.
+var unsetRefused = []string{"id", "title", "severity", "kind", "path", "rev", "sections", "lines"}
 
 // locate returns the path of the finding with the given ID.
 func (r *Report) locate(id string) (string, error) {
@@ -155,7 +90,7 @@ func (tx *Tx) edit(id, rel string, change func(*findingFile) error) (sdk.Finding
 
 // checkValue type-checks a value for a declared finding field before it is
 // written. Undeclared keys take any value.
-func checkValue(key string, val *yaml.Node, severities []sdk.Severity) error {
+func checkValue(key string, val *yaml.Node) error {
 	bad := func(format string, a ...any) error {
 		return fmt.Errorf("%w: %s: %s", ErrBadValue, key, fmt.Sprintf(format, a...))
 	}
@@ -173,13 +108,8 @@ func checkValue(key string, val *yaml.Node, severities []sdk.Severity) error {
 		_, err := scalarText()
 		return err
 	case "severity":
-		s, err := scalarText()
-		if err != nil {
-			return err
-		}
-		if !slices.Contains(severities, sdk.Severity(s)) {
-			return bad("%q is not one of %v", s, severities)
-		}
+		_, err := scalarText() // whether it's one of the report's is validate's to say
+		return err
 	case "evidence":
 		if val.Kind != yaml.SequenceNode {
 			return bad("must be a list, like [evidence/F-001-login.png]")

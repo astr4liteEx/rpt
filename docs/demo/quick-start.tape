@@ -20,7 +20,7 @@ Type "rpt scope add --id S-14 --host 10.0.0.6 --port 8443 --protocol tcp"
 Sleep 300ms
 Enter
 Sleep 800ms
-Type "rpt findings add < ../findings.jsonl"
+Type "rpt finding add < ../findings.jsonl"
 Sleep 300ms
 Enter
 Sleep 2.5s

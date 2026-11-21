@@ -12,12 +12,12 @@ var problemFields = []string{"kind", "path", "line", "rule", "level", "command"}
 
 func TestReadGivesProblemRecords(t *testing.T) {
 	dir := brokenFixture(t)
-	code, out, errOut := runIn(t, "", "findings", "--report", dir)
+	code, out, errOut := runIn(t, "", "finding", "get", "--report", dir)
 	if code != 1 {
 		t.Errorf("exit %d, want 1", code)
 	}
 	// The good findings, then the broken file as a problem record.
-	want := "finding F-003    \nfinding F-002    \nfinding F-001    \nproblem  3 readable error findings\n"
+	want := "finding F-003    \nfinding F-002    \nfinding F-001    \nproblem  3 readable error finding get\n"
 	if got := pick(t, out, "kind", "id", "line", "rule", "level", "command"); got != want {
 		t.Errorf("stdout\n got: %q\nwant: %q", got, want)
 	}
@@ -68,14 +68,14 @@ func TestAnErrorOnStdinStopsAWrite(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := reportCopy(t)
 			before := findingFiles(t, dir)
-			code, out, errOut := runIn(t, tt.in, "findings", "add", "--report", dir)
+			code, out, errOut := runIn(t, tt.in, "finding", "add", "--report", dir)
 			if code != 1 {
 				t.Errorf("exit %d, want 1", code)
 			}
 			if tt.wantOut != "" && out != tt.wantOut {
 				t.Errorf("stdout %q, want only the incoming problem %q", out, tt.wantOut)
 			}
-			if tt.wantOut == "" && pick(t, out, problemFields...) != "problem - 2 input error findings add\n" {
+			if tt.wantOut == "" && pick(t, out, problemFields...) != "problem - 2 input error finding add\n" {
 				t.Errorf("stdout %q, want one input problem", out)
 			}
 			if tt.wantErr == "" && errOut != "" || !strings.HasPrefix(errOut, tt.wantErr) {
@@ -90,7 +90,7 @@ func TestAnErrorOnStdinStopsAWrite(t *testing.T) {
 
 func TestAWarningOnStdinPassesThrough(t *testing.T) {
 	dir := reportCopy(t)
-	code, out, errOut := runIn(t, warnProblem+newFinding, "findings", "add", "--report", dir)
+	code, out, errOut := runIn(t, warnProblem+newFinding, "finding", "add", "--report", dir)
 	if code != 0 || !strings.HasPrefix(out, warnProblem) || !strings.Contains(out, `"title":"New"`) {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}

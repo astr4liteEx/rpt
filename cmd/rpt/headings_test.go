@@ -37,7 +37,7 @@ func TestRenamedHeadingsRead(t *testing.T) {
 	dir := renamedReport(t, renamedConfig, "---\nid: F-001\ntitle: XSS\ntargets: [{scope: S-1}]\nseverity: low\n---\n"+
 		"\n## Description\n\nd\n\n## Recommendation\n\nr\n\n## Steps to reproduce\n\np\n\n## Remediation\n\nold\n")
 
-	code, out, errOut := runIn(t, "", "findings", "--report", dir)
+	code, out, errOut := runIn(t, "", "finding", "get", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("findings: exit %d, stderr %q", code, errOut)
 	}
@@ -68,7 +68,7 @@ func sectionsOf(t *testing.T, jsonl string) map[string]string {
 func TestRenamedHeadingsAdd(t *testing.T) {
 	dir := renamedReport(t, renamedConfig, "")
 	in := `{"kind":"finding","title":"XSS","targets":[{"scope":"S-1"}],"severity":"low","sections":{"description":"d","remediation":"r","poc":"p","Impact":"i"}}` + "\n"
-	if code, _, errOut := runIn(t, in, "findings", "add", "--report", dir); code != 0 {
+	if code, _, errOut := runIn(t, in, "finding", "add", "--report", dir); code != 0 {
 		t.Fatalf("add: exit %d, stderr %q", code, errOut)
 	}
 	got, err := os.ReadFile(filepath.Join(dir, "findings", "F-001-xss.md"))
@@ -88,7 +88,7 @@ func TestRenamedHeadingsAdd(t *testing.T) {
 func TestFixedHeadingsIgnoreCase(t *testing.T) {
 	dir := renamedReport(t, "format: 2\n", "---\nid: F-001\ntitle: XSS\ntargets: [{scope: S-1}]\nseverity: low\n---\n"+
 		"## DESCRIPTION\n\nd\n\n## remediation\n\nr\n\n## Proof Of Concept\n\np\n")
-	code, out, errOut := runIn(t, "", "findings", "--report", dir)
+	code, out, errOut := runIn(t, "", "finding", "get", "--report", dir)
 	if code != 0 || errOut != "" {
 		t.Fatalf("findings: exit %d, stderr %q", code, errOut)
 	}

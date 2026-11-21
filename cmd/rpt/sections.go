@@ -1,11 +1,8 @@
 package main
 
 import (
-	"io"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
-	"github.com/astr4liteEx/rpt/internal/report"
-	"github.com/astr4liteEx/rpt/sdk"
 )
 
 var sectionColumns = []cli.Column{{Header: "KEY", Field: "key"}, {Header: "HEADING", Field: "heading"}, {Header: "REQUIRED", Field: "required"}}
@@ -46,25 +43,4 @@ func sectionsVerb(e *env, args []string) int {
 		return cli.ExitProblems
 	}
 	return cli.ExitOK
-}
-
-// sectionsSetVerb replaces one section's text in one finding with stdin.
-func sectionsSetVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "sections set")
-	wf := addWriteFlags(flags, true)
-	if err := flags.Parse(args); err != nil {
-		return cli.ExitUsage
-	}
-	pos := flags.Args()
-	if len(pos) != 2 {
-		return badUsage(e, "sections set")
-	}
-	text, err := io.ReadAll(e.stdin)
-	if err != nil {
-		e.log.Error("read stdin: " + err.Error())
-		return cli.ExitProblems
-	}
-	return writeFinding(e, of, wf, "sections set", pos[0], func(tx *report.Tx) (sdk.Finding, error) {
-		return tx.SetSection(pos[0], pos[1], string(text))
-	})
 }

@@ -65,6 +65,10 @@ func newWrite(e *env, out *cli.Output, r *report.Report, wf writeFlags, usageNam
 	}
 	for _, v := range *wf.ifRev {
 		id, rev, ok := strings.Cut(v, "=")
+		// An ID may be given in any case.
+		if i := slices.IndexFunc(named, func(n string) bool { return strings.EqualFold(n, id) }); i >= 0 {
+			id = named[i]
+		}
 		switch {
 		case !ok && len(named) == 1:
 			id, rev = named[0], v

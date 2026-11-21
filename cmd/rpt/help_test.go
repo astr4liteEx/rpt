@@ -14,7 +14,7 @@ func TestHelpListsCommands(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nevidence\nfindings\nhelp\nls\nnew\nscope\nsections\nseverities\nvalidate\nversion\n"
+	want := "assemble\nevidence\nfinding\nhelp\nls\nnew\nscope\nsections\nseverities\nvalidate\nversion\n"
 	if names != want {
 		t.Errorf("commands listed\n got: %q\nwant: %q", names, want)
 	}
@@ -96,7 +96,7 @@ func TestRootHelp(t *testing.T) {
 		if code != 0 || errOut != "" {
 			t.Fatalf("rpt %v: exit %d, stderr %q", args, code, errOut)
 		}
-		for _, w := range []string{"rpt <command>", "findings", "validate", "--report", "--json"} {
+		for _, w := range []string{"rpt <command>", "finding", "validate", "--report", "--json"} {
 			if !strings.Contains(out, w) {
 				t.Errorf("rpt %v lacks %q:\n%s", args, w, out)
 			}
@@ -106,9 +106,9 @@ func TestRootHelp(t *testing.T) {
 
 func TestDidYouMean(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
-	code, _, errOut := runIn(t, "", "fidnings")
-	if code != 2 || !strings.Contains(errOut, `unknown command "fidnings"`) || !strings.Contains(errOut, "findings") {
-		t.Errorf("exit %d, stderr %q; want a suggestion of findings", code, errOut)
+	code, _, errOut := runIn(t, "", "fidning")
+	if code != 2 || !strings.Contains(errOut, `unknown command "fidning"`) || !strings.Contains(errOut, "finding") {
+		t.Errorf("exit %d, stderr %q; want a suggestion of finding", code, errOut)
 	}
 }
 
@@ -141,27 +141,28 @@ func TestSingleDashLongFlagsAreGone(t *testing.T) {
 // can't drift.
 func TestUsageMatchesTable(t *testing.T) {
 	misuse := map[string][][]string{
-		"assemble":        {{"extra"}, {"--no-such-flag"}},
-		"evidence":        {{"extra"}, {"--no-such-flag"}},
-		"evidence add":    {{}, {"F-001"}, {"--no-such-flag"}},
-		"evidence prune":  {{"extra"}, {"--no-such-flag"}},
-		"findings":        {{"extra"}, {"--no-such-flag"}},
-		"findings add":    {{"extra"}, {"--no-such-flag"}},
-		"findings set":    {{}, {"--no-such-flag"}},
-		"findings delete": {{}, {"--no-such-flag"}},
-		"findings unset":  {{}, {"F-001"}, {"--no-such-flag"}},
-		"help":            {{"--no-such-flag"}},
-		"ls":              {{"a", "b"}, {"--no-such-flag"}},
-		"new":             {{}, {"a", "b"}, {"--no-such-flag"}},
-		"scope":           {{"--no-such-flag"}},
-		"scope match":     {{"extra"}, {"--no-such-flag"}},
-		"scope add":       {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},
-		"scope delete":    {{}, {"--no-such-flag"}},
-		"sections":        {{"extra"}, {"--no-such-flag"}},
-		"sections set":    {{}, {"F-001"}, {"F-001", "a", "b"}, {"--no-such-flag"}},
-		"severities":      {{"extra"}, {"--no-such-flag"}},
-		"validate":        {{"extra"}, {"--no-such-flag"}},
-		"version":         {{"extra"}, {"--no-such-flag"}},
+		"assemble":       {{"extra"}, {"--no-such-flag"}},
+		"evidence":       {{"extra"}, {"--no-such-flag"}},
+		"evidence add":   {{}, {"F-001"}, {"--no-such-flag"}},
+		"evidence prune": {{"extra"}, {"--no-such-flag"}},
+		"finding":        {{}, {"extra"}, {"--no-such-flag"}},
+		"finding get":    {{"--no-such-flag"}},
+		"finding add":    {{"extra"}, {"--no-such-flag"}},
+		"finding set":    {{}, {"F-001", "title"}, {"--no-such-flag"}},
+		"finding remove": {{}, {"--no-such-flag"}},
+		"finding unset":  {{}, {"F-001"}, {"--no-such-flag"}},
+		"help":           {{"--no-such-flag"}},
+		"ls":             {{"a", "b"}, {"--no-such-flag"}},
+		"new":            {{}, {"a", "b"}, {"--no-such-flag"}},
+		"scope":          {{"--no-such-flag"}},
+		"scope match":    {{"extra"}, {"--no-such-flag"}},
+		"scope add":      {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},
+		"scope delete":   {{}, {"--no-such-flag"}},
+		"sections":       {{"extra"}, {"--no-such-flag"}},
+		"sections set":   {{}, {"F-001"}, {"F-001", "a", "b"}, {"--no-such-flag"}},
+		"severities":     {{"extra"}, {"--no-such-flag"}},
+		"validate":       {{"extra"}, {"--no-such-flag"}},
+		"version":        {{"extra"}, {"--no-such-flag"}},
 	}
 	for _, name := range builtinNames() {
 		cases, ok := misuse[name]

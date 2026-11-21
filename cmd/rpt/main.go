@@ -66,11 +66,12 @@ func init() {
 			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--if-rev rev] [--dry-run] <id> <file>..."},
 			{"prune", evidencePruneVerb, "rpt evidence prune [--dry-run]"},
 		}},
-		"findings": {findingsVerb, sdk.Command{Summary: "List findings; add, set, unset and delete change them", Usage: "rpt findings [--lines] [--json] [--report dir]", Input: "records", Output: "records"}, []sub{
-			{"add", addVerb, "rpt findings add [--scaffold] [--dry-run] < records.jsonl, or rpt findings add --title t --severity s [--target S-N]... [--id F-NNN] [--dry-run]"},
-			{"set", setVerb, "rpt findings set [--if-rev rev] [--dry-run] <id> <key> <value>"},
-			{"unset", unsetVerb, "rpt findings unset [--if-rev rev] [--dry-run] <id> <key>..."},
-			{"delete", deleteVerb, "rpt findings delete [--if-rev id=rev]... [--dry-run] <id>..."},
+		"finding": {nounVerb("finding"), sdk.Command{Summary: "Get, add, set, unset and remove findings", Usage: "rpt finding <action>", Input: "records", Output: "records"}, []sub{
+			{"get", findingGetVerb, "rpt finding get [--lines] [id...]"},
+			{"add", findingAddVerb, "rpt finding add [--scaffold] [--dry-run] < records.jsonl, or rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold] [--dry-run]"},
+			{"set", findingSetVerb, "rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>..."},
+			{"unset", findingUnsetVerb, "rpt finding unset [--if-rev rev] [--dry-run] <id> <path>..."},
+			{"remove", findingRemoveVerb, "rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>..."},
 		}},
 		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
@@ -80,9 +81,7 @@ func init() {
 			{"delete", scopeDeleteVerb, "rpt scope delete [--force] [--if-rev id=rev]... [--dry-run] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
-		"sections": {sectionsVerb, sdk.Command{Summary: "List the report's sections; sections set changes one in a finding", Usage: "rpt sections [--json]", Input: "text", Output: "records"}, []sub{
-			{"set", sectionsSetVerb, "rpt sections set [--if-rev rev] [--dry-run] <id> <key> < text.md"},
-		}},
+		"sections":   {sectionsVerb, sdk.Command{Summary: "List the report's sections", Usage: "rpt sections [--json]", Output: "records"}, nil},
 		"severities": {severitiesVerb, sdk.Command{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
 		"validate":   {validateVerb, sdk.Command{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
 		"version":    {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},

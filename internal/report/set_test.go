@@ -70,12 +70,11 @@ func TestSetRefuses(t *testing.T) {
 		want                 error
 	}{
 		{"unknown ID", "F-404", "severity", "high", ErrNoFinding},
-		{"id is permanent", "F-003", "id", "F-010", ErrRefusedKey},
-		{"sections are edited by hand", "F-003", "sections", "{}", ErrRefusedKey},
+		{"id taken", "F-003", "id", "F-001", ErrBadValue},
+		{"malformed id", "F-003", "id", "F-7", ErrBadValue},
+		{"sections whole", "F-003", "sections", "{}", ErrRefusedKey},
 		{"kind", "F-003", "kind", "scope", ErrRefusedKey},
 		{"path", "F-003", "path", "x.md", ErrRefusedKey},
-		{"unknown severity", "F-003", "severity", "urgent", ErrBadValue},
-		{"targets must be a list", "F-003", "targets", "S-12", ErrBadValue},
 		{"targets items are maps", "F-003", "targets", "[S-12]", ErrBadValue},
 		{"scope is format 1", "F-003", "scope", "[S-12]", ErrRefusedKey},
 		{"target is format 1", "F-003", "target", "{host: a}", ErrRefusedKey},

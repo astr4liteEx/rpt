@@ -27,7 +27,7 @@ func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	if err := checkRecord(rec, cfg.Severities); err != nil {
+	if err := checkRecord(rec); err != nil {
 		return sdk.Finding{}, err
 	}
 	id := rec.ID
@@ -107,16 +107,18 @@ func (r *Report) Scaffold(rec sdk.Finding) (sdk.Finding, error) {
 	return rec, nil
 }
 
-// checkRecord checks a record before anything is written.
-func checkRecord(rec sdk.Finding, severities []sdk.Severity) error {
+// checkRecord checks a record's form before anything is written. Whether
+// its severity is one of the report's, or its targets fit scope, is
+// rpt validate's to say (ADR 0008).
+func checkRecord(rec sdk.Finding) error {
 	bad := func(format string, a ...any) error {
 		return fmt.Errorf("%w: %s", ErrBadValue, fmt.Sprintf(format, a...))
 	}
 	switch {
 	case rec.Title == "":
 		return bad("title is required")
-	case !slices.Contains(severities, rec.Severity):
-		return bad("severity %q is not one of %v", rec.Severity, severities)
+	case rec.Severity == "":
+		return bad("severity is required")
 	case rec.ID != "" && !ValidID(rec.ID):
 		return bad("id %q is not F- and at least three digits", rec.ID)
 	}

@@ -216,9 +216,13 @@ func bodyLine(body []byte, first, off int) int {
 // findingLines is where a finding's frontmatter keys and sections sit in
 // its file. A repeated section is located where its kept text is: the last.
 func findingLines(doc *yaml.Node, head, body []byte, h Headings) *sdk.Lines {
-	l := &sdk.Lines{Frontmatter: keyLines(doc)}
-	for k := range l.Frontmatter {
-		l.Frontmatter[k]++ // frontmatter starts on file line 2
+	l := &sdk.Lines{Frontmatter: map[string]sdk.Position{}}
+	if doc.Kind == yaml.DocumentNode && len(doc.Content) > 0 && doc.Content[0].Kind == yaml.MappingNode {
+		m := doc.Content[0].Content
+		for i := 0; i+1 < len(m); i += 2 {
+			// frontmatter starts on file line 2
+			l.Frontmatter[m[i].Value] = sdk.Position{Line: m[i].Line + 1, Column: m[i].Column}
+		}
 	}
 	first := bodyFirstLine(head)
 	for _, sp := range sectionSpans(body, h) {

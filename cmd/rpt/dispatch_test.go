@@ -24,7 +24,7 @@ var (
 )
 
 // bins builds rpt and the stub plugin once per test run into one folder,
-// installed as rpt-stub, rpt-hang (never answers --describe), rpt-findings
+// installed as rpt-stub, rpt-hang (never answers --describe), rpt-finding
 // (must lose to the built-in) and rpt-broken (executable but not a program).
 func bins(t *testing.T) string {
 	t.Helper()
@@ -41,7 +41,7 @@ func bins(t *testing.T) string {
 			}
 		}
 		stub, _ := os.ReadFile(filepath.Join(binsDir, "rpt-stub"))
-		for _, name := range []string{"rpt-hang", "rpt-findings"} {
+		for _, name := range []string{"rpt-hang", "rpt-finding"} {
 			if binsErr = os.WriteFile(filepath.Join(binsDir, name), stub, 0o755); binsErr != nil {
 				return
 			}
@@ -104,9 +104,9 @@ func TestDispatch(t *testing.T) {
 		}
 	})
 	t.Run("a built-in can't be shadowed", func(t *testing.T) {
-		code, out, _ := rptCmd(t, fixture, "findings")
+		code, out, _ := rptCmd(t, fixture, "finding", "get")
 		if code != 0 || !strings.HasPrefix(out, `{"kind":"finding"`) {
-			t.Errorf("exit %d, stdout %.60q: rpt-findings ran instead of the built-in", code, out)
+			t.Errorf("exit %d, stdout %.60q: rpt-finding ran instead of the built-in", code, out)
 		}
 	})
 	t.Run("a plugin that can't start is 126", func(t *testing.T) {
@@ -134,7 +134,7 @@ func TestDispatch(t *testing.T) {
 	t.Run("root help lists plugins in their own group, not the shadowed one", func(t *testing.T) {
 		code, out, errOut := rptCmd(t, fixture, "--help")
 		_, plugins, ok := strings.Cut(out, "Plugin commands:")
-		if code != 0 || !ok || !strings.Contains(plugins, "stub") || strings.Contains(plugins, "findings") {
+		if code != 0 || !ok || !strings.Contains(plugins, "stub") || strings.Contains(plugins, "finding") {
 			t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 		}
 	})
@@ -173,7 +173,7 @@ func TestHelpListsPlugins(t *testing.T) {
 	stub := "Stub plugin for tests records json/stub [checker filter] https://example.com"
 	want := []string{
 		"plugin broken  " + filepath.Join(b, "rpt-broken") + "     ",
-		"plugin findings true " + filepath.Join(b, "rpt-findings") + " " + stub, // hidden by the built-in, but listed
+		"plugin finding true " + filepath.Join(b, "rpt-finding") + " " + stub, // hidden by the built-in, but listed
 		"plugin hang  " + filepath.Join(b, "rpt-hang") + "     ",
 		"plugin stub  " + filepath.Join(b, "rpt-stub") + " " + stub,
 	}
