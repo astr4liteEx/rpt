@@ -1,120 +1,204 @@
 package main
 
 import (
-	"cmp"
-	"encoding/json/v2"
+	"errors"
 	"fmt"
-	"maps"
+	"os"
 	"slices"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/astr4liteEx/rpt/internal/cli"
+	"github.com/astr4liteEx/rpt/internal/plugin"
+	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
-	"github.com/spf13/pflag"
 )
 
-var commandColumns = []cli.Column{
-	{Header: "NAME", Field: "name"}, {Header: "SOURCE", Value: verbSource}, {Header: "IO", Value: verbIO},
-	{Header: "ROLES", Value: verbRoles},
-	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
+// commands are the built-in commands, the tree --describe and help walk.
+func (e *env) commands() []*cobra.Command {
+	return []*cobra.Command{
+		e.assembleCommand(), e.completionCommand(), e.configCommand(), e.evidenceCommand(),
+		e.docCommand(report.FindingKind), e.helpCommand(), e.lsCommand(), e.newCommand(),
+		e.docCommand(report.PageKind), e.scopeCommand(), e.validateCommand(), e.versionCommand(),
+	}
 }
 
-// verbSource renders where a command comes from, flagging a shadowed plugin.
-func verbSource(m map[string]any) string {
-	src, _ := m["source"].(string)
-	if shadowed, _ := m["shadowed"].(bool); shadowed {
-		src += " (shadowed)"
-	}
-	if incompatible, _ := m["incompatible"].(bool); incompatible {
-		src += " (incompatible)"
-	}
-	return src
-}
-
-// verbIO renders a command's input and output for the table. A built-in's
-// description is complete, so a missing side is "-", none; a plugin's is
-// whatever it said, so a missing side is "?", not said.
-func verbIO(m map[string]any) string {
-	if src, _ := m["source"].(string); src == "plugin" {
-		return pluginIO(m)
-	}
-	in, _ := m["input"].(string)
-	out, _ := m["output"].(string)
-	if in == "" && out == "" {
-		return ""
-	}
-	return cmp.Or(in, "-") + " → " + cmp.Or(out, "-")
-}
-
-// verbRoles renders a command's declared roles for the table, "checker,filter",
-// and nothing when it declared none.
-func verbRoles(m map[string]any) string {
-	roles, _ := m["roles"].([]any)
-	var names []string
-	for _, r := range roles {
-		if s, ok := r.(string); ok {
-			names = append(names, s)
+// builtin is the built-in command name, or nil.
+func (e *env) builtin(name string) *cobra.Command {
+	for _, c := range e.commands() {
+		if c.Name() == name {
+			return c
 		}
 	}
-	return strings.Join(names, ",")
+	return nil
 }
 
-// isBuiltin reports whether name is a built-in command.
-func isBuiltin(name string) bool {
-	_, ok := builtins[name]
-	return ok
-}
-
-// helpVerb lists everything rpt <name> can run: the built-ins by name,
-// then the plugins on PATH by name, each described the way --describe
-// describes it. Given a command (and sub), it shows that one's usage, as
-// rpt <command> [sub] --help does; a plugin is asked for its --help.
-func helpVerb(flags *pflag.FlagSet) runner {
-	all := flags.Bool("all", false, "list every command, plugins this rpt isn't compatible with too")
-	return func(e *env, args []string) int {
-		if len(args) > 0 {
-			if !isBuiltin(args[0]) {
-				return dispatch(e, args[0], []string{"--help"}, globals{})
+// record is a built-in as a command record: its usage lines from its
+// examples, or its use; for a noun, each action's.
+func record(c *cobra.Command) sdk.Command {
+	r := sdk.Command{Kind: "command", Name: c.Name(), Source: "builtin", Summary: c.Short,
+		Input: c.Annotations["input"], Output: c.Annotations["output"]}
+	if roles := c.Annotations["roles"]; roles != "" {
+		r.Roles = strings.Split(roles, ",")
+	}
+	forms := func(c *cobra.Command, parent string) []string {
+		if c.Example != "" {
+			var out []string
+			for _, l := range strings.Split(c.Example, "\n") {
+				out = append(out, strings.TrimSpace(l))
 			}
-			return execute(e, append(args, "--help"))
+			return out
 		}
-		out, err := e.output(commandColumns)
-		if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
+		return []string{parent + " " + c.Use}
+	}
+	if c.HasSubCommands() {
+		usage := []string{"rpt " + c.Name() + " <action>"}
+		for _, sub := range c.Commands() {
+			usage = append(usage, strings.Join(forms(sub, "rpt "+c.Name()), ", or "))
 		}
-		var list []sdk.Command
-		for _, name := range slices.Sorted(maps.Keys(builtins)) {
-			d := builtins[name].desc
-			d.Kind, d.Name, d.Source = "command", name, "builtin"
-			list = append(list, d)
+		r.Usage = strings.Join(usage, " | ")
+	} else {
+		r.Usage = strings.Join(forms(c, "rpt"), ", or ")
+	}
+	return r
+}
+
+// describe prints a built-in's command record, as a plugin answers
+// --describe.
+func (e *env) describe(name string) error {
+	return cli.NewOutput(e.stdout, false, true).Write(record(e.builtin(name)))
+}
+
+// pluginRecords describes the plugins on PATH. A plugin named like a
+// built-in is shadowed: the built-in always runs.
+func (e *env) pluginRecords() []sdk.Command {
+	ps := plugin.Discover(os.Getenv("PATH"))
+	dir, _ := e.reportDir()
+	answers := describer(dir).Describe(ps)
+	var out []sdk.Command
+	for _, p := range ps {
+		r := sdk.Command{Kind: "command", Name: p.Name, Source: "plugin", Path: p.Path, Shadowed: isBuiltin(p.Name)}
+		a := answers[p.Name]
+		if a.Err != nil {
+			e.log.Warn(fmt.Sprintf("plugin %s: %v", p.Name, a.Err))
+		} else {
+			d := a.Desc
+			r.Summary, r.Usage, r.Version, r.Input, r.Output, r.Roles, r.Requires = d.Summary, d.Usage, d.Version, d.Input, d.Output, d.Roles, d.Requires
+			r.Incompatible = !d.Requires.Fits(report.SchemaVersion, report.FormatVersion)
 		}
-		for _, v := range append(list, describePlugins(e)...) {
-			if v.Incompatible && !*all {
-				continue
+		out = append(out, r)
+	}
+	return out
+}
+
+func (e *env) helpCommand() *cobra.Command {
+	var all bool
+	c := &cobra.Command{
+		Use:         "help [command [action]]",
+		Short:       "List the commands rpt can run, built-in and plugin; with a command, show its usage",
+		Annotations: io_("", "records"),
+		ValidArgsFunction: func(*cobra.Command, []string, string) ([]string, cobra.ShellCompDirective) {
+			names := slices.Clone(builtinNames)
+			for _, p := range plugin.Discover(os.Getenv("PATH")) {
+				names = append(names, p.Name)
 			}
-			if err := out.Write(v); err != nil {
-				e.log.Error(err.Error())
-				return cli.ExitProblems
+			return names, cobra.ShellCompDirectiveNoFileComp
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 0 {
+				return e.helpFor(cmd.Root(), args)
 			}
+			for _, c := range e.commands() {
+				if err := e.out.Write(record(c)); err != nil {
+					return err
+				}
+			}
+			for _, r := range e.pluginRecords() {
+				if (r.Incompatible || r.Shadowed) && !all {
+					continue
+				}
+				if err := e.out.Write(r); err != nil {
+					return err
+				}
+			}
+			return nil
+		},
+	}
+	c.Flags().BoolVar(&all, "all", false, "List every command, plugins this rpt can't run as they ask or a built-in hides too")
+	return c
+}
+
+// helpFor shows one command's help: a built-in's from cobra, a plugin's
+// from its description.
+func (e *env) helpFor(root *cobra.Command, args []string) error {
+	if isBuiltin(args[0]) {
+		c, _, err := root.Find(args)
+		if err != nil || c == root {
+			return usagef("no command %q", strings.Join(args, " "))
 		}
-		if err := out.Flush(); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
+		c.SetOut(e.stdout)
+		return c.Help()
+	}
+	for _, r := range e.pluginRecords() {
+		if r.Name == args[0] {
+			fmt.Fprintf(e.stdout, "%s\n\n  %s\n\n%s\n", cli.Clean(r.Summary), cli.Clean(r.Usage), r.Path)
+			return nil
 		}
-		return cli.ExitOK
+	}
+	return usagef("no command %q: not built in, and no rpt-%s on PATH", args[0], args[0])
+}
+
+func (e *env) completionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:       "completion bash|zsh|fish|powershell",
+		Short:     "Print the shell completion script for bash, zsh, fish or powershell",
+		Args:      cobra.ExactArgs(1),
+		ValidArgs: []string{"bash", "zsh", "fish", "powershell"},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			root := cmd.Root()
+			switch args[0] {
+			case "bash":
+				return root.GenBashCompletionV2(e.stdout, true)
+			case "zsh":
+				return root.GenZshCompletion(e.stdout)
+			case "fish":
+				return root.GenFishCompletion(e.stdout, true)
+			case "powershell":
+				return root.GenPowerShellCompletionWithDesc(e.stdout)
+			}
+			return usagef("no completion for %q: bash, zsh, fish or powershell", args[0])
+		},
 	}
 }
 
-// describeBuiltin prints a built-in's --describe answer: the members a
-// plugin's answer has, on one line.
-func describeBuiltin(e *env, b builtin) int {
-	d := sdk.Description{Summary: b.desc.Summary, Usage: b.desc.Usage, Input: b.desc.Input, Output: b.desc.Output, Roles: b.desc.Roles}
-	line, err := json.Marshal(d, json.Deterministic(true))
+// runPlugin runs rpt-<name> with args untouched, in place of rpt where
+// the system allows. A plugin whose requires this rpt doesn't fit runs
+// after one warning.
+func (e *env) runPlugin(name string, args []string) int {
+	p, err := plugin.Lookup(os.Getenv("PATH"), name)
+	if errors.Is(err, plugin.ErrNotFound) {
+		fmt.Fprintf(e.stderr, "rpt: unknown command %q: not built in, and no rpt-%s on PATH\nRun 'rpt help' for the commands.\n", cli.CleanLine(name), cli.CleanLine(name))
+		return cli.ExitUsage
+	}
+	dir, _ := e.reportDir()
+	d := describer(dir)
+	if a := d.Describe([]plugin.Plugin{p})[name]; a.Err == nil && !a.Desc.Requires.Fits(report.SchemaVersion, report.FormatVersion) {
+		e.log.Warn(fmt.Sprintf("plugin %s may not work with this rpt: it requires schema_version %s and format %s; this rpt writes schema_version %d and reads format %d",
+			name, a.Desc.Requires.SchemaVersion, a.Desc.Requires.Format, report.SchemaVersion, report.FormatVersion))
+	}
+	code, err := plugin.Exec(p, args, d.Env)
 	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
+		e.log.Error(fmt.Sprintf("plugin %s: %v", name, err))
+		return cli.ExitPluginFailed
 	}
-	fmt.Fprintf(e.stdout, "%s\n", line)
-	return cli.ExitOK
+	return code
+}
+
+// pluginCompletion completes a plugin's arguments by running it with
+// cobra's __complete, as a cobra-built plugin answers.
+func pluginCompletion(p plugin.Plugin) cobra.CompletionFunc {
+	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return completeFromPlugin(p, args, toComplete)
+	}
 }

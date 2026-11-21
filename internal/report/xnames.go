@@ -54,4 +54,3 @@ func (m *Model) XNames() []XName {
 // Leveled gives problems the levels the config's rules set, and sorts
 // them.
 func (m *Model) Leveled(ps []Problem) []Problem { return m.leveled(slices.Clone(ps)) }
-

@@ -3,139 +3,140 @@ package main
 import (
 	"bytes"
 	"encoding/json/v2"
-	"fmt"
+	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/astr4liteEx/rpt/internal/plugin"
 )
 
-// fixture is absolute because tests change into a temporary directory.
-var fixture = func() string {
-	p, err := filepath.Abs("../../testdata/fixture")
-	if err != nil {
-		panic(err)
-	}
-	return p
-}()
-
-// brokenFixture is a copy of the fixture with one malformed finding file.
-func brokenFixture(t *testing.T) string {
+// fixture copies testdata/fixture into a temporary folder, makes it the
+// report every command acts on, and returns its path.
+func fixture(t *testing.T) string {
 	t.Helper()
 	dir := filepath.Join(t.TempDir(), "report")
-	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
+	if err := os.CopyFS(dir, os.DirFS("../../testdata/fixture")); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "findings", "broken.md"), []byte("---\nid: F-009\ntitle: : bad\n---\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	t.Setenv("RPT_REPORT_DIR", dir)
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("PATH", "/usr/bin:/bin")
 	return dir
 }
 
-// pick reads JSON Lines and returns, for each record, the named fields
-// joined with spaces, one line per record; a missing field is empty.
-func pick(t *testing.T, jsonl string, fields ...string) string {
+// rpt runs rpt in-process and returns its exit code, stdout and stderr.
+func rpt(t *testing.T, stdin string, args ...string) (int, string, string) {
 	t.Helper()
-	var out strings.Builder
-	for line := range strings.Lines(jsonl) {
-		var m map[string]any
-		if err := json.Unmarshal([]byte(line), &m); err != nil {
-			t.Fatalf("not JSON Lines: %q: %v", line, err)
-		}
-		vals := make([]string, len(fields))
-		for i, f := range fields {
-			if v, ok := m[f]; ok {
-				vals[i] = fmt.Sprint(v)
-			}
-		}
-		out.WriteString(strings.Join(vals, " ") + "\n")
-	}
-	return out.String()
+	var out, errOut bytes.Buffer
+	code := run(args, strings.NewReader(stdin), &out, &errOut)
+	return code, out.String(), errOut.String()
 }
 
-func TestRun(t *testing.T) {
-	jsonl := func(ids ...string) func(string) bool {
-		return func(out string) bool {
-			lines := strings.Split(strings.TrimSuffix(out, "\n"), "\n")
-			if len(lines) != len(ids) {
-				return false
-			}
-			for i, id := range ids {
-				if !strings.HasPrefix(lines[i], `{"kind":"finding","id":"`+id+`"`) {
-					return false
-				}
-			}
-			return true
+// records decodes JSON Lines into maps.
+func records(t *testing.T, s string) []map[string]any {
+	t.Helper()
+	var out []map[string]any
+	for _, l := range strings.Split(strings.TrimSpace(s), "\n") {
+		if l == "" {
+			continue
+		}
+		var m map[string]any
+		if err := json.Unmarshal([]byte(l), &m); err != nil {
+			t.Fatalf("not a record: %q", l)
+		}
+		out = append(out, m)
+	}
+	return out
+}
+
+func read(t *testing.T, path string) string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return "<absent>"
+	}
+	return string(b)
+}
+
+// plugins puts shell-script plugins on PATH, name to script body, and
+// runs them as child processes rather than in place of the test.
+func plugins(t *testing.T, scripts map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	for name, body := range scripts {
+		if err := os.WriteFile(filepath.Join(dir, "rpt-"+name), []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+			t.Fatal(err)
 		}
 	}
-	exactly := func(want string) func(string) bool { return func(out string) bool { return out == want } }
-	ids := func(want string) func(string) bool {
-		return func(out string) bool { return pick(t, out, "id") == want }
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	old := plugin.Exec
+	plugin.Exec = func(p plugin.Plugin, args, env []string) (int, error) {
+		cmd := exec.Command(p.Path, args...)
+		cmd.Env, cmd.Stdout, cmd.Stderr = env, pluginOut, pluginOut
+		err := cmd.Run()
+		var ee *exec.ExitError
+		if errors.As(err, &ee) {
+			return ee.ExitCode(), nil
+		}
+		return 0, err
 	}
+	pluginOut.Reset()
+	t.Cleanup(func() { plugin.Exec = old })
+	return dir
+}
 
-	tests := []struct {
-		name      string
-		args      []string
-		env       string // RPT_REPORT_DIR
-		wantCode  int
-		wantOut   func(string) bool
-		wantInErr string
+// pluginOut is what the last plugin printed.
+var pluginOut = &bytes.Buffer{}
+
+func TestExitCodes(t *testing.T) {
+	fixture(t)
+	for _, tt := range []struct {
+		args []string
+		want int
 	}{
-		{name: "no command prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "rpt [command]"},
-		{name: "unknown command exits 2", args: []string{"frobnicate"}, wantCode: 2, wantOut: exactly(""), wantInErr: `unknown command "frobnicate"`},
-		{
-			name:     "finding get into a pipe is JSON Lines",
-			args:     []string{"finding", "get", "--report", fixture},
-			wantCode: 0, wantOut: jsonl("F-003", "F-002", "F-001"),
-		},
-		{
-			name:     "finding get finds the report through RPT_REPORT_DIR",
-			args:     []string{"finding", "get"},
-			env:      fixture,
-			wantCode: 0, wantOut: ids("F-003\nF-002\nF-001\n"),
-		},
-		{
-			name:     "a broken finding is reported, the rest still printed, exit 1",
-			args:     []string{"finding", "get"},
-			env:      "BROKEN",
-			wantCode: 1, wantOut: ids("F-003\nF-002\nF-001\n\n"), // then the problem record
-			wantInErr: "rpt: findings/broken.md:3: ",
-		},
-		{
-			name:     "--format is gone: use jq",
-			args:     []string{"finding", "get", "--report", fixture, "--format", "{{.id}}"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --format",
-		},
-		{
-			name:     "an unknown flag is a usage error",
-			args:     []string{"finding", "get", "--nope"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --nope",
-		},
-		{
-			name:     "no report anywhere exits 1",
-			args:     []string{"finding", "get"},
-			wantCode: 1, wantOut: exactly(""), wantInErr: "rpt: no report",
-		},
+		{[]string{"version"}, 0},
+		{[]string{"validate"}, 1}, // the fixture plants S-99
+		{nil, 2},
+		{[]string{"--bogus"}, 2},
+		{[]string{"finding", "get", "--bogus"}, 2},
+		{[]string{"finding", "set", "F-001"}, 2},
+		{[]string{"no-such-command"}, 2},
+		{[]string{"finding", "get", "F-404"}, 1},
+	} {
+		if code, _, errOut := rpt(t, "", tt.args...); code != tt.want {
+			t.Errorf("rpt %v: exit %d, want %d (stderr %q)", tt.args, code, tt.want, errOut)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			env := tt.env
-			if env == "BROKEN" {
-				env = brokenFixture(t)
-			}
-			t.Setenv("RPT_REPORT_DIR", env)
-			t.Chdir(t.TempDir())
-			var stdout, stderr bytes.Buffer
-			code := run(tt.args, strings.NewReader(""), &stdout, &stderr)
-			if code != tt.wantCode {
-				t.Errorf("exit code = %d, want %d (stderr %q)", code, tt.wantCode, stderr.String())
-			}
-			if !tt.wantOut(stdout.String()) {
-				t.Errorf("stdout = %q", stdout.String())
-			}
-			if !strings.Contains(stderr.String(), tt.wantInErr) {
-				t.Errorf("stderr = %q, want it to contain %q", stderr.String(), tt.wantInErr)
-			}
-		})
+}
+
+func TestUsageErrorPointsAtHelp(t *testing.T) {
+	fixture(t)
+	_, _, errOut := rpt(t, "", "finding", "get", "--bogus")
+	if errOut != "rpt: unknown flag: --bogus\nRun 'rpt finding get --help' for usage.\n" {
+		t.Errorf("stderr %q", errOut)
+	}
+}
+
+func TestGlobalFlagsGoEitherSide(t *testing.T) {
+	dir := fixture(t)
+	t.Setenv("RPT_REPORT_DIR", "")
+	for _, args := range [][]string{{"--report", dir, "scope", "get", "S-12"}, {"scope", "get", "S-12", "--report=" + dir}} {
+		code, out, errOut := rpt(t, "", args...)
+		if code != 0 || len(records(t, out)) != 1 {
+			t.Errorf("rpt %v: exit %d, %q %q", args, code, out, errOut)
+		}
+	}
+}
+
+func TestDescribeBuiltin(t *testing.T) {
+	fixture(t)
+	code, out, _ := rpt(t, "", "scope", "--describe")
+	recs := records(t, out)
+	if code != 0 || len(recs) != 1 || recs[0]["name"] != "scope" || !strings.Contains(recs[0]["usage"].(string), "rpt scope match") {
+		t.Errorf("exit %d: %s", code, out)
 	}
 }

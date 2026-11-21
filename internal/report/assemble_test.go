@@ -9,10 +9,10 @@ import (
 
 func TestAssemble(t *testing.T) {
 	m := fixture(t, map[string]string{
-		"findings/x.md": "---\nid: F-009\ntitle: X\ntargets: [{scope: S-12}, {scope: S-12, port: 80}]\nseverity: critical\n---\n\n## Description\n\n![shot](<evidence/F-003-login.png> \"t\") and [web](https://x.test/a.png)\n\n## Remediation\n\nr\n\n## Proof of concept\n\np\n",
-		"findings/y.md": "---\nid: F-009\ntitle: Dup\ntargets: []\nseverity: low\n---\n",
+		"findings/x.md":    "---\nid: F-009\ntitle: X\ntargets: [{scope: S-12}, {scope: S-12, port: 80}]\nseverity: critical\n---\n\n## Description\n\n![shot](<evidence/F-003-login.png> \"t\") and [web](https://x.test/a.png)\n\n## Remediation\n\nr\n\n## Proof of concept\n\np\n",
+		"findings/y.md":    "---\nid: F-009\ntitle: Dup\ntargets: []\nseverity: low\n---\n",
 		"pages/P-002-b.md": "---\nid: P-002\ntitle: B\n---\n\n<img src=\"../findings/evidence/F-003-login.png\">\n",
-		ConfigFile: "format: 2\npages: [P-002, findings]\n",
+		ConfigFile:         "format: 2\npages: [P-002, findings]\n",
 	})
 	r, warn := m.Assemble()
 	var ids []string

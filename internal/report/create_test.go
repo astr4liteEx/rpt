@@ -28,7 +28,7 @@ func TestNew(t *testing.T) {
 
 func TestNewLike(t *testing.T) {
 	src := fixture(t, map[string]string{
-		"pages/P-001-a.md":      "---\nid: P-001\ntitle: A\n---\n\n![x](evidence/a.png)\n",
+		"pages/P-001-a.md":     "---\nid: P-001\ntitle: A\n---\n\n![x](evidence/a.png)\n",
 		"pages/evidence/a.png": "png",
 	})
 	dir := filepath.Join(t.TempDir(), "r")

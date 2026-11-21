@@ -65,6 +65,9 @@ func (h *lineHandler) Handle(_ context.Context, r slog.Record) error {
 	for _, kv := range rest {
 		b.WriteString(" " + kv)
 	}
+	text := Clean(b.String())
+	b.Reset()
+	b.WriteString(text)
 	b.WriteString("\n")
 
 	h.mu.Lock()

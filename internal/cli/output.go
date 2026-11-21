@@ -27,41 +27,28 @@ type Column struct {
 	Severity bool
 }
 
-type mode int
-
-const (
-	modeJSONLines mode = iota
-	modeTable
-)
-
-// Output writes records in the one mode chosen for this run.
+// Output writes a command's records: JSON Lines, or on a terminal a table
+// per kind of record, printed by Flush in a fixed order. Records of a kind
+// with no columns are left out of tables; a person reading a terminal
+// isn't feeding another program.
 type Output struct {
-	w       io.Writer
-	mode    mode
-	columns []Column
-	rows    [][]string       // a table's rows, rendered by Flush
-	recs    []map[string]any // the records behind them, for Totals
-	// Totals, when set, gives a line under a table, such as a count per
-	// severity, from its records.
-	Totals func([]map[string]any) string
+	w      io.Writer
+	tables bool
+	rows   map[string][][]string
+	recs   map[string][]map[string]any
+	// Severities, when set, orders the totals line under a findings table.
+	Severities []string
 }
 
-// NewOutput picks the output mode once: JSON Lines when jsonFlag is set or
-// w is not a terminal, otherwise a table of columns.
-func NewOutput(w io.Writer, terminal, jsonFlag bool, columns []Column) (*Output, error) {
-	o := &Output{w: w}
-	switch {
-	case jsonFlag || !terminal:
-		o.mode = modeJSONLines
-	default:
-		o.mode, o.columns = modeTable, columns
-	}
-	return o, nil
+// NewOutput writes JSON Lines when jsonFlag is set or w isn't a terminal,
+// otherwise tables.
+func NewOutput(w io.Writer, terminal, jsonFlag bool) *Output {
+	return &Output{w: w, tables: terminal && !jsonFlag, rows: map[string][][]string{}, recs: map[string][]map[string]any{}}
 }
 
 // Write writes one record.
 func (o *Output) Write(rec any) error {
-	if o.mode == modeTable {
+	if o.tables {
 		return o.writeRow(rec)
 	}
 	if err := json.MarshalWrite(o.w, rec, json.Deterministic(true)); err != nil {
@@ -71,12 +58,9 @@ func (o *Output) Write(rec any) error {
 	return err
 }
 
-// WriteRaw passes through a record this verb doesn't own, as the exact
-// bytes it arrived with. Only JSON Lines output carries it: a table shows
-// the verb's own records, and a person reading a terminal isn't feeding
-// another program.
+// WriteRaw passes on a record exactly as it arrived; tables leave it out.
 func (o *Output) WriteRaw(raw []byte) error {
-	if o.mode != modeJSONLines {
+	if o.tables {
 		return nil
 	}
 	if _, err := o.w.Write(raw); err != nil {
@@ -86,78 +70,78 @@ func (o *Output) WriteRaw(raw []byte) error {
 	return err
 }
 
-// WriteOwn writes one of the verb's own records that arrived as raw and
-// may have been edited: JSON Lines output gets raw exactly, a table gets
-// rec.
-func (o *Output) WriteOwn(rec any, raw []byte) error {
-	if o.mode == modeJSONLines {
-		return o.WriteRaw(raw)
-	}
-	return o.Write(rec)
-}
+// Table reports whether o prints tables rather than JSON Lines.
+func (o *Output) Table() bool { return o.tables }
 
-// Table reports whether o prints a table rather than JSON Lines.
-func (o *Output) Table() bool { return o.mode == modeTable }
-
-// Flush writes anything buffered: a table, with rounded grey borders, as
-// wide as the terminal allows, and its totals line. A table with no rows
-// prints nothing.
+// Flush prints the tables, rounded and grey-bordered, as wide as the
+// terminal allows; a findings table has a totals line under it.
 func (o *Output) Flush() error {
-	if o.mode != modeTable || len(o.rows) == 0 {
+	if !o.tables {
 		return nil
 	}
-	headers := make([]string, len(o.columns))
-	for i, c := range o.columns {
-		headers[i] = c.Header
-	}
-	rows := o.rows
-	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(lipgloss.NewStyle().Foreground(grey)).
-		Headers(headers...).
-		Rows(rows...).
-		StyleFunc(func(row, col int) lipgloss.Style {
-			s := lipgloss.NewStyle().Padding(0, 1)
-			switch {
-			case row == table.HeaderRow:
-				return s.Bold(true)
-			case o.columns[col].Severity:
-				if c, ok := severityColors[rows[row][col]]; ok {
-					return s.Foreground(c)
+	var out strings.Builder
+	for _, c := range columns {
+		rows := o.rows[c.kind]
+		if len(rows) == 0 {
+			continue
+		}
+		cols := c.cols
+		headers := make([]string, len(cols))
+		for i, col := range cols {
+			headers[i] = col.Header
+		}
+		t := table.New().
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(lipgloss.NewStyle().Foreground(grey)).
+			Headers(headers...).
+			Rows(rows...).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				s := lipgloss.NewStyle().Padding(0, 1)
+				switch {
+				case row == table.HeaderRow:
+					return s.Bold(true)
+				case cols[col].Severity:
+					if c, ok := severityColors[rows[row][col]]; ok {
+						return s.Foreground(c)
+					}
 				}
-			}
-			return s
-		})
-	if w := Width(o.w); w > 0 && lipgloss.Width(t.Render()) > w {
-		t = t.Width(w)
-	}
-	out := t.Render() + "\n"
-	if o.Totals != nil {
-		if line := o.Totals(o.recs); line != "" {
-			out += line + "\n"
+				return s
+			})
+		if w := Width(o.w); w > 0 && lipgloss.Width(t.Render()) > w {
+			t = t.Width(w)
+		}
+		out.WriteString(t.Render() + "\n")
+		if c.kind == "finding" {
+			out.WriteString(SeverityTotals(o.Severities)(o.recs[c.kind]) + "\n")
 		}
 	}
-	_, err := io.WriteString(Styled(o.w), out)
-	o.rows, o.recs = nil, nil
+	clear(o.rows)
+	clear(o.recs)
+	_, err := io.WriteString(Styled(o.w), out.String())
 	return err
 }
 
-// writeRow adds one table row; lists are joined with commas.
+// writeRow adds a table row for the record's kind.
 func (o *Output) writeRow(rec any) error {
 	m, err := jsonMap(rec)
 	if err != nil {
 		return err
 	}
-	cells := make([]string, len(o.columns))
-	for i, c := range o.columns {
+	kind, _ := m["kind"].(string)
+	i := slices.IndexFunc(columns, func(c kindColumns) bool { return c.kind == kind })
+	if i < 0 {
+		return nil
+	}
+	cells := make([]string, len(columns[i].cols))
+	for j, c := range columns[i].cols {
 		if c.Value != nil {
-			cells[i] = cell(c.Value(m))
+			cells[j] = cell(c.Value(m))
 		} else {
-			cells[i] = cell(m[c.Field])
+			cells[j] = cell(m[c.Field])
 		}
 	}
-	o.rows = append(o.rows, cells)
-	o.recs = append(o.recs, m)
+	o.rows[kind] = append(o.rows[kind], cells)
+	o.recs[kind] = append(o.recs[kind], m)
 	return nil
 }
 
@@ -189,8 +173,7 @@ func SeverityTotals(order []string) func([]map[string]any) string {
 	}
 }
 
-// cell renders one JSON value for a table. Tabs and newlines would break
-// the table's layout, so they become spaces.
+// cell renders one JSON value for a table, on one line and cleaned.
 func cell(v any) string {
 	var s string
 	switch v := v.(type) {
@@ -206,7 +189,7 @@ func cell(v any) string {
 	default:
 		s = fmt.Sprint(v)
 	}
-	return strings.NewReplacer("\t", " ", "\n", " ").Replace(s)
+	return CleanLine(s)
 }
 
 // jsonMap returns rec's JSON object form.

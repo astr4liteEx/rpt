@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -210,5 +211,22 @@ func TestNodeJSON(t *testing.T) {
 		if got := string(NodeJSON(&n)); got != want {
 			t.Errorf("%s: got %s, want %s", in, got, want)
 		}
+	}
+}
+
+func TestParseTargets(t *testing.T) {
+	ts, err := ParseTargets([]string{"S-12", "{scope: S-20, port: 22}", "[S-1, S-2]"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got []string
+	for _, tg := range ts {
+		got = append(got, fmt.Sprintf("%s:%d", tg.Scope, tg.Port))
+	}
+	if strings.Join(got, " ") != "S-12:0 S-20:22 S-1:0 S-2:0" {
+		t.Errorf("got %v", got)
+	}
+	if _, err := ParseTargets([]string{"{port: 22}"}); err == nil {
+		t.Error("a target without a scope ID was taken")
 	}
 }

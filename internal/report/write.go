@@ -392,31 +392,45 @@ func valuesNode(values []string) (*yaml.Node, error) {
 // setTargets reads each value as a target, {scope: S-1, port: 443}, or a
 // list of them.
 func (m *Model) setTargets(d *Doc, values []string) (*Doc, error) {
+	ts, err := ParseTargets(values)
+	if err != nil {
+		return nil, refuse(d.Path, "%v", err)
+	}
+	return m.setTargetList(d, ts)
+}
+
+// ParseTargets reads targets as rpt set and rpt finding add --target take
+// them: each value a scope ID, a YAML map like {scope: S-20, port: 22},
+// or a list of either.
+func ParseTargets(values []string) ([]Target, error) {
 	seq := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
 	for _, v := range values {
 		n, err := ParseValue(v)
 		if err != nil {
-			return nil, refuse(d.Path, "%v", err)
+			return nil, err
 		}
+		items := []*yaml.Node{n}
 		if n.Kind == yaml.SequenceNode {
-			seq.Content = append(seq.Content, n.Content...)
-		} else {
-			seq.Content = append(seq.Content, n)
+			items = n.Content
+		}
+		for _, it := range items {
+			if it.Kind == yaml.ScalarNode {
+				// A scope ID alone.
+				it = &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{StringNode("scope"), StringNode(it.Value)}}
+			}
+			seq.Content = append(seq.Content, it)
 		}
 	}
 	ts, err := targets(seq, func(*yaml.Node) int { return 0 })
 	if err != nil {
-		return nil, refuse(d.Path, "targets: %v", err)
+		return nil, fmt.Errorf("targets: %w", err)
 	}
 	for i, t := range ts {
 		if t.Scope == "" {
-			return nil, refuse(d.Path, "target %d has no scope ID", i+1)
+			return nil, fmt.Errorf("target %d has no scope ID", i+1)
 		}
 	}
-	for _, c := range seq.Content {
-		c.Style |= yaml.FlowStyle
-	}
-	return m.edit(d, func(s *doc.Doc) error { return s.Set(seq, "targets") })
+	return ts, nil
 }
 
 // setSection sets the text of a finding's section, adding the section

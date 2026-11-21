@@ -1,436 +1,361 @@
 package main
 
 import (
-	"cmp"
-	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"fmt"
-	"slices"
+	"strconv"
 	"strings"
 
-	"github.com/spf13/pflag"
+	"github.com/spf13/cobra"
 
-	"github.com/astr4liteEx/rpt/internal/cli"
-	"github.com/astr4liteEx/rpt/internal/legacy/report"
+	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-var scopeColumns = []cli.Column{
-	{Header: "ID", Field: "id"}, {Header: "HOST", Field: "host"},
-	{Header: "PORT", Field: "port"}, {Header: "PROTOCOL", Field: "protocol"},
+func (e *env) scopeCommand() *cobra.Command {
+	c := &cobra.Command{
+		Use:         "scope",
+		Short:       "Get, add, set, unset and remove scope rows; match attributes finding targets to them",
+		Annotations: io_("records", "records"),
+	}
+	c.AddCommand(e.scopeGet(), e.scopeAdd(), e.scopeSet(), e.scopeUnset(), e.scopeRemove(), e.scopeMatch())
+	return c
 }
 
-// scopeGetVerb prints the report's scope rows, or with IDs only those rows
-// in the order given; with --lines, each record also says which line of
-// scope.csv it starts on.
-func scopeGetVerb(flags *pflag.FlagSet) runner {
-	withLines := flags.Bool("lines", false, "add each row's lines: scope.csv's absolute path and the line the row starts on")
-	return func(e *env, args []string) int {
-		ids := args
-		out, err := e.output(scopeColumns)
-		if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		r := openReport(e)
-		if r == nil {
-			return cli.ExitProblems
-		}
-		defer r.Close()
+const (
+	citedForce   = "Leave finding targets citing the row dangling, or unfit for it"
+	citedCleanup = "Drop the finding targets the change leaves dangling or unfit"
+)
 
-		read := r.Scope
-		if *withLines {
-			read = r.ScopeWithLines
-		}
-		rows, readErr := read()
-		var missing []string
-		if len(ids) > 0 {
-			var picked []sdk.ScopeRow
-			for _, id := range slices.Compact(ids) {
-				i := slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return r.ID == id })
-				if i < 0 { // an ID may be given in any case
-					i = slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return strings.EqualFold(r.ID, id) })
-				}
-				if i < 0 {
-					missing = append(missing, id)
-					continue
-				}
-				picked = append(picked, rows[i])
-			}
-			rows = picked
-		}
-		for _, row := range rows {
-			if err := out.Write(row); err != nil {
-				e.log.Error(err.Error())
-				return cli.ExitProblems
+// rowRevs are the revs of the scope rows named, for --if-rev.
+func rowRevs(ids ...string) func(*report.Model) map[string]string {
+	return func(m *report.Model) map[string]string {
+		out := map[string]string{}
+		for _, id := range ids {
+			if r, err := m.Scope.Row(id); err == nil {
+				out[r.ID] = r.Rev
 			}
 		}
-		for _, id := range missing {
-			p := sdk.Problem{Path: report.ScopeFile, Rule: ruleExists, Level: sdk.Error, Message: fmt.Sprintf("%s: %v", id, report.ErrNoScopeRow)}
-			if err := e.problem(out, p); err != nil {
-				e.log.Error(err.Error())
-				return cli.ExitProblems
-			}
-		}
-		if err := out.Flush(); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		if code := reportErrors(e, out, readErr); code != cli.ExitOK || len(missing) == 0 {
-			return code
-		}
-		return cli.ExitProblems
+		return out
 	}
 }
 
-// scopeMatchVerb reads JSON Lines and attributes each finding's targets to
-// scope: a target with a host and no scope ID gets the ID of the most
-// specific row it falls in, losing the host when that row is one asset.
-// A finding whose targets change has only its targets member replaced, and
-// every other record passes through byte for byte.
-func scopeMatchVerb(flags *pflag.FlagSet) runner {
-	drop := flags.Bool("drop-out-of-scope", false, "drop targets that fall in no scope row, and findings left with none")
-	return func(e *env, args []string) int {
-		if len(args) != 0 {
-			return usageError(e, "takes no arguments")
-		}
-		out, err := e.output(findingColumns)
-		if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		r := openReport(e)
-		if r == nil {
-			return cli.ExitProblems
-		}
-		defer r.Close()
-		rows, err := r.Scope()
-		if code := reportErrors(e, out, err); code != cli.ExitOK {
-			return code
-		}
-		recs, code, ok := readInput(e, out)
-		if !ok {
-			return code
-		}
-		for _, rec := range recs {
-			if rec.Kind != "finding" {
-				err = out.WriteRaw(rec.Raw)
-			} else {
-				err = matchFinding(e, out, rec, rows, *drop)
-			}
+// printChange prints a scope write: the row, then the findings it
+// rewrote, and warns of those left citing it as they were.
+func (e *env) printChange(b *batch, ch report.ScopeChange) {
+	if ch.Row != nil {
+		b.print(b.m.ScopeRecord(ch.Row, false))
+	}
+	for _, d := range ch.Rewrote {
+		b.print(b.m.FindingRecord(d, report.RecordOpts{}))
+	}
+	for _, d := range ch.Left {
+		e.log.Warn(fmt.Sprintf("%s still cites the row, left as it was (--force)", d.ID), "path", d.Path)
+	}
+}
+
+func (e *env) scopeGet() *cobra.Command {
+	var lines bool
+	c := &cobra.Command{
+		Use:               "get [id...]",
+		Short:             "Print scope rows, or those with the IDs given",
+		ValidArgsFunction: e.completeScopeIDs,
+		RunE: func(_ *cobra.Command, ids []string) error {
+			m, err := e.load()
 			if err != nil {
-				e.log.Error(err.Error(), "path", stdinPath, "line", rec.Line)
-				code = cli.ExitProblems
+				return err
 			}
-		}
-		if err := out.Flush(); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		return code
+			defer m.Close()
+			var ps []report.Problem
+			if m.Scope.Err != nil {
+				p, _ := failure(m.Scope.Err, report.ScopeFile, 0)
+				return e.problems([]report.Problem{p})
+			}
+			rows := m.Scope.Rows
+			if len(ids) > 0 {
+				rows = nil
+				for _, id := range ids {
+					r, err := m.Scope.Row(id)
+					if err != nil {
+						p, _ := failure(err, report.ScopeFile, 0)
+						ps = append(ps, p)
+						continue
+					}
+					rows = append(rows, r)
+				}
+			} else {
+				for _, err := range m.Scope.RowErrs {
+					p, _ := failure(err, report.ScopeFile, 0)
+					ps = append(ps, p)
+				}
+			}
+			for _, r := range rows {
+				if err := e.out.Write(m.ScopeRecord(r, lines)); err != nil {
+					return err
+				}
+			}
+			return e.problems(ps)
+		},
 	}
+	c.Flags().BoolVar(&lines, "lines", false, "Add scope.csv's absolute path and the line each row starts on")
+	return c
 }
 
-// matchFinding writes one finding record with its targets attributed to
-// scope rows; with drop, it leaves out the targets no row covers, and the
-// finding when none is left.
-func matchFinding(e *env, out *cli.Output, rec sdk.Rec, rows []sdk.ScopeRow, drop bool) error {
-	var f sdk.Finding
-	if err := json.Unmarshal(rec.Raw, &f); err != nil {
-		return fmt.Errorf("finding: %w", err)
+func (e *env) scopeAdd() *cobra.Command {
+	var w writeFlags
+	var host, protocol, id string
+	var port int
+	var cols []string
+	c := &cobra.Command{
+		Use:     "add",
+		Short:   "Add scope rows from records on stdin, or one from flags",
+		Example: "  rpt scope add < records.jsonl\n  rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]...",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if host == "" {
+				for _, f := range []string{"port", "protocol", "id", "col"} {
+					if cmd.Flags().Changed(f) {
+						return usagef("--%s goes with --host", f)
+					}
+				}
+				return e.scopeFromStdin(&w)
+			}
+			row := report.Row{ID: id, Host: host, Port: port, Protocol: protocol}
+			for _, kv := range cols {
+				k, v, ok := strings.Cut(kv, "=")
+				if !ok || k == "" {
+					return usagef("--col %s: give name=value", kv)
+				}
+				if row.Extra == nil {
+					row.Extra = map[string]string{}
+				}
+				row.Extra[strings.ToLower(strings.TrimSpace(k))] = v
+			}
+			return e.write(&w, nil, func(b *batch) error {
+				r, err := b.m.AddScope(row)
+				if err != nil {
+					return b.refuse(err, "", 0)
+				}
+				b.print(b.m.ScopeRecord(r, false))
+				return nil
+			})
+		},
 	}
-	if len(f.Targets) == 0 {
-		return out.WriteOwn(f, rec.Raw)
-	}
-	info := func(format string, a ...any) {
-		e.log.Info(fmt.Sprintf(format, a...), "path", stdinPath, "line", rec.Line)
-	}
-	kept := make([]sdk.Target, 0, len(f.Targets))
-	var dropped []string
-	changed := false
-	for _, t := range f.Targets {
-		at, ok := report.Attribute(t, rows)
-		switch {
-		case !ok && drop:
-			dropped = append(dropped, describe(t))
-			changed = true
-		case !ok:
-			kept = append(kept, t)
-		default:
-			changed = changed || at.Scope != t.Scope || at.Host != t.Host
-			kept = append(kept, at)
-		}
-	}
-	switch {
-	case len(kept) == 0 && len(dropped) == 1:
-		info("dropped %q: %s is out of scope", f.Title, dropped[0])
-		return nil
-	case len(kept) == 0:
-		info("dropped %q: none of its targets is in scope (%s)", f.Title, strings.Join(dropped, ", "))
-		return nil
-	}
-	for _, d := range dropped {
-		info("dropped a target of %q: %s is out of scope", f.Title, d)
-	}
-	if !changed {
-		return out.WriteOwn(f, rec.Raw)
-	}
-	raw, err := sdk.SetMember(rec.Raw, "targets", kept)
+	c.Flags().StringVar(&host, "host", "", "Add one row for this host, address, range or CIDR instead of reading stdin")
+	c.Flags().IntVar(&port, "port", 0, "The row's port (with --host)")
+	c.Flags().StringVar(&protocol, "protocol", "", "The row's protocol, tcp or udp (with --host)")
+	c.Flags().StringVar(&id, "id", "", "The row's ID (with --host); default: the next free S-NNN")
+	c.Flags().StringArrayVar(&cols, "col", nil, "Another column's value, name=value (with --host; repeatable)")
+	c.RegisterFlagCompletionFunc("protocol", cobra.FixedCompletions([]string{"tcp", "udp"}, cobra.ShellCompDirectiveNoFileComp))
+	addWriteFlags(c, &w, false)
+	return c
+}
+
+// scopeFromStdin adds or replaces the scope records on stdin, by ID;
+// others pass through.
+func (e *env) scopeFromStdin(w *writeFlags) error {
+	recs, err := e.readStdin()
 	if err != nil {
 		return err
 	}
-	f.Targets = kept
-	return out.WriteOwn(f, raw)
-}
-
-// describe renders a target for a message, e.g. "10.9.9.9 tcp/23".
-func describe(t sdk.Target) string {
-	host := cmp.Or(t.Host, "a target with no host")
-	switch {
-	case t.Port != 0 && t.Protocol != "":
-		return fmt.Sprintf("%s %s/%d", host, t.Protocol, t.Port)
-	case t.Port != 0:
-		return fmt.Sprintf("%s port %d", host, t.Port)
-	default:
-		return host
-	}
-}
-
-// colFlags collects repeated --col name=value flags.
-type colFlags map[string]string
-
-func (c colFlags) String() string { return "" }
-
-func (c colFlags) Type() string { return "name=value" }
-
-func (c colFlags) Set(v string) error {
-	k, val, ok := strings.Cut(v, "=")
-	if !ok || k == "" {
-		return fmt.Errorf("want name=value, got %q", v)
-	}
-	c[k] = val
-	return nil
-}
-
-// scopeAddVerb appends scope rows: each scope record on stdin, passing
-// other records through, or one row from its flags. Every row is checked
-// before any is written: one refusal and nothing is written.
-func scopeAddVerb(flags *pflag.FlagSet) runner {
-	host := flags.String("host", "", "add one row for this host instead of reading stdin")
-	port := flags.Int("port", 0, "the row's port (with --host)")
-	protocol := flags.String("protocol", "", "the row's protocol, tcp or udp (with --host)")
-	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-NNN")
-	cols := colFlags{}
-	flags.Var(cols, "col", "another column's value, name=value (with --host; repeatable)")
-	wf := addWriteFlags(flags, false)
-	return func(e *env, args []string) int {
-		pos := args
-		fromFlags := false
-		flags.Visit(func(f *pflag.Flag) {
-			fromFlags = fromFlags || slices.Contains([]string{"host", "port", "protocol", "id", "col"}, f.Name)
-		})
-		if len(pos) != 0 || fromFlags && *host == "" {
-			return usageError(e, "reads records on stdin, or takes --host")
-		}
-		out, err := e.output(scopeColumns)
-		if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		r := openReport(e)
-		if r == nil {
-			return cli.ExitProblems
-		}
-		defer r.Close()
-		w, _ := newWrite(e, out, r, wf, nil)
-
-		add := func(row sdk.ScopeRow, line int) {
-			added, err := w.tx.AddScope(row)
-			if err != nil {
-				path := report.ScopeFile
-				if line > 0 {
-					path = stdinPath
-				}
-				w.refuse(err, path, line)
-				return
-			}
-			w.done(added, report.ScopeFile)
-		}
-
-		if fromFlags {
-			row := sdk.ScopeRow{Kind: "scope", ID: *id, Host: *host, Port: *port, Protocol: *protocol}
-			for k, v := range cols {
-				b, _ := json.Marshal(v)
-				if row.Extra == nil {
-					row.Extra = map[string]jsontext.Value{}
-				}
-				row.Extra[k] = b
-			}
-			add(row, 0)
-			return w.finish()
-		}
-		recs, code, ok := readInput(e, out)
-		if !ok {
-			return code
-		}
+	return e.write(w, nil, func(b *batch) error {
 		for _, rec := range recs {
 			if rec.Kind != "scope" {
-				w.pass(rec.Raw)
+				b.pass(rec.Raw)
 				continue
 			}
-			var row sdk.ScopeRow
-			if err := json.Unmarshal(rec.Raw, &row); err != nil {
-				w.refused = append(w.refused, sdk.Problem{Path: stdinPath, Line: rec.Line, Rule: ruleInput, Level: sdk.Error, Message: "scope: " + err.Error()})
+			var s sdk.ScopeRow
+			err := json.Unmarshal(rec.Raw, &s)
+			var row report.Row
+			if err == nil {
+				row, err = report.ScopeDraft(s)
+			}
+			if err != nil {
+				b.refused = append(b.refused, report.Problem{Path: report.StreamPath, Line: rec.Line, Rule: ruleInput, Level: report.Error, Message: "scope: " + err.Error()})
 				continue
 			}
-			delete(row.Extra, "kind")
-			row.Rev = "" // rpt's, not a column
-			add(row, rec.Line)
-		}
-		return w.finish()
-	}
-}
-
-// citedFlags adds --force and --cleanup, which say what a scope write does
-// to the finding targets it would leave dangling or unfit.
-func citedFlags(f *pflag.FlagSet) func() (report.Cited, bool) {
-	force := f.Bool("force", false, "leave finding targets citing the row dangling, or unfit for it")
-	cleanup := f.Bool("cleanup", false, "drop the finding targets the change leaves dangling or unfit")
-	return func() (report.Cited, bool) {
-		switch {
-		case *force && *cleanup:
-			return 0, false
-		case *force:
-			return report.CitedForce, true
-		case *cleanup:
-			return report.CitedCleanup, true
-		}
-		return report.CitedRefuse, true
-	}
-}
-
-// scopeChanged adds what one scope write did to w: the row, then each
-// finding it rewrote.
-func scopeChanged(w *write, ch report.ScopeChange) {
-	w.done(ch.Row, report.ScopeFile)
-	for _, f := range ch.Findings {
-		w.done(f, f.Path)
-	}
-}
-
-// scopeSetVerb sets one column of one scope row. Setting id renames the
-// row and every target citing it.
-func scopeSetVerb(flags *pflag.FlagSet) runner {
-	cited := citedFlags(flags)
-	wf := addWriteFlags(flags, true)
-	return func(e *env, args []string) int {
-		pos := args
-		mode, ok := cited()
-		if len(pos) != 3 || !ok {
-			return usageError(e, "needs an ID, a column and a value, and --force and --cleanup don't go together")
-		}
-		return writeScope(e, wf, []string{pos[0]}, func(w *write) {
-			ch, err := w.tx.SetScope(pos[0], pos[1], pos[2], mode)
+			r, err := b.m.AddScope(row)
 			if err != nil {
-				w.refuse(err, report.ScopeFile, 0)
-				return
+				if err := b.refuse(err, report.StreamPath, rec.Line); err != nil {
+					return err
+				}
+				continue
 			}
-			scopeChanged(w, ch)
-		})
-	}
+			b.print(b.m.ScopeRecord(r, false))
+		}
+		return nil
+	})
 }
 
-// scopeUnsetVerb blanks columns of one scope row.
-func scopeUnsetVerb(flags *pflag.FlagSet) runner {
-	wf := addWriteFlags(flags, true)
-	return func(e *env, args []string) int {
-		pos := args
-		if len(pos) < 2 {
-			return usageError(e, "needs an ID and a column")
-		}
-		return writeScope(e, wf, []string{pos[0]}, func(w *write) {
-			ch, err := w.tx.UnsetScope(pos[0], pos[1:]...)
-			if err != nil {
-				w.refuse(err, report.ScopeFile, 0)
-				return
-			}
-			scopeChanged(w, ch)
-		})
-	}
-}
-
-// writeScope runs a write on scope rows named by ids.
-func writeScope(e *env, wf writeFlags, ids []string, do func(*write)) int {
-	out, err := e.output(scopeColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-	w, ok := newWrite(e, out, r, wf, ids)
-	if !ok {
-		return cli.ExitUsage
-	}
-	do(w)
-	return w.finish()
-}
-
-// scopeRemoveVerb removes scope rows by ID and prints each as it was. A
-// row a finding cites is refused unless --force or --cleanup; one refusal
-// and nothing is removed. On a terminal it asks first; otherwise it needs
-// --yes.
-func scopeRemoveVerb(flags *pflag.FlagSet) runner {
-	yes := addYesFlag(flags)
-	cited := citedFlags(flags)
-	wf := addWriteFlags(flags, true)
-	return func(e *env, args []string) int {
-		ids := uniq(args)
-		mode, ok := cited()
-		if len(ids) == 0 || !ok {
-			return usageError(e, "needs an ID, and --force and --cleanup don't go together")
-		}
-		if !mayAsk(e, *yes, *wf.dryRun) {
-			return cli.ExitUsage
-		}
-		return writeScope(e, wf, ids, func(w *write) {
-			var things, effects []string
-			for _, id := range ids {
-				ch, err := w.tx.RemoveScope(id, mode)
+func (e *env) scopeSet() *cobra.Command {
+	var w writeFlags
+	c := &cobra.Command{
+		Use:               "set <id> <column> <value>",
+		Short:             "Change one column of a scope row; a new id or host carries into the findings citing it",
+		Args:              cobra.ExactArgs(3),
+		ValidArgsFunction: e.completeScopeColumn,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return e.write(&w, rowRevs(args[0]), func(b *batch) error {
+				ch, err := b.m.SetScope(args[0], args[1], args[2], w.mode())
 				if err != nil {
-					w.refuse(err, report.ScopeFile, 0)
+					return b.refuse(err, "", 0)
+				}
+				e.printChange(b, ch)
+				return nil
+			})
+		},
+	}
+	c.Flags().SetInterspersed(false)
+	addCitedFlags(c, &w, citedForce, citedCleanup)
+	addWriteFlags(c, &w, true)
+	return c
+}
+
+func (e *env) scopeUnset() *cobra.Command {
+	var w writeFlags
+	c := &cobra.Command{
+		Use:               "unset <id> <column>...",
+		Short:             "Empty columns of a scope row",
+		Args:              cobra.MinimumNArgs(2),
+		ValidArgsFunction: e.completeScopeColumn,
+		RunE: func(_ *cobra.Command, args []string) error {
+			return e.write(&w, rowRevs(args[0]), func(b *batch) error {
+				ch, err := b.m.UnsetScope(args[0], args[1:]...)
+				if err != nil {
+					return b.refuse(err, "", 0)
+				}
+				e.printChange(b, ch)
+				return nil
+			})
+		},
+	}
+	addWriteFlags(c, &w, true)
+	return c
+}
+
+func (e *env) scopeRemove() *cobra.Command {
+	var w writeFlags
+	c := &cobra.Command{
+		Use:               "remove <id>...",
+		Short:             "Remove scope rows",
+		Args:              cobra.MinimumNArgs(1),
+		ValidArgsFunction: e.completeScopeIDs,
+		RunE: func(_ *cobra.Command, ids []string) error {
+			return e.write(&w, rowRevs(ids...), func(b *batch) error {
+				for _, id := range ids {
+					row, _ := b.m.Scope.Row(id)
+					ch, err := b.m.RemoveScope(id, w.mode())
+					if err != nil {
+						if err := b.refuse(err, "", 0); err != nil {
+							return err
+						}
+						continue
+					}
+					if row != nil {
+						b.removing = append(b.removing, row.ID+"  "+row.Host+portText(row.Port))
+					}
+					e.printChange(b, ch)
+				}
+				return nil
+			})
+		},
+	}
+	addYesFlag(c, &w)
+	addCitedFlags(c, &w, citedForce, citedCleanup)
+	addWriteFlags(c, &w, true)
+	return c
+}
+
+func portText(p int) string {
+	if p == 0 {
+		return ""
+	}
+	return ":" + strconv.Itoa(p)
+}
+
+// scopeMatch attributes the targets of the findings on stdin to scope
+// rows: a target with a host and no scope ID gets the most specific row
+// covering it. Other records, and members rpt doesn't touch, pass
+// through byte for byte. The report isn't written.
+func (e *env) scopeMatch() *cobra.Command {
+	var drop bool
+	c := &cobra.Command{
+		Use:     "match",
+		Short:   "Attribute the targets of findings on stdin to scope rows",
+		Example: "  rpt-nessus scan.nessus | rpt scope match [--drop-out-of-scope] | rpt finding add",
+		Args:    cobra.NoArgs,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			recs, err := e.readStdin()
+			if err != nil {
+				return err
+			}
+			m, err := e.load()
+			if err != nil {
+				return err
+			}
+			defer m.Close()
+			if m.Scope.Err != nil {
+				return e.fail(m.Scope.Err)
+			}
+			var ps []report.Problem
+			for _, rec := range recs {
+				if rec.Kind != "finding" {
+					if err := e.out.WriteRaw(rec.Raw); err != nil {
+						return err
+					}
 					continue
 				}
-				scopeChanged(w, ch)
-				things = append(things, strings.Join(slices.DeleteFunc([]string{ch.Row.ID, ch.Row.Host, portOf(ch.Row)}, func(s string) bool { return s == "" }), "  "))
-				if len(ch.Findings) > 0 {
-					var fs []string
-					for _, f := range ch.Findings {
-						fs = append(fs, f.ID)
+				var f sdk.Finding
+				if err := json.Unmarshal(rec.Raw, &f); err != nil {
+					ps = append(ps, report.Problem{Path: report.StreamPath, Line: rec.Line, Rule: ruleInput, Level: report.Error, Message: "finding: " + err.Error()})
+					continue
+				}
+				var kept []sdk.Target
+				for _, t := range f.Targets {
+					if t.Scope != "" || t.Host == "" {
+						kept = append(kept, t)
+						continue
 					}
-					effects = append(effects, fmt.Sprintf("--cleanup drops %s's targets from %s", ch.Row.ID, strings.Join(fs, ", ")))
+					got, row, ok := m.Scope.Attribute(report.Target{Host: t.Host, Port: t.Port, Protocol: t.Protocol})
+					if !ok {
+						ps = append(ps, report.Problem{Path: report.StreamPath, Line: rec.Line, Rule: "targets", Level: report.Warning,
+							Message: fmt.Sprintf("%s: %s is in no scope row%s", cmpID(f.ID, f.Title), t.Host, map[bool]string{true: "; dropped", false: ""}[drop])})
+						if !drop {
+							kept = append(kept, t)
+						}
+						continue
+					}
+					t.Scope, t.Host = row.ID, got.Host
+					kept = append(kept, t)
 				}
-				if len(ch.Left) > 0 {
-					effects = append(effects, fmt.Sprintf("--force leaves %s citing %s", strings.Join(ch.Left, ", "), ch.Row.ID))
+				if len(kept) == 0 && len(f.Targets) > 0 && drop {
+					ps = append(ps, report.Problem{Path: report.StreamPath, Line: rec.Line, Rule: "targets", Level: report.Warning,
+						Message: fmt.Sprintf("%s: no target is in scope; finding dropped", cmpID(f.ID, f.Title))})
+					continue
+				}
+				if kept == nil {
+					kept = []sdk.Target{}
+				}
+				raw, err := sdk.SetMember(rec.Raw, "targets", kept)
+				if err != nil {
+					return err
+				}
+				f.Targets = kept
+				if err := e.writeOwn(f, raw); err != nil {
+					return err
 				}
 			}
-			if len(w.refused) == 0 && !w.failed && !*yes && !*wf.dryRun && !confirm(e, "scope row", things, effects) {
-				w.declined = true
-			}
-		})
+			return e.problems(ps)
+		},
 	}
+	c.Flags().BoolVar(&drop, "drop-out-of-scope", false, "Drop targets that fall in no scope row, and findings left with none")
+	return c
 }
 
-// portOf renders a row's port and protocol, e.g. "tcp/443".
-func portOf(row sdk.ScopeRow) string {
-	switch {
-	case row.Port != 0 && row.Protocol != "":
-		return fmt.Sprintf("%s/%d", row.Protocol, row.Port)
-	case row.Port != 0:
-		return fmt.Sprint(row.Port)
+// cmpID names a stream finding: its ID, else its title.
+func cmpID(id, title string) string {
+	if id != "" {
+		return id
 	}
-	return row.Protocol
+	return fmt.Sprintf("%q", title)
 }

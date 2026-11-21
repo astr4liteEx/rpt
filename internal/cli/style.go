@@ -64,16 +64,16 @@ func Width(w io.Writer) int {
 func Severity(level string) string {
 	c, ok := severityColors[level]
 	if !ok {
-		return level
+		return CleanLine(level)
 	}
 	return lipgloss.NewStyle().Foreground(c).Bold(level == "critical" || level == "high").Render(level)
 }
 
 // Dim is secondary text.
-func Dim(s string) string { return dim.Render(s) }
+func Dim(s string) string { return dim.Render(Clean(s)) }
 
 // Bold is emphasised text.
-func Bold(s string) string { return bold.Render(s) }
+func Bold(s string) string { return bold.Render(Clean(s)) }
 
 // Rule is a grey rule width wide.
 func Rule(width int) string {
@@ -87,7 +87,7 @@ func Markdown(md string) string {
 	h := lipgloss.NewStyle().Foreground(magenta).Bold(true)
 	var out []string
 	fence := ""
-	for _, l := range strings.Split(strings.TrimRight(md, "\n"), "\n") {
+	for _, l := range strings.Split(strings.TrimRight(Clean(md), "\n"), "\n") {
 		trimmed := strings.TrimLeft(l, " ")
 		switch {
 		case fence == "" && (strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")):
@@ -121,7 +121,7 @@ func NewReadingView(w io.Writer) *ReadingView { return &ReadingView{w: Styled(w)
 // Record prints one record: its ID and title, a line of facts (already
 // styled), and its markdown body.
 func (v *ReadingView) Record(id, title, facts, body string) error {
-	head := bold.Render(id + "  " + title)
+	head := bold.Render(CleanLine(id + "  " + title))
 	if facts != "" {
 		head += "\n" + facts
 	}
@@ -202,9 +202,9 @@ func (d *Diagnostics) Print(p Diagnostic) {
 		level += "[" + p.Rule + "]"
 	}
 	var b strings.Builder
-	b.WriteString(style.Render(level) + " " + bold.Render(p.Message) + "\n")
+	b.WriteString(style.Render(level) + " " + bold.Render(Clean(p.Message)) + "\n")
 	if p.Path != "" {
-		loc := p.Path
+		loc := CleanLine(p.Path)
 		if p.Line > 0 {
 			loc += fmt.Sprintf(":%d", p.Line)
 			if p.Column > 0 {
@@ -218,7 +218,7 @@ func (d *Diagnostics) Print(p Diagnostic) {
 		pad := strings.Repeat(" ", len(num))
 		bar := gutterStyle.Render("|")
 		b.WriteString(pad + "  " + bar + "\n")
-		b.WriteString(" " + gutterStyle.Render(num) + " " + bar + " " + src + "\n")
+		b.WriteString(" " + gutterStyle.Render(num) + " " + bar + " " + CleanLine(src) + "\n")
 		if p.Column > 0 && p.Column <= len(src)+1 {
 			n := 1
 			if p.End >= p.Column {
@@ -226,7 +226,7 @@ func (d *Diagnostics) Print(p Diagnostic) {
 			}
 			// The caret sits under the column's character, counted in
 			// screen cells, as the line shows.
-			b.WriteString(pad + "  " + bar + " " + strings.Repeat(" ", ansi.StringWidth(src[:p.Column-1])) + style.Render(strings.Repeat("^", n)) + "\n")
+			b.WriteString(pad + "  " + bar + " " + strings.Repeat(" ", ansi.StringWidth(CleanLine(src[:p.Column-1]))) + style.Render(strings.Repeat("^", n)) + "\n")
 		}
 	}
 	b.WriteString("\n")

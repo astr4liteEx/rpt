@@ -1,121 +1,116 @@
 package main
 
 import (
-	"bytes"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// runIn runs rpt with stdin and returns its exit code, stdout and stderr.
-func runIn(t *testing.T, stdin string, args ...string) (int, string, string) {
-	t.Helper()
-	var stdout, stderr bytes.Buffer
-	code := run(args, strings.NewReader(stdin), &stdout, &stderr)
-	return code, stdout.String(), stderr.String()
-}
-
-func TestScopeVerb(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "get", "--report", fixture)
-	if code != 0 || errOut != "" {
-		t.Fatalf("exit %d, stderr %q", code, errOut)
-	}
-	if want := "S-12 10.0.0.5 443\nS-14 10.0.0.6 8443\nS-20 10.0.1.0/24 \n"; pick(t, out, "id", "host", "port") != want {
-		t.Errorf("stdout\n got: %q\nwant: %q", out, want)
-	}
-}
-
-func TestScopeByID(t *testing.T) {
-	code, out, errOut := runIn(t, "", "scope", "get", "--report", fixture, "S-20", "S-12")
-	if code != 0 || errOut != "" {
-		t.Fatalf("exit %d, stderr %q", code, errOut)
-	}
-	if got := pick(t, out, "id", "host"); got != "S-20 10.0.1.0/24\nS-12 10.0.0.5\n" {
-		t.Errorf("stdout = %q, want S-20 then S-12, in the order asked", got)
-	}
-	code, out, errOut = runIn(t, "", "scope", "get", "--report", fixture, "S-12", "S-99")
-	if code != 1 || pick(t, out, "kind", "id") != "scope S-12\nproblem \n" || !strings.Contains(errOut, "S-99: no such scope row") {
-		t.Errorf("unknown ID: exit %d, stdout %q, stderr %q; want 1, S-12 printed, S-99 named", code, out, errOut)
-	}
-}
-
 func TestScopeMatch(t *testing.T) {
-	foreign := `{"kind":"scope",  "id":"S-1","z":1,"a":2}` // odd spacing and order: must survive
-	noTarget := `{"kind":"finding","title":"Weak password policy", "targets":[]}`
-	already := `{"kind":"finding","title":"Already","targets":[{"scope":"S-20","host":"10.0.1.9"}]}`
-	in := strings.Join([]string{
-		`{"kind":"finding","title":"SSH weak ciphers","targets":[{"host":"10.0.1.5","port":22,"protocol":"tcp","vhost":"ssh.acme.com"}],"cvss":"5.3"}`, // 1: CIDR S-20
-		`{"kind":"finding","title":"TLS","targets":[{"scope":"S-14"},{"host":"10.0.0.5","port":443}]}`,                                                 // 2: one asset S-12
-		foreign + "\r", // 3: CRLF
-		"",             // 4: blank
-		`{"kind":"finding","title":"Telnet","targets":[{"host":"10.9.9.9","port":23,"protocol":"tcp"}]}`, // 5: out of scope
-		noTarget, // 6: nothing to match
-		"",       // 7: blank (a malformed line now stops the filter: problems_test.go)
-		already,  // 8: unchanged
-		`{"kind":"finding","title":"Mixed","targets":[{"host":"10.0.0.6","port":8443},{"host":"10.9.9.9"}]}`, // 9: half in scope
-	}, "\n") + "\n"
-
-	// Only the targets member changes; every other member keeps its bytes and place.
-	ssh := `{"kind":"finding","title":"SSH weak ciphers","targets":[{"scope":"S-20","host":"10.0.1.5","port":22,"protocol":"tcp","vhost":"ssh.acme.com"}],"cvss":"5.3"}`
-	tls := `{"kind":"finding","title":"TLS","targets":[{"scope":"S-14"},{"scope":"S-12","port":443}]}`
-	telnet := `{"kind":"finding","title":"Telnet","targets":[{"host":"10.9.9.9","port":23,"protocol":"tcp"}]}`
-	mixed := `{"kind":"finding","title":"Mixed","targets":[{"scope":"S-14","port":8443},{"host":"10.9.9.9"}]}`
-	mixedDropped := `{"kind":"finding","title":"Mixed","targets":[{"scope":"S-14","port":8443}]}`
-
-	tests := []struct {
-		name    string
-		args    []string
-		wantOut []string
-		wantErr []string
-	}{
-		{
-			name:    "attributes, passes through, keeps out-of-scope targets",
-			args:    []string{"scope", "match", "--report", fixture},
-			wantOut: []string{ssh, tls, foreign, telnet, noTarget, already, mixed},
-			wantErr: nil,
-		},
-		{
-			name:    "--drop-out-of-scope drops and says so",
-			args:    []string{"scope", "match", "--report", fixture, "--drop-out-of-scope"},
-			wantOut: []string{ssh, tls, foreign, noTarget, already, mixedDropped},
-			wantErr: []string{
-				`rpt: -:5: dropped "Telnet": 10.9.9.9 tcp/23 is out of scope`,
-				`rpt: -:9: dropped a target of "Mixed": 10.9.9.9 is out of scope`,
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			code, out, errOut := runIn(t, in, tt.args...)
-			if code != 0 {
-				t.Errorf("exit %d, want 0", code)
-			}
-			if want := strings.Join(tt.wantOut, "\n") + "\n"; out != want {
-				t.Errorf("stdout\n got: %s\nwant: %s", out, want)
-			}
-			want := strings.Join(tt.wantErr, "\n") + "\n"
-			if tt.wantErr == nil {
-				want = ""
-			}
-			if errOut != want {
-				t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
-			}
-		})
+	fixture(t)
+	stdin := `{"kind":"finding","title":"A","severity":"high","targets":[{"host":"10.0.0.5","port":443}],"x-keep":1}` + "\n" +
+		`{"kind":"finding","title":"B","severity":"low","targets":[{"host":"192.168.9.9"}]}` + "\n" +
+		`{"kind":"note"}` + "\n"
+	code, out, errOut := rpt(t, stdin, "scope", "match", "--drop-out-of-scope")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if code != 0 || len(lines) != 4 || !strings.Contains(lines[0], `"targets":[{"scope":"S-12","port":443}]`) || !strings.Contains(lines[0], `"x-keep":1`) ||
+		lines[1] != `{"kind":"note"}` || !strings.Contains(lines[2]+lines[3], "dropped") {
+		t.Errorf("exit %d\n%s\n%s", code, out, errOut)
 	}
 }
 
-// The stage's Done-when: findings piped through scope match.
-func TestFindingsThroughScopeMatch(t *testing.T) {
-	code, findings, errOut := runIn(t, "", "finding", "get", "--report", fixture, "--json")
-	if code != 0 {
-		t.Fatalf("findings exit %d: %s", code, errOut)
+func TestValidateStream(t *testing.T) {
+	fixture(t)
+	good := `{"kind":"finding","title":"A","severity":"high","targets":[{"scope":"S-12"}],"sections":{"description":"d","remediation":"r","poc":"p"}}` + "\n"
+	code, out, _ := rpt(t, good, "validate", "-")
+	if code != 0 || out != good {
+		t.Errorf("a clean stream: exit %d %q", code, out)
 	}
-	big := `{"kind":"scope","id":"S-big","note":"` + strings.Repeat("x", 1<<20) + `"}`
-	code, out, errOut := runIn(t, findings+big+"\n", "scope", "match", "--report", fixture, "--drop-out-of-scope")
-	if code != 0 || errOut != "" {
-		t.Fatalf("scope match exit %d, stderr %q", code, errOut)
+	bad := `{"kind":"finding","id":"F-001","title":"A","severity":"high","targets":[{"scope":"S-404"}]}` + "\n"
+	code, out, _ = rpt(t, bad, "validate", "-")
+	recs := records(t, out)
+	if code != 1 || len(recs) == 0 || recs[0]["kind"] != "problem" || strings.Contains(out, `"kind":"finding"`) {
+		t.Errorf("a bad stream: exit %d %s", code, out)
 	}
-	// Fixture findings are attributed already: nothing to match, so every byte passes through.
-	if want := findings + big + "\n"; out != want {
-		t.Errorf("output differs from input (%d vs %d bytes)", len(out), len(want))
+}
+
+func TestAssemble(t *testing.T) {
+	fixture(t)
+	code, out, errOut := rpt(t, "", "assemble")
+	recs := records(t, out)
+	if code != 0 || recs[0]["kind"] != "report" || !strings.Contains(errOut, "S-99") {
+		t.Errorf("exit %d %s %s", code, out[:min(len(out), 200)], errOut)
+	}
+}
+
+func TestNewAndLs(t *testing.T) {
+	src := fixture(t)
+	t.Setenv("RPT_REPORT_DIR", "")
+	root := t.TempDir()
+	dir := filepath.Join(root, "a", "r")
+	if code, _, errOut := rpt(t, "", "new", "--like", src, dir); code != 0 {
+		t.Fatal(errOut)
+	}
+	if read(t, filepath.Join(dir, "rpt.yaml")) != read(t, filepath.Join(src, "rpt.yaml")) {
+		t.Error("--like didn't copy rpt.yaml")
+	}
+	if code, _, _ := rpt(t, "", "new", dir); code != 1 {
+		t.Error("new over a report")
+	}
+	code, out, _ := rpt(t, "", "ls", root)
+	if recs := records(t, out); code != 0 || len(recs) != 1 || recs[0]["findings"] != 0.0 {
+		t.Errorf("ls: exit %d %s", code, out)
+	}
+	if code, _, _ := rpt(t, "", "ls", "--report", dir); code != 2 {
+		t.Error("--report without --current")
+	}
+}
+
+func TestHelpListsPlugins(t *testing.T) {
+	fixture(t)
+	plugins(t, map[string]string{
+		"tag":     `echo '{"summary":"Tag findings"}'`,
+		"old":     `echo '{"summary":"Old","requires":{"format":{"max":1}}}'`,
+		"finding": `echo '{"summary":"shadowed"}'`,
+	})
+	_, out, _ := rpt(t, "", "help")
+	if !strings.Contains(out, `"name":"tag"`) || !strings.Contains(out, "Tag findings") || strings.Contains(out, `"name":"old"`) || strings.Contains(out, "shadowed") {
+		t.Errorf("help: %s", out)
+	}
+	_, out, _ = rpt(t, "", "help", "--all")
+	if !strings.Contains(out, `"incompatible":true`) || !strings.Contains(out, `"shadowed":true`) {
+		t.Errorf("help --all: %s", out)
+	}
+}
+
+func TestPluginRunsWithItsArgumentsAndEnvironment(t *testing.T) {
+	dir := fixture(t)
+	plugins(t, map[string]string{"echo": `printf '%s|' "$@"; echo "$RPT_REPORT_DIR $RPT_SCHEMA_VERSION"; exit 3`})
+	code, _, _ := rpt(t, "", "echo", "a b", "--report", "x", "--json")
+	want := "a b|--report|x|--json|" + dir + " 2\n"
+	if code != 3 || pluginOut.String() != want {
+		t.Errorf("exit %d, plugin printed %q, want %q", code, pluginOut.String(), want)
+	}
+}
+
+func TestIncompatiblePluginWarns(t *testing.T) {
+	fixture(t)
+	plugins(t, map[string]string{"old": `[ "$1" = --describe ] && echo '{"summary":"s","requires":{"schema_version":{"max":1}}}'; exit 0`})
+	code, _, errOut := rpt(t, "", "old")
+	if code != 0 || strings.Count(errOut, "may not work with this rpt") != 1 || !strings.Contains(errOut, "up to 1") {
+		t.Errorf("exit %d %q", code, errOut)
+	}
+}
+
+func TestValidateChecksPluginSchemas(t *testing.T) {
+	dir := fixture(t)
+	plugins(t, map[string]string{"api": `echo '{"summary":"s","schemas":{"finding":{"x-api-id":{"type":"integer"}}}}'`})
+	f := filepath.Join(dir, "findings/sqli-login.md")
+	b, _ := os.ReadFile(f)
+	writeFile(t, f, strings.Replace(string(b), "cvss:", "x-api-id: seven\ncvss:", 1))
+	_, out, _ := rpt(t, "", "validate")
+	if !strings.Contains(out, `"rule":"pluginSchema"`) || !strings.Contains(out, "x-api-id: got string, want integer (schema from api)") {
+		t.Errorf("%s", out)
 	}
 }

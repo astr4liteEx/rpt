@@ -1,105 +1,145 @@
 package main
 
 import (
-	"maps"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 )
 
-// revOf returns the rev of the one record in jsonl.
-func revOf(t *testing.T, jsonl string) string {
-	t.Helper()
-	rev := strings.TrimSuffix(pick(t, jsonl, "rev"), "\n")
-	if len(rev) != 16 {
-		t.Fatalf("no rev in %q", jsonl)
+func TestSetTakesValuesStartingWithADash(t *testing.T) {
+	dir := fixture(t)
+	code, out, errOut := rpt(t, "", "finding", "set", "F-001", "title", "--not a flag")
+	if code != 0 || records(t, out)[0]["title"] != "--not a flag" {
+		t.Fatalf("exit %d: %s %s", code, out, errOut)
 	}
-	return rev
+	if !strings.Contains(read(t, filepath.Join(dir, "findings/xss-search.md")), "title: --not a flag") {
+		t.Error("not written")
+	}
+}
+
+func TestSectionFromStdin(t *testing.T) {
+	dir := fixture(t)
+	code, _, errOut := rpt(t, "New text\n\nwith two paragraphs.\n", "finding", "set", "F-001", "sections.remediation")
+	got := read(t, filepath.Join(dir, "findings/xss-search.md")) // CRLF, kept
+	if code != 0 || !strings.Contains(got, "## Remediation\r\n\r\nNew text\r\n\r\nwith two paragraphs.\r\n") {
+		t.Errorf("exit %d %s:\n%s", code, errOut, read(t, filepath.Join(dir, "findings/xss-search.md")))
+	}
+}
+
+func TestDryRunWritesNothing(t *testing.T) {
+	dir := fixture(t)
+	before := read(t, filepath.Join(dir, "scope.csv"))
+	code, out, _ := rpt(t, "", "scope", "add", "--host", "10.9.9.9", "--dry-run")
+	if code != 0 || records(t, out)[0]["id"] == nil || read(t, filepath.Join(dir, "scope.csv")) != before {
+		t.Errorf("exit %d %s", code, out)
+	}
 }
 
 func TestIfRev(t *testing.T) {
-	dir := reportCopy(t)
-	_, out, _ := runIn(t, "", "finding", "get", "--report", dir)
-	var rev string
-	for line := range strings.Lines(out) {
-		if strings.Contains(line, `"id":"F-001"`) {
-			rev = revOf(t, line)
-		}
+	fixture(t)
+	_, out, _ := rpt(t, "", "finding", "get", "F-001")
+	rev := records(t, out)[0]["rev"].(string)
+	if code, _, errOut := rpt(t, "", "finding", "set", "--if-rev", rev, "F-001", "title", "One"); code != 0 {
+		t.Fatalf("matching rev refused: %s", errOut)
 	}
-
-	before := folderState(t, dir)
-	code, out, errOut := runIn(t, "", "finding", "set", "F-001", "cvss", `"1.0"`, "--if-rev", "0123456789abcdef", "--report", dir)
-	if code != 1 || pick(t, out, "kind", "rule") != "problem rev\n" || !strings.Contains(errOut, "changed since read") {
-		t.Errorf("stale rev: exit %d, stdout %q, stderr %q", code, out, errOut)
+	code, out, _ := rpt(t, "", "finding", "set", "--if-rev", "F-001="+rev, "F-001", "title", "Two")
+	if code != 1 || records(t, out)[0]["rule"] != "rev" {
+		t.Errorf("stale rev: exit %d %s", code, out)
 	}
-	if !maps.Equal(before, folderState(t, dir)) {
-		t.Error("a stale --if-rev wrote")
-	}
-
-	code, out, errOut = runIn(t, "", "finding", "set", "F-001", "cvss", `"1.0"`, "--if-rev", "F-001="+rev, "--report", dir)
-	if code != 0 || revOf(t, out) == rev {
-		t.Errorf("fresh rev: exit %d, stdout %q, stderr %q; want the new rev", code, out, errOut)
-	}
-	// The old rev is stale now.
-	if code, _, _ := runIn(t, "", "finding", "set", "F-001", "cvss", `"2.0"`, "--if-rev", rev, "--report", dir); code != 1 {
-		t.Errorf("reused rev: exit %d, want 1", code)
+	if code, _, _ := rpt(t, "", "finding", "set", "--if-rev", "F-002="+rev, "F-001", "title", "Two"); code != 2 {
+		t.Errorf("an --if-rev for a thing not named: exit %d", code)
 	}
 }
 
-func TestIfRevUsage(t *testing.T) {
-	for _, args := range [][]string{
-		{"finding", "remove", "--yes", "F-001", "F-002", "--if-rev", "0123456789abcdef"}, // which one?
-		{"finding", "set", "F-001", "cvss", "1", "--if-rev", "F-002=0123456789abcdef"},
-	} {
-		if code, _, errOut := runIn(t, "", append(args, "--report", reportCopy(t))...); code != 2 || !strings.Contains(errOut, "--if-rev") {
-			t.Errorf("rpt %v: exit %d, stderr %q; want 2", args, code, errOut)
-		}
+func TestRemoveNeedsYesOffATerminal(t *testing.T) {
+	dir := fixture(t)
+	if code, _, errOut := rpt(t, "", "finding", "remove", "F-002"); code != 1 || !strings.Contains(errOut, "--yes") {
+		t.Errorf("exit %d %q", code, errOut)
+	}
+	if read(t, filepath.Join(dir, "findings/tls-weak.md")) == "<absent>" {
+		t.Fatal("removed without --yes")
+	}
+	if code, _, _ := rpt(t, "", "finding", "remove", "--yes", "F-002"); code != 0 || read(t, filepath.Join(dir, "findings/tls-weak.md")) != "<absent>" {
+		t.Errorf("--yes: exit %d", code)
 	}
 }
 
-func TestDryRun(t *testing.T) {
-	dir := reportCopy(t)
-	before := folderState(t, dir)
-	code, dry, errOut := runIn(t, "", "finding", "set", "F-001", "cvss", `"1.0"`, "--dry-run", "--report", dir)
-	if code != 0 || !strings.Contains(dry, `"cvss":"1.0"`) {
-		t.Fatalf("exit %d, stdout %q, stderr %q", code, dry, errOut)
+func TestARefusalWritesNothing(t *testing.T) {
+	dir := fixture(t)
+	stdin := `{"kind":"finding","title":"Good","severity":"low","targets":[{"scope":"S-12"}]}` + "\n" +
+		`{"kind":"finding","title":"Bad","severity":"urgent","targets":[{"scope":"S-12"}]}` + "\n"
+	code, out, _ := rpt(t, stdin, "finding", "add")
+	recs := records(t, out)
+	if code != 1 || len(recs) != 1 || recs[0]["kind"] != "problem" || recs[0]["path"] != "-" || recs[0]["line"] != 2.0 {
+		t.Errorf("exit %d %s", code, out)
 	}
-	if !maps.Equal(before, folderState(t, dir)) {
-		t.Error("--dry-run wrote")
-	}
-	// The real write prints exactly what the dry run did, rev included.
-	if _, real, _ := runIn(t, "", "finding", "set", "F-001", "cvss", `"1.0"`, "--report", dir); real != dry {
-		t.Errorf("dry run printed\n%s\nthe write printed\n%s", dry, real)
-	}
-	// A refused write fails the same way dry.
-	if code, out, _ := runIn(t, "", "finding", "set", "F-404", "cvss", "1", "--dry-run", "--report", dir); code != 1 || pick(t, out, "rule") != "exists\n" {
-		t.Errorf("dry refusal: exit %d, stdout %q", code, out)
+	if m, _ := filepath.Glob(filepath.Join(dir, "findings", "F-004*")); len(m) != 0 {
+		t.Error("the good record was written")
 	}
 }
 
-func TestScopeDeleteIfRev(t *testing.T) {
-	dir := reportCopy(t)
-	_, out, _ := runIn(t, "", "scope", "get", "S-20", "--report", dir)
-	rev := revOf(t, out)
-	// Adding a row leaves S-20's rev alone.
-	if code, _, errOut := runIn(t, "", "scope", "add", "--host", "new.example", "--report", dir); code != 0 {
-		t.Fatalf("add: exit %d, stderr %q", code, errOut)
-	}
-	if code, out, errOut := runIn(t, "", "scope", "remove", "--yes", "S-20", "--if-rev", "S-20="+rev, "--report", dir); code != 0 || pick(t, out, "id") != "S-20\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+func TestAddFromStdinPassesOtherRecords(t *testing.T) {
+	fixture(t)
+	stdin := `{"kind":"note", "keep":  "spacing"}` + "\n" + `{"kind":"finding","title":"New","severity":"low","targets":[{"scope":"S-12"}]}` + "\n"
+	code, out, errOut := rpt(t, stdin, "finding", "add")
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	if code != 0 || len(lines) != 2 || lines[0] != `{"kind":"note", "keep":  "spacing"}` || records(t, lines[1])[0]["id"] != "F-004" {
+		t.Errorf("exit %d %s %s", code, out, errOut)
 	}
 }
 
-func TestRevIsReserved(t *testing.T) {
-	dir := reportCopy(t)
-	if code, out, _ := runIn(t, "", "finding", "set", "F-001", "rev", "x", "--report", dir); code != 1 || pick(t, out, "rule") != "write\n" {
-		t.Errorf("set rev: exit %d, stdout %q", code, out)
+func TestAnErrorUpstreamStopsAWrite(t *testing.T) {
+	dir := fixture(t)
+	stdin := `{"kind":"problem","path":"x","rule":"r","level":"error","message":"broken upstream"}` + "\n" +
+		`{"kind":"finding","title":"New","severity":"low","targets":[{"scope":"S-12"}]}` + "\n"
+	code, out, _ := rpt(t, stdin, "finding", "add")
+	if code != 1 || !strings.Contains(out, "broken upstream") || strings.Contains(out, `"kind":"finding"`) {
+		t.Errorf("exit %d %s", code, out)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "scope.csv"), []byte("id,host,rev\nS-1,a,b\n"), 0o644); err != nil {
-		t.Fatal(err)
+	if m, _ := filepath.Glob(filepath.Join(dir, "findings", "F-004*")); len(m) != 0 {
+		t.Error("written after an upstream error")
 	}
-	if code, _, errOut := runIn(t, "", "scope", "get", "--report", dir); code != 1 || !strings.Contains(errOut, `column "rev" is reserved`) {
-		t.Errorf("rev column: exit %d, stderr %q", code, errOut)
+}
+
+func TestScopeRenameCarriesIntoFindings(t *testing.T) {
+	dir := fixture(t)
+	code, out, errOut := rpt(t, "", "scope", "set", "S-12", "id", "S-50")
+	recs := records(t, out)
+	if code != 0 || len(recs) != 2 || recs[1]["id"] != "F-003" {
+		t.Fatalf("exit %d %s %s", code, out, errOut)
+	}
+	if !strings.Contains(read(t, filepath.Join(dir, "findings/sqli-login.md")), "S-50") {
+		t.Error("finding not rewritten")
+	}
+}
+
+func TestConfigGetPath(t *testing.T) {
+	fixture(t)
+	code, out, _ := rpt(t, "", "config", "get", "sections.poc")
+	if code != 0 || !strings.Contains(out, `"sections":{"poc":"Proof of concept"}`) || strings.Contains(out, "severities") {
+		t.Errorf("exit %d %s", code, out)
+	}
+	if code, _, _ := rpt(t, "", "config", "get", "nope"); code != 1 {
+		t.Errorf("a missing path: exit %d", code)
+	}
+}
+
+func TestEvidenceAddAndPrune(t *testing.T) {
+	dir := fixture(t)
+	src := filepath.Join(t.TempDir(), "shot.png")
+	writeFile(t, src, "png")
+	if code, _, errOut := rpt(t, "", "evidence", "add", "--link", "poc", "F-001", src); code != 0 {
+		t.Fatal(errOut)
+	}
+	if !strings.Contains(read(t, filepath.Join(dir, "findings/xss-search.md")), "![shot.png](evidence/F-001-shot.png)") {
+		t.Error("not linked")
+	}
+	writeFile(t, filepath.Join(dir, "findings/evidence/stray.png"), "x")
+	code, out, _ := rpt(t, "", "evidence", "prune", "--yes")
+	if code != 0 || !strings.Contains(out, "stray.png") || read(t, filepath.Join(dir, "findings/evidence/stray.png")) != "<absent>" {
+		t.Errorf("prune: exit %d %s", code, out)
+	}
+	if read(t, filepath.Join(dir, "findings/evidence/F-001-shot.png")) != "png" {
+		t.Error("pruned a linked file")
 	}
 }
