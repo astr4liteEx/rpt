@@ -21,6 +21,11 @@ func fangHelp(e *env, w io.Writer, path []string) int {
 	root.SetHelpTemplate("")
 	root.SetUsageTemplate("")
 	root.SetHelpCommand(&cobra.Command{Hidden: true})
+	if len(path) > 0 && path[0] == "help" {
+		// rpt help --help: the help command is out of the listing above,
+		// so it joins the tree as a hidden command of its own.
+		root.AddCommand(&cobra.Command{Use: "help", Short: builtins["help"].desc.Summary, Hidden: true})
+	}
 	for _, g := range root.Groups() {
 		g.Title = strings.TrimSuffix(g.Title, ":")
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -96,10 +97,15 @@ func TestIncompatiblePlugin(t *testing.T) {
 	}
 }
 
+// TestRunningIncompatiblePluginWarns runs the built rpt: running a plugin
+// execs it, which only a separate process can do.
 func TestRunningIncompatiblePluginWarns(t *testing.T) {
 	plugins(t, map[string]string{"old": `{"summary":"s","requires":{"format":[1]}}`})
-	code, _, errOut := runIn(t, "", "old")
-	if code != 0 || strings.Count(errOut, "may not work with this rpt") != 1 {
-		t.Errorf("exit %d, stderr %q", code, errOut)
+	cmd := exec.Command(filepath.Join(bins(t), "rpt"), "old")
+	cmd.Env = []string{"PATH=" + os.Getenv("PATH"), "HOME=" + t.TempDir()}
+	var errOut strings.Builder
+	cmd.Stderr = &errOut
+	if err := cmd.Run(); err != nil || strings.Count(errOut.String(), "may not work with this rpt") != 1 {
+		t.Errorf("%v, stderr %q", err, errOut.String())
 	}
 }

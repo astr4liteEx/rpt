@@ -173,7 +173,7 @@ func TestScopeRemoveCleanupAsks(t *testing.T) {
 	if code != 0 || pick(t, out, "kind", "id") != "scope S-12\nfinding F-003\nscope S-20\n" {
 		t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 	}
-	if !strings.Contains(errOut, "Remove 2 scope rows:\n  S-12  10.0.0.5  443\n  S-20  10.0.1.0/24\n--cleanup drops S-12's targets from F-003\n") {
+	if !strings.Contains(unbox(errOut), "Remove 2 scope rows:\n  S-12  10.0.0.5  443\n  S-20  10.0.1.0/24\n\n--cleanup drops S-12's targets from F-003\n") {
 		t.Errorf("prompt %q", errOut)
 	}
 }

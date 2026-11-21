@@ -81,7 +81,7 @@ func TestRun(t *testing.T) {
 		wantOut   func(string) bool
 		wantInErr string
 	}{
-		{name: "no command prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "usage: rpt <command>"},
+		{name: "no command prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "rpt [command]"},
 		{name: "unknown command exits 2", args: []string{"frobnicate"}, wantCode: 2, wantOut: exactly(""), wantInErr: `unknown command "frobnicate"`},
 		{
 			name:     "finding get into a pipe is JSON Lines",

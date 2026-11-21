@@ -45,7 +45,7 @@ func TestVerbsIsGone(t *testing.T) {
 }
 
 // TestHelpFlag asks every built-in and subcommand for --help and -h: each
-// prints its usage line on stdout, exits 0, and does nothing else.
+// prints its fang help on stdout, exits 0, and does nothing else.
 func TestHelpFlag(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	for _, name := range builtinNames() {
@@ -54,7 +54,7 @@ func TestHelpFlag(t *testing.T) {
 			t.Chdir(dir)
 			args := append(strings.Fields(name), flag)
 			code, out, errOut := runIn(t, "", args...)
-			if code != 0 || errOut != "" || !strings.HasPrefix(out, "usage: "+usageOf(name)+"\n") {
+			if code != 0 || errOut != "" || !isHelpFor(out, name) {
 				t.Errorf("rpt %s %s: exit %d, stdout %q, stderr %q; want exit 0 and the usage", name, flag, code, out, errOut)
 			}
 			if ents, _ := os.ReadDir(dir); len(ents) != 0 {
@@ -68,7 +68,7 @@ func TestHelpCommandShowsUsage(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	for _, args := range [][]string{{"help", "scope", "add"}, {"scope", "add", "--help"}} {
 		code, out, errOut := runIn(t, "", args...)
-		if code != 0 || errOut != "" || !strings.HasPrefix(out, "usage: "+usageOf("scope add")+"\n") || !strings.Contains(out, "--host") {
+		if code != 0 || errOut != "" || !isHelpFor(out, "scope add") || !strings.Contains(out, "--host") {
 			t.Errorf("rpt %v: exit %d, stdout %q, stderr %q", args, code, out, errOut)
 		}
 	}
@@ -81,7 +81,7 @@ func TestNewHelpCreatesNothing(t *testing.T) {
 	dir := t.TempDir()
 	t.Chdir(dir)
 	code, out, _ := runIn(t, "", "new", "--help")
-	if code != 0 || !strings.HasPrefix(out, "usage: rpt new") {
+	if code != 0 || !isHelpFor(out, "new") {
 		t.Errorf("exit %d, stdout %q", code, out)
 	}
 	if _, err := os.Stat(filepath.Join(dir, "--help")); err == nil {
@@ -96,7 +96,7 @@ func TestRootHelp(t *testing.T) {
 		if code != 0 || errOut != "" {
 			t.Fatalf("rpt %v: exit %d, stderr %q", args, code, errOut)
 		}
-		for _, w := range []string{"rpt <command>", "finding", "validate", "--report", "--json"} {
+		for _, w := range []string{"rpt [command]", "finding", "validate", "--report", "--json"} {
 			if !strings.Contains(out, w) {
 				t.Errorf("rpt %v lacks %q:\n%s", args, w, out)
 			}
@@ -196,6 +196,21 @@ func TestUsageMatchesTable(t *testing.T) {
 }
 
 // builtinNames lists every built-in and "built-in sub" name.
+// isHelpFor reports whether out is fang's help for the built-in name
+// ("scope add"): its summary from the command table, and a usage section
+// naming the command.
+func isHelpFor(out, name string) bool {
+	f := strings.Fields(name)
+	b := builtins[f[0]]
+	summary := b.desc.Summary
+	for _, s := range b.subs {
+		if len(f) > 1 && s.name == f[1] {
+			summary = s.summary
+		}
+	}
+	return strings.Contains(out, summary) && strings.Contains(out, "USAGE") && strings.Contains(out, "rpt "+name)
+}
+
 func builtinNames() []string {
 	var names []string
 	for name, b := range builtins {

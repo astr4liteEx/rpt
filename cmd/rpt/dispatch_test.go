@@ -127,13 +127,13 @@ func TestDispatch(t *testing.T) {
 	})
 	t.Run("rpt help <plugin> asks the plugin for --help", func(t *testing.T) {
 		code, out, errOut := rptCmd(t, fixture, "help", "stub")
-		if code != 0 || !strings.Contains(out, `"args":["--help"]`) {
+		if code != 0 || !strings.Contains(out, "Usage: rpt stub") {
 			t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 		}
 	})
 	t.Run("root help lists plugins in their own group, not the shadowed one", func(t *testing.T) {
 		code, out, errOut := rptCmd(t, fixture, "--help")
-		_, plugins, ok := strings.Cut(out, "Plugin commands:")
+		_, plugins, ok := strings.Cut(out, "PLUGIN COMMANDS")
 		if code != 0 || !ok || !strings.Contains(plugins, "stub") || strings.Contains(plugins, "finding") {
 			t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
 		}

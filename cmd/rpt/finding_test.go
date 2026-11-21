@@ -15,7 +15,7 @@ func TestFindingNounNeedsAnAction(t *testing.T) {
 			t.Errorf("rpt %v: exit %d, stdout %q, stderr %q", args, code, out, errOut)
 		}
 	}
-	if code, out, _ := runIn(t, "", "finding", "--help"); code != 0 || !strings.Contains(out, "rpt finding get") {
+	if code, out, _ := runIn(t, "", "finding", "--help"); code != 0 || !isHelpFor(out, "finding") || !strings.Contains(out, "get [id...]") {
 		t.Errorf("--help: exit %d, stdout %q", code, out)
 	}
 	if code, _, _ := runIn(t, "", "findings", "--report", fixture); code != 2 {
@@ -112,7 +112,7 @@ func TestRemoveAsks(t *testing.T) {
 	}{{"y\n", true}, {"YES\n", true}, {"\n", false}, {"n\n", false}, {"", false}} {
 		dir := reportCopy(t)
 		code, out, errOut := runIn(t, tt.answer, "finding", "remove", "F-003", "F-001", "--report", dir)
-		if !strings.Contains(errOut, "Remove 2 findings:\n  F-003  SQL injection in login  findings/sqli-login.md\n") ||
+		if !strings.Contains(unbox(errOut), "Remove 2 findings:\n  F-003  SQL injection in login  findings/sqli-login.md\n") ||
 			!strings.Contains(errOut, "evidence prune") || !strings.Contains(errOut, "[y/N]") {
 			t.Errorf("%q: prompt %q", tt.answer, errOut)
 		}
@@ -163,4 +163,21 @@ func TestFindingAddRefusesMissingAsset(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(dir, "findings", "F-004-t.md")); err == nil {
 		t.Error("the batch was written in part")
 	}
+}
+
+// unbox gives the text inside the remove prompt's box: the border lines
+// dropped, each line's side borders and padding trimmed.
+func unbox(s string) string {
+	var out []string
+	for line := range strings.Lines(s) {
+		line = strings.TrimRight(line, "\n")
+		if strings.HasPrefix(line, "╭") || strings.HasPrefix(line, "╰") {
+			continue
+		}
+		if l, ok := strings.CutPrefix(line, "│ "); ok {
+			line = strings.TrimRight(strings.TrimSuffix(l, "│"), " ")
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
 }
