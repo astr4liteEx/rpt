@@ -76,19 +76,19 @@ func TestRecordsRoundTrip(t *testing.T) {
 				`"report":{"severities":["critical","high","medium","low","info"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],"renderer":"typst"},` +
 				`"summary":{"high":1,"critical":0,"medium":1,"low":0,"info":2},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
-				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
+				`"findings":[{"id":"F-003","path":"findings/sqli-login.md","title":"SQL injection in login","severity":"high",` +
 				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
 				`"sections":{"description":"d","remediation":"r","poc":"p"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
+				`"assets":[{"ref":"evidence/F-003-login.png","path":"findings/evidence/F-003-login.png","file":"/engagements/acme/findings/evidence/F-003-login.png","source":"frontmatter","media_type":"image/png"}],"cvss":"9.1"}],` +
 				`"pages":[],"generator":"rpt 0.1.0"}`,
 			want: `{"kind":"report","schema_version":1,` +
 				`"report":{"severities":["critical","high","medium","low","info"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],"renderer":"typst"},` +
 				`"summary":{"critical":0,"high":1,"info":2,"low":0,"medium":1},` +
 				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
-				`"findings":[{"id":"F-003","title":"SQL injection in login","severity":"high",` +
+				`"findings":[{"id":"F-003","path":"findings/sqli-login.md","title":"SQL injection in login","severity":"high",` +
 				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
 				`"sections":{"description":"d","poc":"p","remediation":"r"},` +
-				`"assets":["/engagements/acme/findings/evidence/F-003-login.png"],"cvss":"9.1"}],` +
+				`"assets":[{"ref":"evidence/F-003-login.png","path":"findings/evidence/F-003-login.png","file":"/engagements/acme/findings/evidence/F-003-login.png","source":"frontmatter","media_type":"image/png"}],"cvss":"9.1"}],` +
 				`"pages":[],"generator":"rpt 0.1.0"}`,
 		},
 	}

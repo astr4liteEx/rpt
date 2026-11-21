@@ -208,6 +208,38 @@ func (r *Report) references(o owner) []sdk.Evidence {
 	return out
 }
 
+// assets are the files o lists and links, one per source and ref, in the
+// order references gives them. A ref leaving the report is left out; with
+// existing, so is one naming no regular file.
+func (r *Report) assets(o owner, existing bool) []sdk.Asset {
+	out := []sdk.Asset{}
+	seen := map[[2]string]bool{}
+	for _, e := range r.references(o) {
+		k := [2]string{e.Source, e.Ref}
+		if seen[k] || e.File == "" || existing && !e.Exists {
+			continue
+		}
+		seen[k] = true
+		out = append(out, sdk.Asset{Ref: e.Ref, Path: e.Path, File: e.File, Source: e.Source, MediaType: e.MediaType, Text: e.Text, Image: e.Image})
+	}
+	return out
+}
+
+// AssetsOf gives the files the finding or page in the report file rel
+// lists and links, one per source and ref; any that leaves the report is
+// left out.
+func (r *Report) AssetsOf(rel string) ([]sdk.Asset, error) {
+	src, err := r.root.ReadFile(rel)
+	if err != nil {
+		return nil, &FileError{Path: rel, Err: err}
+	}
+	o, err := ownerFrom(rel, src, strings.HasPrefix(rel, PagesDir+"/"), r.headings())
+	if err != nil {
+		return nil, err
+	}
+	return r.assets(o, false), nil
+}
+
 // reference is the record for one reference o makes to ref.
 func (r *Report) reference(o owner, ref, source string) sdk.Evidence {
 	e := sdk.Evidence{Kind: "evidence", Ref: ref, Source: source, Rev: o.rev}
@@ -636,8 +668,7 @@ func (tx *Tx) moveEvidence(o owner, rel, to string) ([]any, error) {
 				list[i], touched = nr, true
 			}
 		}
-		ls := relLinks(cur.body)
-		if !touched && !slices.ContainsFunc(ls, func(l link) bool { return cur.refersTo(l.path, rel) }) {
+		if !touched && !slices.ContainsFunc(fileLinks(cur.body), func(l link) bool { return cur.refersTo(l.path, rel) }) {
 			continue
 		}
 		rec, err := tx.editOwner(cur, func(ff *findingFile) error {
@@ -650,15 +681,8 @@ func (tx *Tx) moveEvidence(o owner, rel, to string) ([]any, error) {
 					return err
 				}
 			}
-			var err error
-			ff.body, _, err = rewriteLinks(ff.body, cur, rel, func(l link) string {
-				md := "[" + string(ff.body[l.textStart:l.textEnd]) + "](" + linkDest(nr) + ")"
-				if l.image {
-					md = "!" + md
-				}
-				return md
-			})
-			return err
+			ff.body = rewriteDests(ff.body, func(l link) (string, bool) { return nr, cur.refersTo(l.path, rel) })
+			return nil
 		})
 		if err != nil {
 			return nil, err

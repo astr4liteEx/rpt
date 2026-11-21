@@ -76,7 +76,7 @@ func init() {
 			{"prune", evidencePruneVerb, "rpt evidence prune [--yes] [--dry-run]"},
 		}},
 		"finding": {nounVerb("finding"), sdk.Command{Summary: "Get, add, set, unset and remove findings", Usage: "rpt finding <action>", Input: "records", Output: "records"}, []sub{
-			{"get", findingGetVerb, "rpt finding get [--lines] [id...]"},
+			{"get", findingGetVerb, "rpt finding get [--lines] [--assets] [id...]"},
 			{"add", findingAddVerb, "rpt finding add [--scaffold] [--dry-run] < records.jsonl, or rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold] [--dry-run]"},
 			{"set", findingSetVerb, "rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>..."},
 			{"unset", findingUnsetVerb, "rpt finding unset [--if-rev rev] [--dry-run] <id> <path>..."},
@@ -86,7 +86,7 @@ func init() {
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
 		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
 		"page": {nounVerb("page"), sdk.Command{Summary: "Get, add, set, unset and remove pages of report-level prose", Usage: "rpt page <action>", Input: "records", Output: "records"}, []sub{
-			{"get", pageGetVerb, "rpt page get [--lines] [id...]"},
+			{"get", pageGetVerb, "rpt page get [--lines] [--assets] [id...]"},
 			{"add", pageAddVerb, "rpt page add [--dry-run] < records.jsonl, or rpt page add --title t [--id P-NNN] [--dry-run]"},
 			{"set", pageSetVerb, "rpt page set [--if-rev rev] [--dry-run] <id> <path> <value>..."},
 			{"unset", pageUnsetVerb, "rpt page unset [--if-rev rev] [--dry-run] <id> <path>..."},

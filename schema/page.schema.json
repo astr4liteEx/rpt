@@ -11,6 +11,7 @@
     "path": {"type": "string", "description": "The page file, relative to the report root. rpt page add ignores it."},
     "body": {"type": "string", "description": "Markdown after the frontmatter. ## headings in it are the page's own, not sections."},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence files, relative to the page file."},
+    "assets": {"type": "array", "items": {"$ref": "finding.schema.json#/$defs/asset"}, "description": "Set by rpt page get --assets; read by rpt page add, as for a finding."},
     "rev": {"type": "string", "description": "The page file's revision. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the page changed since this read."},
     "lines": {
       "type": "object",

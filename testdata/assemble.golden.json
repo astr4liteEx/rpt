@@ -59,6 +59,7 @@
   "findings": [
     {
       "id": "F-003",
+      "path": "findings/sqli-login.md",
       "title": "SQL injection in login",
       "severity": "high",
       "targets": [
@@ -87,12 +88,28 @@
         "remediation": "Use parameterised queries."
       },
       "assets": [
-        "$REPORT/findings/evidence/F-003-login.png"
+        {
+          "ref": "evidence/F-003-login.png",
+          "path": "findings/evidence/F-003-login.png",
+          "file": "$REPORT/findings/evidence/F-003-login.png",
+          "source": "frontmatter",
+          "media_type": "image/png"
+        },
+        {
+          "ref": "evidence/F-003-login.png",
+          "path": "findings/evidence/F-003-login.png",
+          "file": "$REPORT/findings/evidence/F-003-login.png",
+          "source": "body",
+          "media_type": "image/png",
+          "text": "login bypass",
+          "image": true
+        }
       ],
       "cvss": "9.1"
     },
     {
       "id": "F-001",
+      "path": "findings/xss-search.md",
       "title": "Reflected XSS in search",
       "severity": "medium",
       "targets": [
@@ -118,6 +135,7 @@
     },
     {
       "id": "F-002",
+      "path": "findings/tls-weak.md",
       "title": "Weak TLS configuration",
       "severity": "info",
       "targets": [],

@@ -41,7 +41,7 @@ var pageKeys = []string{"id", "title", "evidence"}
 
 // pageRecordKeys are the page record members rpt sets itself; a
 // frontmatter key with one of these names would clash with them.
-var pageRecordKeys = []string{"kind", "path", "rev", "body", "lines"}
+var pageRecordKeys = []string{"kind", "path", "rev", "body", "lines", "assets"}
 
 // Pages reads every page file in pages/, in file-name order, as Findings
 // reads findings.
@@ -260,6 +260,11 @@ func (tx *Tx) AddPage(rec sdk.Page) (sdk.Page, error) {
 	} else if exists {
 		return sdk.Page{}, bad("%s already exists", rel)
 	}
+	ev, err := tx.takeAssets(id, rel, PageEvidenceDir, rec.Evidence, []*string{&rec.Body}, rec.Assets)
+	if err != nil {
+		return sdk.Page{}, err
+	}
+	rec.Evidence, rec.Assets = ev, nil
 	var ff findingFile
 	fields := []struct {
 		key string
@@ -360,7 +365,7 @@ func (tx *Tx) SetPage(id, p string, values ...string) (PageChange, error) {
 	if len(values) == 0 {
 		return PageChange{}, bad("give a value")
 	}
-	if slices.Contains([]string{"kind", "path", "rev", "lines"}, p) {
+	if slices.Contains([]string{"kind", "path", "rev", "lines", "assets"}, p) {
 		return PageChange{}, fmt.Errorf("%w: %s: rpt sets it on page records", ErrRefusedKey, p)
 	}
 	if (p == "body" || p == "id" || p == "title") && len(values) != 1 {
@@ -504,7 +509,7 @@ func (tx *Tx) rewritePageLists(fn func(string) (string, bool)) (sdk.Config, bool
 // its id and title), x-<plugin>.<key>, or body, which empties it.
 func (tx *Tx) UnsetPage(id string, paths ...string) (sdk.Page, error) {
 	for _, p := range paths {
-		if slices.Contains([]string{"id", "title", "kind", "path", "rev", "lines"}, p) {
+		if slices.Contains([]string{"id", "title", "kind", "path", "rev", "lines", "assets"}, p) {
 			return sdk.Page{}, fmt.Errorf("%w: %s: a page needs it, or rpt sets it", ErrRefusedUnset, p)
 		}
 	}

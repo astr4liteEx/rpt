@@ -91,7 +91,7 @@ rpt assemble | rpt-render-pdf --client Acme --out report.pdf
 
 For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains one planted problem for `rpt validate` to find.
 
-`rpt-render-pdf` stands for any renderer plugin. `rpt assemble` prints the whole report as one JSON record, with each finding's evidence paths made absolute, a count of findings per severity, and the report's section headings. A renderer writes its document where `--out` says, so stdout carries only records.
+`rpt-render-pdf` stands for any renderer plugin. `rpt assemble` prints the whole report as one JSON record, with each finding's and page's file and every file it lists or links (its `assets`, links pointed at their absolute paths), a count of findings per severity, and the report's section headings. A renderer writes its document where `--out` says, so stdout carries only records.
 
 ## Commands
 
@@ -100,12 +100,12 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt new <dir>` | Creates an empty report in a new or empty folder. |
 | `rpt ls [dir]` | Lists the reports at or under a folder (default: the current one), with each one's finding count. |
 | `rpt ls --current` | Prints the report every other command would act on from here, found from `--report`, `$RPT_REPORT_DIR` or the current folder. Exits 1 when there is none. |
-| `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (line and column) and section sits in it, for checkers that load files or report problems by position. |
+| `rpt finding get [id...]` | Prints every finding, or those with the IDs given. `--lines` adds each finding file's absolute path and where each frontmatter key (line and column) and section sits in it, for checkers that load files or report problems by position. `--assets` adds every file the finding lists or links, so `rpt finding get --assets F-003 \| jq 'del(.id)' \| rpt finding add --report ../other` copies it to another report, evidence and all. |
 | `rpt finding add` | Writes each finding record on stdin as a new finding file. With `--title` and `--severity` (and `--target`, `--id`), writes one blank finding with an empty heading for each required section (`--no-scaffold` leaves them out); `--scaffold` adds those headings to stdin records too. It checks only the form: whether the severity is one of the report's is `rpt validate`'s to say. |
 | `rpt finding set <id> <path> <value>...` | Changes one value, given as YAML. The path is a frontmatter key, `sections.<key>` (the text from stdin when no value is given, adding the section if it's missing) or `x-<plugin>.<key>`. Several values make a list: `targets S-12 '{scope: S-20, port: 443}'`. Setting `id` renames the finding, and its file when the name starts with the old ID. Only the lines that change are rewritten. |
 | `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
 | `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
-| `rpt page get [id...]` | Prints the report's pages of prose, such as an executive summary. `--lines` adds where each page's parts sit in its file. |
+| `rpt page get [id...]` | Prints the report's pages of prose, such as an executive summary. `--lines` adds where each page's parts sit in its file; `--assets` is as for findings. |
 | `rpt page add` | Writes each page record on stdin as a new page file, or one empty page from `--title` (and `--id`). |
 | `rpt page set <id> <path> <value>...` | Changes a page's `title`, `evidence`, `body` (from stdin when no value is given) or another key. Setting `id` rewrites `pages` and `required_pages` in `rpt.yaml` too. |
 | `rpt page unset <id> <path>...` | Removes keys from a page; `body` empties it. |

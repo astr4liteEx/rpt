@@ -18,7 +18,7 @@ var (
 )
 
 // refusedKeys can't be set as top-level keys: sections are set one at a
-// time as sections.<key>, and kind, path, rev and lines aren't stored in
+// time as sections.<key>, and kind, path, rev, lines and assets aren't stored in
 // the file. Setting id renames the finding.
 var refusedKeys = map[string]string{
 	"kind":     "kind is not stored in the file",
@@ -26,11 +26,12 @@ var refusedKeys = map[string]string{
 	"rev":      "rev is the file's revision; rpt sets it on records",
 	"sections": "set one section as sections.<key>",
 	"lines":    "lines are where the file's parts sit",
+	"assets":   "assets are the files the finding lists and links; rpt sets them on records",
 }
 
 // unsetRefused are the keys Unset refuses: a finding needs id, title and
 // severity, and the rest aren't stored in the file.
-var unsetRefused = []string{"id", "title", "severity", "kind", "path", "rev", "sections", "lines"}
+var unsetRefused = []string{"id", "title", "severity", "kind", "path", "rev", "sections", "lines", "assets"}
 
 // locate returns the path of the finding with the given ID.
 func (r *Report) locate(id string) (string, error) {

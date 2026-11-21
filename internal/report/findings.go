@@ -280,7 +280,7 @@ func splitFrontmatter(src []byte) (head, body []byte, err error) {
 
 // recordKeys are the finding record members rpt sets itself. A frontmatter
 // key with one of these names would clash with them in the record.
-var recordKeys = []string{"kind", "path", "rev", "sections", "lines"}
+var recordKeys = []string{"kind", "path", "rev", "sections", "lines", "assets"}
 
 // checkReservedKeys refuses a frontmatter key named like a recordKeys member
 // or one of the formerKeys, at its line.

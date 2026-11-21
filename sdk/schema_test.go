@@ -42,6 +42,7 @@ func TestSchemasMatchTypes(t *testing.T) {
 		{"report.schema.json", []string{"$defs", "reportPage"}, reflect.TypeFor[ReportPage]()},
 		{"config.schema.json", []string{"properties", "lines"}, reflect.TypeFor[ConfigLines]()},
 		{"finding.schema.json", []string{"$defs", "position"}, reflect.TypeFor[Position]()},
+		{"finding.schema.json", []string{"$defs", "asset"}, reflect.TypeFor[Asset]()},
 		{"command.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
 	}
 	for _, tt := range tests {

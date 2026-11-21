@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -131,11 +132,12 @@ func (a *assembly) finding(ff findingSrc, byID map[string]sdk.ScopeRow) sdk.Repo
 	f := ff.f
 	rf := sdk.ReportFinding{
 		ID:       f.ID,
+		Path:     ff.rel,
 		Title:    f.Title,
 		Severity: f.Severity,
 		Targets:  []sdk.ReportTarget{},
 		Sections: map[string]string{},
-		Assets:   []string{},
+		Assets:   a.r.assets(owner{id: f.ID, rel: ff.rel, evidence: f.Evidence, body: ff.body, first: ff.first, h: a.r.headings()}, true),
 		Extra:    f.Extra,
 	}
 	line := ff.keyLines["targets"]
@@ -155,86 +157,55 @@ func (a *assembly) finding(ff findingSrc, byID map[string]sdk.ScopeRow) sdk.Repo
 		}
 		rf.Targets = append(rf.Targets, sdk.ReportTarget{Scope: row, Host: t.Host, Port: t.Port, Protocol: t.Protocol, Extra: t.Extra})
 	}
-	addAsset := func(rel string) string {
-		abs := filepath.Join(a.r.abs, filepath.FromSlash(rel))
-		if !slices.Contains(rf.Assets, abs) {
-			rf.Assets = append(rf.Assets, abs)
-		}
-		return abs
-	}
 	for _, p := range f.Evidence {
-		rel, msg := a.r.checkEvidence(f, p)
-		if msg != "" {
+		if _, msg := a.r.checkEvidence(f, p); msg != "" {
 			a.warn(ff.rel, ff.keyLines["evidence"], RuleEvidence, "%s; left out", msg)
-			continue
 		}
-		addAsset(rel)
 	}
-	// Section links: problems are located in the file body, rewrites done
-	// per section.
 	for _, l := range relLinks(ff.body) {
 		if _, msg := a.r.checkEvidence(f, l.path); msg != "" {
 			a.warn(ff.rel, ff.bodyLine(l.off), RuleEvidence, "%s; left out", msg)
 		}
 	}
 	for key, text := range f.Sections {
-		for _, l := range relLinks([]byte(text)) {
-			rel, msg := a.r.checkEvidence(f, l.path)
-			if msg != "" {
-				continue // warned above; the link stays as written
-			}
-			text = rewriteLink(text, l.dest, linkTarget(addAsset(rel)))
-		}
-		rf.Sections[key] = text
+		rf.Sections[key] = a.absoluteLinks(f, text)
 	}
 	return rf
 }
 
-// page turns one page into its report form: evidence and body links made
-// absolute and listed as assets.
-func (a *assembly) page(p sdk.Page) sdk.ReportPage {
-	rp := sdk.ReportPage{ID: p.ID, Title: p.Title, Body: p.Body, Assets: []string{}, Extra: p.Extra}
-	f := sdk.Finding{Path: p.Path}
-	addAsset := func(rel string) string {
-		abs := filepath.Join(a.r.abs, filepath.FromSlash(rel))
-		if !slices.Contains(rp.Assets, abs) {
-			rp.Assets = append(rp.Assets, abs)
+// absoluteLinks points each link in md to a file in the report at its
+// absolute path. A link that fails its evidence check stays as written.
+func (a *assembly) absoluteLinks(f sdk.Finding, md string) string {
+	return string(rewriteDests([]byte(md), func(l link) (string, bool) {
+		if path.IsAbs(l.path) {
+			return "", false
 		}
-		return abs
-	}
-	for _, e := range p.Evidence {
-		rel, msg := a.r.checkEvidence(f, e)
-		if msg != "" {
-			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
-			continue
-		}
-		addAsset(rel)
-	}
-	for _, l := range relLinks([]byte(p.Body)) {
 		rel, msg := a.r.checkEvidence(f, l.path)
 		if msg != "" {
-			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
-			continue
+			return "", false
 		}
-		rp.Body = rewriteLink(rp.Body, l.dest, linkTarget(addAsset(rel)))
+		return filepath.ToSlash(filepath.Join(a.r.abs, filepath.FromSlash(rel))), true
+	}))
+}
+
+// page turns one page into its report form: body links made absolute and
+// every listed or linked file given as an asset.
+func (a *assembly) page(p sdk.Page) sdk.ReportPage {
+	o := owner{id: p.ID, rel: p.Path, page: true, evidence: p.Evidence, body: []byte(p.Body), first: 1}
+	rp := sdk.ReportPage{ID: p.ID, Path: p.Path, Title: p.Title, Assets: a.r.assets(o, true), Extra: p.Extra}
+	f := o.stub()
+	for _, e := range p.Evidence {
+		if _, msg := a.r.checkEvidence(f, e); msg != "" {
+			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
+		}
 	}
+	for _, l := range relLinks([]byte(p.Body)) {
+		if _, msg := a.r.checkEvidence(f, l.path); msg != "" {
+			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
+		}
+	}
+	rp.Body = a.absoluteLinks(f, p.Body)
 	return rp
-}
-
-// rewriteLink points every inline link and reference definition with the
-// target dest at target instead.
-func rewriteLink(md, dest, target string) string {
-	return strings.NewReplacer("]("+dest, "]("+target, "]: "+dest, "]: "+target).Replace(md)
-}
-
-// linkTarget writes an absolute path as a markdown link target, in angle
-// brackets when it holds characters a bare target can't.
-func linkTarget(abs string) string {
-	p := filepath.ToSlash(abs)
-	if strings.ContainsAny(p, " ()<>") {
-		return "<" + p + ">"
-	}
-	return p
 }
 
 // compareIDs orders finding IDs by number, so F-999 comes before F-1000;

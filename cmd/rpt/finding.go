@@ -72,6 +72,7 @@ func findingIDs(ids []string) []string {
 func findingGetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "finding get")
 	withLines := flags.Bool("lines", false, "add each finding's lines: its file's absolute path and where its frontmatter keys and sections sit in it")
+	withAssets := flags.Bool("assets", false, "add each finding's assets: every file it lists or links, with its absolute path, to carry it to another report with rpt finding add")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -104,6 +105,16 @@ func findingGetVerb(e *env, args []string) int {
 			picked = append(picked, list[i])
 		}
 		list = picked
+	}
+	if *withAssets {
+		for i := range list {
+			assets, err := r.AssetsOf(list[i].Path)
+			if err != nil {
+				readErr = errors.Join(readErr, err)
+				continue
+			}
+			list[i].Assets = assets
+		}
 	}
 	for _, f := range list {
 		if err := out.Write(f); err != nil {
@@ -216,7 +227,7 @@ func uniq(ids []string) []string {
 // requestErrors are mistakes in what was asked: refusals, not failures.
 var requestErrors = []error{
 	report.ErrNoFinding, report.ErrNoPage, report.ErrRefusedKey, report.ErrRefusedUnset, report.ErrBadValue,
-	report.ErrNoScopeRow, report.ErrCited, report.ErrBadSource, report.ErrInUse, report.ErrNoEvidence,
+	report.ErrNoScopeRow, report.ErrCited, report.ErrBadSource, report.ErrInUse, report.ErrNoEvidence, report.ErrBadAsset,
 }
 
 func isRequestError(err error) bool {

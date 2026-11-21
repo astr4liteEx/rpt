@@ -21,7 +21,7 @@ func TestPagesAssembleAroundFindings(t *testing.T) {
 		t.Fatalf("config set pages: exit %d, stderr %q", code, errOut)
 	}
 	_, out, _ := runIn(t, "", "assemble", "--report", dir)
-	if !strings.Contains(out, `"order":["P-001","findings","P-002"]`) || !strings.Contains(out, `"pages":[{"id":"P-001","title":"Executive summary","body":"We tested Acme.","assets":[]},{"id":"P-002"`) {
+	if !strings.Contains(out, `"order":["P-001","findings","P-002"]`) || !strings.Contains(out, `"pages":[{"id":"P-001","path":"pages/P-001-executive-summary.md","title":"Executive summary","body":"We tested Acme.","assets":[]},{"id":"P-002"`) {
 		t.Errorf("assemble: %s", out)
 	}
 }

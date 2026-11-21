@@ -16,6 +16,7 @@ const (
 	ruleRev        = "rev"        // the thing changed since the caller read it
 	ruleWrite      = "write"      // the write would break a rule; nothing was written
 	ruleNotWritten = "notWritten" // a write stopped partway; run it again to finish
+	ruleEvidence   = "evidence"   // an asset to take in is missing or unreadable
 )
 
 // writeFlags are the flags every write command takes.
@@ -104,6 +105,8 @@ func (w *write) refuse(err error, path string, line int) {
 		p.Path, p.Line, p.Rule = re.Path, 0, ruleRev
 	} else if errors.Is(err, report.ErrNoFinding) || errors.Is(err, report.ErrNoScopeRow) || errors.Is(err, report.ErrNoPage) || errors.Is(err, report.ErrNoEvidence) {
 		p.Rule = ruleExists
+	} else if errors.Is(err, report.ErrBadAsset) {
+		p.Rule = ruleEvidence
 	} else if fe, ok := errors.AsType[*report.FileError](err); ok {
 		p.Path, p.Line, p.Rule, p.Message = fe.Path, fe.Line, ruleReadable, fe.Err.Error()
 	} else if !isRequestError(err) {

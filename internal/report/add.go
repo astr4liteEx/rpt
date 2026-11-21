@@ -45,6 +45,21 @@ func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
 	} else if exists {
 		return sdk.Finding{}, fmt.Errorf("%w: %s already exists", ErrBadValue, rel)
 	}
+	keys := slices.Sorted(maps.Keys(rec.Sections))
+	texts := make([]*string, len(keys))
+	for i, k := range keys {
+		text := rec.Sections[k]
+		texts[i] = &text
+	}
+	ev, err := tx.takeAssets(id, rel, EvidenceDir, rec.Evidence, texts, rec.Assets)
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	rec.Sections = maps.Clone(rec.Sections)
+	for i, k := range keys {
+		rec.Sections[k] = *texts[i]
+	}
+	rec.Evidence, rec.Assets = ev, nil
 
 	out, err := newFindingFile(rec, cfg.Headings)
 	if err != nil {

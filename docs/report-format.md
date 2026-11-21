@@ -97,7 +97,7 @@ Use parameterised queries.
 | `targets` | Where the finding was found, each attributed to a scope row: see Targets below. Every finding needs at least one. |
 | `severity` | One of the config's `severities`. |
 | `evidence` | Files backing the finding, relative to the finding file. They must stay inside the report. |
-| anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. Not `kind`, `path`, `sections` or `lines`: rpt sets those on finding records, so a file using one is unreadable. Nor `scope` or `target`, format 1's keys. |
+| anything else | Kept as is and passed to plugins and renderers, e.g. `cvss`. Not `kind`, `path`, `rev`, `sections`, `lines` or `assets`: rpt sets those on finding records, so a file using one is unreadable. Nor `scope` or `target`, format 1's keys. |
 
 ### Targets
 

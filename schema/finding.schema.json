@@ -14,11 +14,13 @@
     "rev": {"type": "string", "description": "The finding file's revision, over its bytes as stored. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the file changed since this read."},
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
+    "assets": {"type": "array", "items": {"$ref": "#/$defs/asset"}, "description": "Set by rpt finding get --assets: every file the finding lists or links. rpt finding add copies each in and rewrites its references; never written to the file."},
     "lines": {"$ref": "#/$defs/lines"}
   },
   "required": ["kind", "title", "targets", "severity"],
   "additionalProperties": true,
   "$defs": {
+    "asset": {"type": "object", "description": "One file the owner lists in its evidence or links in its text. rpt finding add and rpt page add read ref and file only: they copy file into the report and point every reference to ref at the copy.", "properties": {"ref": {"type": "string", "description": "The path as the owner writes it, relative to its file, or absolute."}, "path": {"type": "string", "description": "Relative to the report root."}, "file": {"type": "string", "description": "The file itself: an absolute path, or for add one relative to the folder add runs in."}, "source": {"enum": ["frontmatter", "body"], "description": "frontmatter: the evidence list; body: a link or image in the text. One asset per source and ref."}, "media_type": {"type": "string", "description": "From the file's content, else its extension."}, "text": {"type": "string", "description": "A link's text, its caption."}, "image": {"type": "boolean", "description": "The link is an image."}}, "required": ["ref", "file"], "additionalProperties": true},
     "position": {
       "type": "object",
       "description": "A place in a file: the 1-based line, and the 1-based byte in that line.",

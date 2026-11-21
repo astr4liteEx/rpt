@@ -130,3 +130,37 @@ func TestRemoveAsks(t *testing.T) {
 		t.Errorf("unknown ID: exit %d, stderr %q", code, errOut)
 	}
 }
+
+func TestFindingCopiedWithAssets(t *testing.T) {
+	src, dst := reportCopy(t), reportCopy(t)
+	_, out, _ := runIn(t, "", "finding", "get", "--assets", "F-003", "--report", src)
+	if !strings.Contains(out, `"assets":[{"ref":"evidence/F-003-login.png","path":"findings/evidence/F-003-login.png","file":"`) {
+		t.Fatalf("get --assets: %s", out)
+	}
+	// What jq 'del(.id)' does: drop the ID so the copy takes a new one.
+	in := strings.Replace(out, `"id":"F-003",`, "", 1)
+	code, out, errOut := runIn(t, in, "finding", "add", "--report", dst)
+	if code != 0 || pick(t, out, "id", "evidence") != "F-004 [evidence/F-004-f-003-login.png]\n" {
+		t.Fatalf("add: exit %d, stdout %q, stderr %q", code, out, errOut)
+	}
+	if _, out, _ := runIn(t, "", "validate", "--report", dst); strings.Contains(out, `"rule":"evidence`) {
+		t.Errorf("validate after the copy:\n%s", out)
+	}
+	_, out, _ = runIn(t, "", "finding", "get", "F-004", "--report", dst)
+	if !strings.Contains(out, `![login bypass](evidence/F-004-f-003-login.png)`) {
+		t.Errorf("link not rewritten: %s", out)
+	}
+}
+
+func TestFindingAddRefusesMissingAsset(t *testing.T) {
+	dir := reportCopy(t)
+	in := `{"kind":"finding","title":"T","severity":"low","targets":[{"scope":"S-12"}]}` + "\n" +
+		`{"kind":"finding","title":"U","severity":"low","targets":[{"scope":"S-12"}],"assets":[{"ref":"a.png","file":"/no/such.png"}]}` + "\n"
+	code, out, _ := runIn(t, in, "finding", "add", "--report", dir)
+	if code != 1 || pick(t, out, "path", "line", "rule") != "- 2 evidence\n" {
+		t.Errorf("exit %d, stdout %q", code, out)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "findings", "F-004-t.md")); err == nil {
+		t.Error("the batch was written in part")
+	}
+}

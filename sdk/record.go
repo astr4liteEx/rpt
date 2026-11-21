@@ -28,6 +28,10 @@ type Finding struct {
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
 	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt finding get --lines; rpt finding add ignores it
+	// Assets are the files the finding lists and links, set by rpt finding
+	// get --assets. rpt finding add reads each one's Ref and File: it
+	// copies the file in and points Ref at the copy.
+	Assets []Asset `json:"assets,omitzero"`
 
 	// Extra holds every member not named above, so records pass through
 	// with fields this version of rpt doesn't know.
@@ -75,6 +79,9 @@ type Page struct {
 	// Rev is the page file's revision; pass it back as --if-rev.
 	Rev   string     `json:"rev,omitzero"`
 	Lines *PageLines `json:"lines,omitzero"` // set by rpt page get --lines; rpt page add ignores it
+	// Assets are as for Finding: set by rpt page get --assets, read by rpt
+	// page add.
+	Assets []Asset `json:"assets,omitzero"`
 
 	// Extra holds unknown frontmatter keys and members.
 	Extra map[string]jsontext.Value `json:",embed"`
@@ -260,11 +267,12 @@ type ReportSection struct {
 // so renderers never read scope.csv or resolve paths.
 type ReportFinding struct {
 	ID       string            `json:"id"`
+	Path     string            `json:"path"` // the finding file, relative to the report root
 	Title    string            `json:"title"`
 	Severity Severity          `json:"severity"`
 	Targets  []ReportTarget    `json:"targets"`
 	Sections map[string]string `json:"sections"` // markdown, keyed description, remediation, poc
-	Assets   []string          `json:"assets"`   // absolute paths
+	Assets   []Asset           `json:"assets"`   // every file listed or linked, links made absolute
 
 	// Extra holds the finding's unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
@@ -273,12 +281,30 @@ type ReportFinding struct {
 // ReportPage is a page inside a Report, its evidence paths and body links
 // made absolute like a finding's.
 type ReportPage struct {
-	ID     string   `json:"id"`
-	Title  string   `json:"title"`
-	Body   string   `json:"body"`
-	Assets []string `json:"assets"` // absolute paths
+	ID     string  `json:"id"`
+	Path   string  `json:"path"` // the page file, relative to the report root
+	Title  string  `json:"title"`
+	Body   string  `json:"body"`
+	Assets []Asset `json:"assets"`
 
 	// Extra holds the page's unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// Asset is one file a finding or page lists in its evidence or links in
+// its text. In a finding or page record, Ref is as written; in an
+// assembled report, a link to it now names File.
+type Asset struct {
+	Ref    string `json:"ref"`             // as the owner writes it, relative to its file
+	Path   string `json:"path,omitzero"`   // relative to the report root
+	File   string `json:"file"`            // absolute: the file to open or copy
+	Source string `json:"source,omitzero"` // "frontmatter" (the evidence list) or "body" (a link)
+	// MediaType is the file's type, from its content, else its extension.
+	MediaType string `json:"media_type,omitzero"`
+	Text      string `json:"text,omitzero"`  // a link's text, its caption
+	Image     bool   `json:"image,omitzero"` // the link is an image
+
+	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
