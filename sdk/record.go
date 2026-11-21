@@ -24,6 +24,7 @@ type Finding struct {
 	Targets  []Target          `json:"targets"` // the scope rows it was found on
 	Severity Severity          `json:"severity"`
 	Path     string            `json:"path,omitzero"` // relative to the report root
+	Rev      string            `json:"rev,omitzero"`  // the file's revision; pass it back as --if-rev
 	Sections map[string]string `json:"sections,omitzero"`
 	Evidence []string          `json:"evidence,omitzero"` // relative to the finding file's folder
 	Lines    *Lines            `json:"lines,omitzero"`    // set by rpt findings --lines; rpt findings add ignores it
@@ -66,6 +67,7 @@ type Evidence struct {
 	Path    string `json:"path,omitzero"`    // relative to the report root; absent when Ref leaves the report
 	File    string `json:"file,omitzero"`    // absolute, symlinks kept; absent when Ref leaves the report
 	Exists  bool   `json:"exists"`
+	Rev     string `json:"rev,omitzero"` // the referencing finding's rev
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
@@ -80,6 +82,9 @@ type ScopeRow struct {
 	Port int    `json:"port,omitzero"` // absent: every port
 	// Protocol is "tcp" or "udp"; absent: any protocol.
 	Protocol string `json:"protocol,omitzero"`
+	// Rev is the row's revision, over the header and the row's own text;
+	// pass it back as --if-rev.
+	Rev string `json:"rev,omitzero"`
 	// Lines is where the row sits in scope.csv, set by rpt scope --lines.
 	Lines *ScopeLines `json:"lines,omitzero"`
 

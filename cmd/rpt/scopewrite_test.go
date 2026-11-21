@@ -4,6 +4,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"testing"
@@ -68,8 +69,8 @@ func TestScopeLines(t *testing.T) {
 	file := filepath.Join(dir, "scope.csv")
 	want := `{"kind":"scope","id":"S-1","host":"a","port":80,"lines":{"row":2,"file":` + strconv.Quote(file) + `},"env":"two\nlines"}` + "\n" +
 		`{"kind":"scope","id":"S-2","host":"b","lines":{"row":5,"file":` + strconv.Quote(file) + `},"env":"prod"}` + "\n"
-	if out != want {
-		t.Errorf("stdout\n%s\nwant\n%s", out, want)
+	if got := revs.ReplaceAllString(out, ""); got != want {
+		t.Errorf("stdout\n%s\nwant\n%s", got, want)
 	}
 	if _, out, _ := runIn(t, "", "scope", "--json", "--report", dir); strings.Contains(out, `"lines":`) {
 		t.Errorf("without --lines, records carry lines:\n%s", out)
@@ -82,6 +83,9 @@ func TestScopeLines(t *testing.T) {
 	}
 }
 
+// revs matches a record's rev member, for comparing records whole.
+var revs = regexp.MustCompile(`"rev":"[0-9a-f]{16}",?`)
+
 func TestScopeAddFromStdin(t *testing.T) {
 	dir := reportCopy(t)
 	if err := os.WriteFile(filepath.Join(dir, "scope.csv"), []byte(strings.ReplaceAll(fixtureScope, "\n", "\r\n")), 0o644); err != nil {
@@ -92,8 +96,17 @@ func TestScopeAddFromStdin(t *testing.T) {
 		`{"kind":"scope","host":"h","owner":"me"}` + "\n" + // refused: no owner column
 		`{"kind":"scope","host":"10.9.9.9","port":8080}` + "\n"
 	code, out, errOut := runIn(t, in, "scope", "add", "--report", dir)
-	if code != 1 || !strings.Contains(errOut, "-:3") {
-		t.Errorf("exit %d, stderr %q; want 1 naming stdin line 3", code, errOut)
+	if code != 1 || !strings.Contains(errOut, "-:3") || pick(t, out, "kind", "line", "rule") != "problem 3 write\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want 1 and a problem at stdin line 3", code, out, errOut)
+	}
+	if got := readScope(t, dir); got != strings.ReplaceAll(fixtureScope, "\n", "\r\n") {
+		t.Errorf("scope.csv changed though a row was refused: %q", got)
+	}
+
+	in = strings.Replace(in, `{"kind":"scope","host":"h","owner":"me"}`+"\n", "", 1)
+	code, out, errOut = runIn(t, in, "scope", "add", "--report", dir)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	if got := pick(t, out, "kind", "id"); got != "scope S-30\nfinding \nscope S-31\n" {
 		t.Errorf("stdout = %q", got)
@@ -113,8 +126,11 @@ func TestScopeDelete(t *testing.T) {
 		t.Errorf("cited row: exit %d, stderr %q; want 1, F-003 named, nothing changed", code, errOut)
 	}
 	code, out, errOut := runIn(t, "", "scope", "delete", "--report", dir, "S-20", "S-404")
-	if code != 1 || !strings.Contains(errOut, "S-404") || pick(t, out, "id") != "S-20\n" {
-		t.Errorf("exit %d, stdout %q, stderr %q; want S-20 deleted, S-404 unknown, exit 1", code, out, errOut)
+	if code != 1 || !strings.Contains(errOut, "S-404") || pick(t, out, "kind", "rule") != "problem exists\n" || !maps.Equal(before, folderState(t, dir)) {
+		t.Errorf("exit %d, stdout %q, stderr %q; want S-404 unknown, nothing deleted, exit 1", code, out, errOut)
+	}
+	if code, out, errOut := runIn(t, "", "scope", "delete", "--report", dir, "S-20"); code != 0 || pick(t, out, "id") != "S-20\n" {
+		t.Errorf("exit %d, stdout %q, stderr %q; want S-20 deleted", code, out, errOut)
 	}
 	if code, _, errOut := runIn(t, "", "scope", "delete", "--report", dir, "--force", "S-12"); code != 0 {
 		t.Errorf("--force: exit %d, stderr %q", code, errOut)

@@ -63,25 +63,25 @@ func init() {
 	builtins = map[string]builtin{
 		"assemble": {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
 		"evidence": {evidenceVerb, sdk.Command{Summary: "List the findings' evidence files; add copies files in, prune removes unreferenced ones", Usage: "rpt evidence [--orphans] [--json] [--report dir]", Output: "records"}, []sub{
-			{"add", evidenceAddVerb, "rpt evidence add [--as name] <id> <file>..."},
+			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--if-rev rev] [--dry-run] <id> <file>..."},
 			{"prune", evidencePruneVerb, "rpt evidence prune [--dry-run]"},
 		}},
 		"findings": {findingsVerb, sdk.Command{Summary: "List findings; add, set, unset and delete change them", Usage: "rpt findings [--lines] [--json] [--report dir]", Input: "records", Output: "records"}, []sub{
-			{"add", addVerb, "rpt findings add [--scaffold] < records.jsonl, or rpt findings add --title t --severity s [--target S-N]... [--id F-NNN]"},
-			{"set", setVerb, "rpt findings set <id> <key> <value>"},
-			{"unset", unsetVerb, "rpt findings unset <id> <key>..."},
-			{"delete", deleteVerb, "rpt findings delete <id>..."},
+			{"add", addVerb, "rpt findings add [--scaffold] [--dry-run] < records.jsonl, or rpt findings add --title t --severity s [--target S-N]... [--id F-NNN] [--dry-run]"},
+			{"set", setVerb, "rpt findings set [--if-rev rev] [--dry-run] <id> <key> <value>"},
+			{"unset", unsetVerb, "rpt findings unset [--if-rev rev] [--dry-run] <id> <key>..."},
+			{"delete", deleteVerb, "rpt findings delete [--if-rev id=rev]... [--dry-run] <id>..."},
 		}},
 		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
 		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
 		"scope": {scopeVerb, sdk.Command{Summary: "List scope rows, or those with the IDs given; add and delete change them, match attributes finding targets to scope rows", Usage: "rpt scope [--lines] [--json] [id...]", Input: "records", Output: "records"}, []sub{
-			{"add", scopeAddVerb, "rpt scope add < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-N] [--col name=value]..."},
-			{"delete", scopeDeleteVerb, "rpt scope delete [--force] <id>..."},
+			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-N] [--col name=value]... [--dry-run]"},
+			{"delete", scopeDeleteVerb, "rpt scope delete [--force] [--if-rev id=rev]... [--dry-run] <id>..."},
 			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
 		}},
 		"sections": {sectionsVerb, sdk.Command{Summary: "List the report's sections; sections set changes one in a finding", Usage: "rpt sections [--json]", Input: "text", Output: "records"}, []sub{
-			{"set", sectionsSetVerb, "rpt sections set <id> <key> < text.md"},
+			{"set", sectionsSetVerb, "rpt sections set [--if-rev rev] [--dry-run] <id> <key> < text.md"},
 		}},
 		"severities": {severitiesVerb, sdk.Command{Summary: "List the report's severity levels, most severe first", Usage: "rpt severities [--json]", Output: "records"}, nil},
 		"validate":   {validateVerb, sdk.Command{Summary: "Check the report and print its problems", Usage: "rpt validate [--json] [--report dir]", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},

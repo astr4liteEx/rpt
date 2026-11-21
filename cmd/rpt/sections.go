@@ -4,6 +4,8 @@ import (
 	"io"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
+	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/sdk"
 )
 
 var sectionColumns = []cli.Column{{Header: "KEY", Field: "key"}, {Header: "HEADING", Field: "heading"}, {Header: "REQUIRED", Field: "required"}}
@@ -49,6 +51,7 @@ func sectionsVerb(e *env, args []string) int {
 // sectionsSetVerb replaces one section's text in one finding with stdin.
 func sectionsSetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "sections set")
+	wf := addWriteFlags(flags, true)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -56,33 +59,12 @@ func sectionsSetVerb(e *env, args []string) int {
 	if len(pos) != 2 {
 		return badUsage(e, "sections set")
 	}
-	out, err := of.output(e, findingColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
 	text, err := io.ReadAll(e.stdin)
 	if err != nil {
 		e.log.Error("read stdin: " + err.Error())
 		return cli.ExitProblems
 	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-
-	f, err := r.SetSection(pos[0], pos[1], string(text))
-	if err != nil {
-		return logEditError(e, err, 0)
-	}
-	if err := out.Write(f); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return cli.ExitOK
+	return writeFinding(e, of, wf, "sections set", pos[0], func(tx *report.Tx) (sdk.Finding, error) {
+		return tx.SetSection(pos[0], pos[1], string(text))
+	})
 }

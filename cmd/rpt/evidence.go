@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/astr4liteEx/rpt/internal/cli"
+	"github.com/astr4liteEx/rpt/internal/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
@@ -55,7 +56,7 @@ func evidenceVerb(e *env, args []string) int {
 // finding references, printing each; --dry-run only prints them.
 func evidencePruneVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "evidence prune")
-	dryRun := flags.Bool("dry-run", false, "print what would be removed, and remove nothing")
+	wf := addWriteFlags(flags, false)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -72,8 +73,15 @@ func evidencePruneVerb(e *env, args []string) int {
 		return cli.ExitProblems
 	}
 	defer r.Close()
-	gone, err := r.PruneEvidence(*dryRun)
-	return writeEvidence(e, out, gone, err)
+	w, _ := newWrite(e, out, r, wf, "evidence prune", nil)
+	gone, err := w.tx.PruneEvidence()
+	if err != nil {
+		return reportErrors(e, out, err)
+	}
+	for _, ev := range gone {
+		w.done(ev, ev.Path)
+	}
+	return w.finish()
 }
 
 // evidenceAddVerb copies files into findings/evidence/ and lists them in
@@ -81,6 +89,7 @@ func evidencePruneVerb(e *env, args []string) int {
 func evidenceAddVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "evidence add")
 	as := flags.String("as", "", "the copy's file name, exactly (one file only); it must not exist")
+	wf := addWriteFlags(flags, true)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -88,28 +97,7 @@ func evidenceAddVerb(e *env, args []string) int {
 	if len(pos) < 2 || *as != "" && len(pos) != 2 {
 		return badUsage(e, "evidence add")
 	}
-	out, err := of.output(e, findingColumns)
-	if err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	r := openReport(e, *of.report)
-	if r == nil {
-		return cli.ExitProblems
-	}
-	defer r.Close()
-
-	f, err := r.AddEvidence(pos[0], pos[1:], *as)
-	if err != nil {
-		return logEditError(e, err, 0)
-	}
-	if err := out.Write(f); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return cli.ExitOK
+	return writeFinding(e, of, wf, "evidence add", pos[0], func(tx *report.Tx) (sdk.Finding, error) {
+		return tx.AddEvidence(pos[0], pos[1:], *as)
+	})
 }

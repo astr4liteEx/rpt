@@ -10,6 +10,7 @@
     "host": {"type": "string", "description": "Host name, address or range."},
     "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Absent: every port."},
     "protocol": {"enum": ["tcp", "udp"], "description": "Absent: any protocol."},
+    "rev": {"type": "string", "description": "The row's revision, over scope.csv's header and the row's own text: edits to other rows leave it alone. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the row changed since this read."},
     "lines": {"$ref": "#/$defs/lines"}
   },
   "required": ["kind", "id", "host"],

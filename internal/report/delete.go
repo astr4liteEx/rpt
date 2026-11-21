@@ -2,7 +2,6 @@ package report
 
 import (
 	"fmt"
-	"path"
 
 	"github.com/astr4liteEx/rpt/sdk"
 )
@@ -12,20 +11,28 @@ import (
 // them. The ID is free again: rpt keeps no history, so the next new finding
 // may take it if it was the highest.
 func (r *Report) Delete(id string) (sdk.Finding, error) {
-	rel, err := r.locate(id)
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Delete(id) })
+}
+
+// Delete is Report.Delete as part of the write tx.
+func (tx *Tx) Delete(id string) (sdk.Finding, error) {
+	rel, err := tx.r.locate(id)
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	src, err := r.root.ReadFile(rel)
-	if err != nil {
-		return sdk.Finding{}, &FileError{Path: rel, Err: err}
-	}
-	f, err := parseFinding(rel, src, r.headings())
+	src, exists, err := tx.read(rel)
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	if err := r.root.Remove(rel); err != nil {
-		return sdk.Finding{}, fmt.Errorf("delete %s: %w", rel, err)
+	if !exists {
+		return sdk.Finding{}, fmt.Errorf("%w: %s in %s/", ErrNoFinding, id, FindingsDir) // removed earlier in this write
 	}
-	return f, syncDir(r.root, path.Dir(rel))
+	if err := tx.checkRev(id, rel, Rev(src)); err != nil {
+		return sdk.Finding{}, err
+	}
+	f, err := parseFinding(rel, src, tx.r.headings())
+	if err != nil {
+		return sdk.Finding{}, err
+	}
+	return f, tx.del(rel, rankFinding)
 }

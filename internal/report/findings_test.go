@@ -56,6 +56,10 @@ func TestFindingsReadsFixture(t *testing.T) {
 		t.Fatalf("got %d findings, want %d: %+v", len(got), len(want), got)
 	}
 	for i := range want {
+		if got[i].Rev == "" {
+			t.Errorf("finding %d has no rev", i)
+		}
+		got[i].Rev = "" // compared in rev_test.go
 		if !reflect.DeepEqual(got[i], want[i]) {
 			t.Errorf("finding %d\n got: %#v\nwant: %#v", i, got[i], want[i])
 		}

@@ -25,19 +25,24 @@ var (
 // byte range of each row, so rows can be added and removed without
 // re-encoding the others.
 type scopeTable struct {
-	src    []byte
-	header []string
-	rows   []sdk.ScopeRow
-	spans  [][2]int // byte range of each row, in step with rows
-	crlf   bool
+	src       []byte
+	header    []string
+	headerEnd int // where the header line ends, line end included
+	rows      []sdk.ScopeRow
+	spans     [][2]int // byte range of each row, in step with rows
+	crlf      bool
 }
 
-func (r *Report) readScopeTable() (scopeTable, error) {
-	src, err := r.root.ReadFile(ScopeFile)
+// scopeTable reads scope.csv as this write sees it.
+func (tx *Tx) scopeTable() (scopeTable, error) {
+	src, exists, err := tx.read(ScopeFile)
 	if err != nil {
-		return scopeTable{}, fmt.Errorf("read scope: %w", err)
+		return scopeTable{}, err
 	}
-	if _, err := r.Scope(); err != nil {
+	if !exists {
+		return scopeTable{}, fmt.Errorf("read scope: %s is missing", ScopeFile)
+	}
+	if _, err := parseScope(src, ""); err != nil {
 		return scopeTable{}, err // never edit a table that doesn't read cleanly
 	}
 	t := scopeTable{src: src, crlf: bytes.Contains(src, []byte("\r\n"))}
@@ -45,6 +50,7 @@ func (r *Report) readScopeTable() (scopeTable, error) {
 	if t.header, err = cr.Read(); err != nil {
 		return scopeTable{}, err
 	}
+	t.headerEnd = int(cr.InputOffset())
 	for {
 		start := cr.InputOffset()
 		rec, err := cr.Read()
@@ -81,10 +87,16 @@ func (t scopeTable) nextScopeID() string {
 // The other rows keep their bytes, and the new row takes the file's line
 // ends.
 func (r *Report) AddScope(row sdk.ScopeRow) (sdk.ScopeRow, error) {
+	return one(r, func(tx *Tx) (sdk.ScopeRow, error) { return tx.AddScope(row) })
+}
+
+// AddScope is Report.AddScope as part of the write tx: several adds in one
+// write append one after another.
+func (tx *Tx) AddScope(row sdk.ScopeRow) (sdk.ScopeRow, error) {
 	bad := func(format string, a ...any) error {
 		return fmt.Errorf("%w: %s", ErrBadValue, fmt.Sprintf(format, a...))
 	}
-	t, err := r.readScopeTable()
+	t, err := tx.scopeTable()
 	if err != nil {
 		return sdk.ScopeRow{}, err
 	}
@@ -135,9 +147,10 @@ func (r *Report) AddScope(row sdk.ScopeRow) (sdk.ScopeRow, error) {
 	if len(out) > 0 && out[len(out)-1] != '\n' {
 		out = append(out, newline(t.crlf)...)
 	}
-	if err := writeAtomic(r.root, ScopeFile, append(out, line.Bytes()...)); err != nil {
+	if err := tx.put(ScopeFile, append(out, line.Bytes()...), rankScope); err != nil {
 		return sdk.ScopeRow{}, err
 	}
+	stored.Rev = rowRev(trimEOL(t.src[:t.headerEnd]), line.Bytes())
 	return stored, nil
 }
 
@@ -152,13 +165,25 @@ func newline(crlf bool) string {
 // it. A row a finding cites is refused, naming the findings, unless force.
 // The other rows keep their bytes.
 func (r *Report) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
-	t, err := r.readScopeTable()
+	return one(r, func(tx *Tx) (sdk.ScopeRow, error) { return tx.DeleteScope(id, force) })
+}
+
+// DeleteScope is Report.DeleteScope as part of the write tx.
+func (tx *Tx) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
+	r := tx.r
+	t, err := tx.scopeTable()
 	if err != nil {
 		return sdk.ScopeRow{}, err
 	}
 	i := slices.IndexFunc(t.rows, func(x sdk.ScopeRow) bool { return x.ID == id })
 	if i < 0 {
 		return sdk.ScopeRow{}, fmt.Errorf("%w: %s in %s", ErrNoScopeRow, id, ScopeFile)
+	}
+	sp := t.spans[i]
+	row := t.rows[i]
+	row.Rev = rowRev(trimEOL(t.src[:t.headerEnd]), t.src[sp[0]:sp[1]])
+	if err := tx.checkRev(id, ScopeFile, row.Rev); err != nil {
+		return sdk.ScopeRow{}, err
 	}
 	if !force {
 		findings, err := r.Findings()
@@ -175,10 +200,9 @@ func (r *Report) DeleteScope(id string, force bool) (sdk.ScopeRow, error) {
 			return sdk.ScopeRow{}, fmt.Errorf("%w: %s is cited by %s; change their targets first, or pass --force", ErrCited, id, strings.Join(citing, ", "))
 		}
 	}
-	sp := t.spans[i]
 	out := append(append([]byte{}, t.src[:sp[0]]...), t.src[sp[1]:]...)
-	if err := writeAtomic(r.root, ScopeFile, out); err != nil {
+	if err := tx.put(ScopeFile, out, rankScope); err != nil {
 		return sdk.ScopeRow{}, err
 	}
-	return t.rows[i], nil
+	return row, nil
 }

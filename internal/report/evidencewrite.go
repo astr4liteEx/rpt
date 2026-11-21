@@ -60,7 +60,7 @@ func (r *Report) Evidence(orphans bool) ([]sdk.Evidence, error) {
 
 // reference is the record for one reference finding f makes to ref.
 func (r *Report) reference(f sdk.Finding, ref, source string) sdk.Evidence {
-	e := sdk.Evidence{Kind: "evidence", Finding: f.ID, Ref: ref, Source: source}
+	e := sdk.Evidence{Kind: "evidence", Finding: f.ID, Ref: ref, Source: source, Rev: f.Rev}
 	rel, err := evidencePath(f, ref)
 	if err != nil {
 		return e
@@ -109,7 +109,17 @@ func (r *Report) orphans(refs []sdk.Evidence) ([]sdk.Evidence, error) {
 // with dryRun it only returns them. It removes nothing while any finding
 // file doesn't parse, since that file may reference what looks orphaned.
 func (r *Report) PruneEvidence(dryRun bool) ([]sdk.Evidence, error) {
-	all, err := r.Evidence(true)
+	tx := r.Begin()
+	gone, err := tx.PruneEvidence()
+	if err != nil {
+		return nil, err
+	}
+	return gone, tx.Commit(dryRun)
+}
+
+// PruneEvidence is Report.PruneEvidence as part of the write tx.
+func (tx *Tx) PruneEvidence() ([]sdk.Evidence, error) {
+	all, err := tx.r.Evidence(true)
 	if err != nil {
 		return nil, err
 	}
@@ -118,10 +128,8 @@ func (r *Report) PruneEvidence(dryRun bool) ([]sdk.Evidence, error) {
 		if e.Finding != "" {
 			continue
 		}
-		if !dryRun {
-			if err := r.root.Remove(e.Path); err != nil {
-				return gone, fmt.Errorf("prune %s: %w", e.Path, err)
-			}
+		if err := tx.del(e.Path, rankAsset); err != nil {
+			return nil, err
 		}
 		gone = append(gone, e)
 	}
@@ -132,17 +140,21 @@ func (r *Report) PruneEvidence(dryRun bool) ([]sdk.Evidence, error) {
 // copy's path to the evidence list of the finding with the given ID, then
 // returns the finding as stored. Each copy is named as, which needs a
 // single source and must not exist, or <id>-<slug>.<ext> with -2, -3, ...
-// on a clash. Every source is checked before anything is copied, and if
-// the finding can't be written the copies are removed, so a failure leaves
-// the report as it was.
+// on a clash. The copies and the finding are one write: all or nothing.
 func (r *Report) AddEvidence(id string, srcs []string, as string) (sdk.Finding, error) {
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.AddEvidence(id, srcs, as) })
+}
+
+// AddEvidence is Report.AddEvidence as part of the write tx.
+func (tx *Tx) AddEvidence(id string, srcs []string, as string) (sdk.Finding, error) {
+	r := tx.r
 	rel, err := r.locate(id)
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	src, err := r.root.ReadFile(rel)
+	src, _, err := tx.read(rel)
 	if err != nil {
-		return sdk.Finding{}, &FileError{Path: rel, Err: err}
+		return sdk.Finding{}, err
 	}
 	f, err := parseFinding(rel, src, r.headings())
 	if err != nil {
@@ -161,44 +173,24 @@ func (r *Report) AddEvidence(id string, srcs []string, as string) (sdk.Finding, 
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-
-	if err := r.root.MkdirAll(EvidenceDir, 0o755); err != nil {
-		return sdk.Finding{}, fmt.Errorf("evidence add: %w", err)
-	}
-	var copied []string
-	undo := func() {
-		for _, p := range copied {
-			r.root.Remove(p) // best effort: the add already failed
-		}
-	}
 	list := slices.Clone(f.Evidence)
 	for i, s := range srcs {
 		data, err := os.ReadFile(s)
 		if err != nil {
-			undo()
 			return sdk.Finding{}, fmt.Errorf("%w: %v", ErrBadSource, err)
 		}
-		dst := path.Join(EvidenceDir, names[i])
-		if err := writeAtomic(r.root, dst, data); err != nil {
-			undo()
+		if err := tx.put(path.Join(EvidenceDir, names[i]), data, rankAsset); err != nil {
 			return sdk.Finding{}, err
 		}
-		copied = append(copied, dst)
 		if ref := "evidence/" + names[i]; !slices.Contains(list, ref) {
 			list = append(list, ref)
 		}
 	}
 	val, err := toNode(list)
 	if err != nil {
-		undo()
 		return sdk.Finding{}, err
 	}
-	out, err := r.edit(rel, func(ff *findingFile) error { return ff.setEntry("evidence", val) })
-	if err != nil {
-		undo()
-		return sdk.Finding{}, err
-	}
-	return out, nil
+	return tx.edit(id, rel, func(ff *findingFile) error { return ff.setEntry("evidence", val) })
 }
 
 // evidenceNames picks the file name each source is copied to.

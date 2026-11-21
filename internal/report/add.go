@@ -1,12 +1,11 @@
 package report
 
 import (
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
 	"path"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/astr4liteEx/rpt/sdk"
@@ -17,6 +16,13 @@ import (
 // returns the finding as stored. Nothing is written if the record fails
 // its checks.
 func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Add(rec) })
+}
+
+// Add is Report.Add as part of the write tx: several adds in one write
+// take IDs one after another.
+func (tx *Tx) Add(rec sdk.Finding) (sdk.Finding, error) {
+	r := tx.r
 	cfg, err := r.Config()
 	if err != nil {
 		return sdk.Finding{}, err
@@ -26,16 +32,18 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 	}
 	id := rec.ID
 	if id == "" {
-		if id, err = r.NextID(); err != nil {
+		if id, err = tx.nextID(); err != nil {
 			return sdk.Finding{}, err
 		}
-	} else if _, err := r.locate(id); err == nil {
+	} else if _, err := r.locate(id); err == nil || tx.newIDs[id] {
 		return sdk.Finding{}, fmt.Errorf("%w: id: %s is already taken", ErrBadValue, id)
 	}
 	rec.ID = id
 	rel := path.Join(FindingsDir, id+"-"+slug(rec.Title)+".md")
-	if _, err := r.root.Stat(rel); !errors.Is(err, fs.ErrNotExist) {
-		return sdk.Finding{}, fmt.Errorf("add %s: file already exists", rel)
+	if _, exists, err := tx.read(rel); err != nil {
+		return sdk.Finding{}, err
+	} else if exists {
+		return sdk.Finding{}, fmt.Errorf("%w: %s already exists", ErrBadValue, rel)
 	}
 
 	out, err := newFindingFile(rec, cfg.Headings)
@@ -46,14 +54,33 @@ func (r *Report) Add(rec sdk.Finding) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, fmt.Errorf("add would write a broken %s: %w", rel, err)
 	}
-	if err := r.root.MkdirAll(FindingsDir, 0o755); err != nil {
-		return sdk.Finding{}, fmt.Errorf("add: %w", err)
-	}
-	if err := writeAtomic(r.root, rel, out); err != nil {
+	if err := tx.put(rel, out, rankFinding); err != nil {
 		return sdk.Finding{}, err
 	}
+	tx.newIDs[id] = true
 	f.Lines = nil
 	return f, nil
+}
+
+// nextID is the next free finding ID, counting the ones this write adds.
+func (tx *Tx) nextID() (string, error) {
+	if tx.nextN == 0 {
+		id, err := tx.r.NextID()
+		if err != nil {
+			return "", err
+		}
+		m := findingID.FindStringSubmatch(id)
+		if tx.nextN, err = strconv.Atoi(m[1]); err != nil {
+			return "", err
+		}
+	}
+	for {
+		id := fmt.Sprintf("F-%03d", tx.nextN)
+		tx.nextN++
+		if !tx.newIDs[id] {
+			return id, nil
+		}
+	}
 }
 
 // Scaffold returns rec with an empty section for every required section it

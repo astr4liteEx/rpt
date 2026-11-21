@@ -131,7 +131,9 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 **Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file, or a failure such as a write that didn't happen. `2` means a usage error, and only that: wrong flags or arguments.
 
 > [!TIP]
-> Every command that changes a report writes atomically and keeps the author's comments, quoting and line endings. Use them from scripts in place of editing files by hand.
+> Every command that changes a report keeps the author's comments, quoting and line endings, and is all or nothing: it checks everything first, writes every file it touches or none, and refuses if a file changed while it worked. Use them from scripts in place of editing files by hand.
+
+**Revs.** Finding and scope records carry a `rev`. Pass it back as `--if-rev` and the write is refused if the thing changed since you read it. `--dry-run` on any write prints what it would do, revs included, and writes nothing.
 
 ## Plugins
 

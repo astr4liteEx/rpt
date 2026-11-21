@@ -34,6 +34,9 @@ func (r *Report) Assemble() (sdk.Report, []sdk.Problem, error) {
 	}
 	a := &assembly{r: r}
 	rows, err := r.Scope()
+	for i := range rows {
+		rows[i].Rev = "" // a renderer has no use for revs
+	}
 	for _, e := range unjoin(err) {
 		a.warnError(RuleScope, e)
 	}

@@ -213,7 +213,8 @@ func (c colFlags) Set(v string) error {
 }
 
 // scopeAddVerb appends scope rows: each scope record on stdin, passing
-// other records through, or one row from its flags.
+// other records through, or one row from its flags. Every row is checked
+// before any is written: one refusal and nothing is written.
 func scopeAddVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope add")
 	host := flags.String("host", "", "add one row for this host instead of reading stdin")
@@ -222,12 +223,15 @@ func scopeAddVerb(e *env, args []string) int {
 	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-N")
 	cols := colFlags{}
 	flags.Var(cols, "col", "another column's value, name=value (with --host; repeatable)")
+	wf := addWriteFlags(flags, false)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
 	pos := flags.Args()
 	fromFlags := false
-	flags.Visit(func(f *pflag.Flag) { fromFlags = fromFlags || f.Name != "json" && f.Name != "report" })
+	flags.Visit(func(f *pflag.Flag) {
+		fromFlags = fromFlags || slices.Contains([]string{"host", "port", "protocol", "id", "col"}, f.Name)
+	})
 	if len(pos) != 0 || fromFlags && *host == "" {
 		return badUsage(e, "scope add")
 	}
@@ -241,24 +245,19 @@ func scopeAddVerb(e *env, args []string) int {
 		return cli.ExitProblems
 	}
 	defer r.Close()
+	w, _ := newWrite(e, out, r, wf, "scope add", nil)
 
-	add := func(row sdk.ScopeRow, line int) int {
-		added, err := r.AddScope(row)
+	add := func(row sdk.ScopeRow, line int) {
+		added, err := w.tx.AddScope(row)
 		if err != nil {
-			return logEditError(e, err, line)
+			path := report.ScopeFile
+			if line > 0 {
+				path = stdinPath
+			}
+			w.refuse(err, path, line)
+			return
 		}
-		if err := out.Write(added); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		return cli.ExitOK
-	}
-	finish := func(code int) int {
-		if err := out.Flush(); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
-		return code
+		w.done(added, report.ScopeFile)
 	}
 
 	if fromFlags {
@@ -270,49 +269,42 @@ func scopeAddVerb(e *env, args []string) int {
 			}
 			row.Extra[k] = b
 		}
-		return finish(add(row, 0))
+		add(row, 0)
+		return w.finish()
 	}
-
 	recs, code, ok := readInput(e, out)
 	if !ok {
-		return finish(code)
+		return code
 	}
 	for _, rec := range recs {
 		if rec.Kind != "scope" {
-			if err := out.WriteRaw(rec.Raw); err != nil {
-				e.log.Error(err.Error())
-				return cli.ExitProblems
-			}
+			w.pass(rec.Raw)
 			continue
 		}
 		var row sdk.ScopeRow
 		if err := json.Unmarshal(rec.Raw, &row); err != nil {
-			e.log.Error("scope: "+err.Error(), "path", stdinPath, "line", rec.Line)
-			code = cli.ExitProblems
+			w.refused = append(w.refused, sdk.Problem{Path: stdinPath, Line: rec.Line, Rule: ruleInput, Level: sdk.Error, Message: "scope: " + err.Error()})
 			continue
 		}
 		delete(row.Extra, "kind")
-		switch c := add(row, rec.Line); c {
-		case cli.ExitUsage:
-			return c
-		case cli.ExitProblems:
-			code = c
-		}
+		row.Rev = "" // rpt's, not a column
+		add(row, rec.Line)
 	}
-	return finish(code)
+	return w.finish()
 }
 
 // scopeDeleteVerb removes scope rows by ID and prints each as it was. A
-// row a finding cites is refused unless --force; the rest are still
-// deleted (exit 1).
+// row a finding cites is refused unless --force; one refusal and nothing
+// is deleted.
 func scopeDeleteVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope delete")
 	force := flags.Bool("force", false, "delete rows even when findings cite them")
+	wf := addWriteFlags(flags, true)
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
-	pos := flags.Args()
-	if len(pos) == 0 {
+	ids := uniq(flags.Args())
+	if len(ids) == 0 {
 		return badUsage(e, "scope delete")
 	}
 	out, err := of.output(e, scopeColumns)
@@ -325,22 +317,17 @@ func scopeDeleteVerb(e *env, args []string) int {
 		return cli.ExitProblems
 	}
 	defer r.Close()
-
-	code := cli.ExitOK
-	for _, id := range pos {
-		row, err := r.DeleteScope(id, *force)
+	w, ok := newWrite(e, out, r, wf, "scope delete", ids)
+	if !ok {
+		return cli.ExitUsage
+	}
+	for _, id := range ids {
+		row, err := w.tx.DeleteScope(id, *force)
 		if err != nil {
-			code = max(code, logEditError(e, err, 0))
+			w.refuse(err, report.ScopeFile, 0)
 			continue
 		}
-		if err := out.Write(row); err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitProblems
-		}
+		w.done(row, report.ScopeFile)
 	}
-	if err := out.Flush(); err != nil {
-		e.log.Error(err.Error())
-		return cli.ExitProblems
-	}
-	return code
+	return w.finish()
 }

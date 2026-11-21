@@ -11,6 +11,7 @@
     "targets": {"type": "array", "items": {"$ref": "#/$defs/target"}, "description": "Where the finding was found, each attributed to a scope row. A finding in a report needs at least one; rpt validate checks them against scope.csv."},
     "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
     "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
+    "rev": {"type": "string", "description": "The finding file's revision, over its bytes as stored. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the file changed since this read."},
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
     "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
     "lines": {"$ref": "#/$defs/lines"}

@@ -41,6 +41,12 @@ func (c Config) SectionList() []sdk.Section {
 // kept. Text holding a ## heading of its own, which would split the
 // section, is refused, as is a finding with the section twice.
 func (r *Report) SetSection(id, key, text string) (sdk.Finding, error) {
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.SetSection(id, key, text) })
+}
+
+// SetSection is Report.SetSection as part of the write tx.
+func (tx *Tx) SetSection(id, key, text string) (sdk.Finding, error) {
+	r := tx.r
 	h := r.headings()
 	key = h.key(strings.TrimSpace(key))
 	text = strings.TrimRight(strings.TrimLeft(string(normaliseNewlines([]byte(text))), "\n"), " \t\n")
@@ -51,7 +57,7 @@ func (r *Report) SetSection(id, key, text string) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	return r.edit(rel, func(ff *findingFile) error {
+	return tx.edit(id, rel, func(ff *findingFile) error {
 		spans := sectionSpans(ff.body, h)
 		var at []span
 		for _, sp := range spans {

@@ -22,6 +22,9 @@ func TestScopeReadsFixture(t *testing.T) {
 		{Kind: "scope", ID: "S-14", Host: "10.0.0.6", Port: 8443, Extra: env("prod")},
 		{Kind: "scope", ID: "S-20", Host: "10.0.1.0/24", Extra: env("staging")},
 	}
+	for i := range got {
+		got[i].Rev = "" // compared in rev_test.go
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("scope\n got: %#v\nwant: %#v", got, want)
 	}
@@ -83,6 +86,9 @@ func TestScopeProtocolIsDeclared(t *testing.T) {
 	want := []sdk.ScopeRow{
 		{Kind: "scope", ID: "S-1", Host: "10.0.0.1", Port: 53, Protocol: "udp"},
 		{Kind: "scope", ID: "S-2", Host: "10.0.0.2"},
+	}
+	for i := range rows {
+		rows[i].Rev = ""
 	}
 	if !reflect.DeepEqual(rows, want) {
 		t.Errorf("rows\n got: %#v\nwant: %#v", rows, want)

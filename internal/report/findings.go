@@ -145,6 +145,12 @@ func (r *Report) FindingsWithLines() ([]sdk.Finding, error) {
 // sections under ## headings. Lines is set: this is the one place rpt works
 // out where a finding's parts sit.
 func parseFinding(rel string, src []byte, h Headings) (sdk.Finding, error) {
+	f, err := parseFindingBytes(rel, src, h)
+	f.Rev = Rev(src)
+	return f, err
+}
+
+func parseFindingBytes(rel string, src []byte, h Headings) (sdk.Finding, error) {
 	src = normaliseNewlines(src)
 	head, body, err := splitFrontmatter(src)
 	if err != nil {
@@ -270,7 +276,7 @@ func splitFrontmatter(src []byte) (head, body []byte, err error) {
 
 // recordKeys are the finding record members rpt sets itself. A frontmatter
 // key with one of these names would clash with them in the record.
-var recordKeys = []string{"kind", "path", "sections", "lines"}
+var recordKeys = []string{"kind", "path", "rev", "sections", "lines"}
 
 // checkReservedKeys refuses a frontmatter key named like a recordKeys member
 // or one of the formerKeys, at its line.

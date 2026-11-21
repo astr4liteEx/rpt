@@ -5,6 +5,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -72,20 +73,24 @@ func TestSetUsageErrors(t *testing.T) {
 		args      []string
 		wantCode  int
 		wantInErr string
+		wantOut   string // the problem's rule
 	}{
-		// What was asked is wrong: exit 1. Bad syntax: exit 2.
-		{"unknown ID", []string{"F-404", "severity", "high"}, 1, "no such finding: F-404"},
-		{"refused key", []string{"F-003", "id", "F-010"}, 1, "key can't be set: id: finding IDs are permanent"},
-		{"bad severity", []string{"F-003", "severity", "urgent"}, 1, `bad value: severity: "urgent" is not one of`},
-		{"missing value", []string{"F-003", "severity"}, 2, "usage: rpt findings set <id> <key> <value>"},
+		// What was asked is wrong: exit 1 and a problem. Bad syntax: exit 2.
+		{"unknown ID", []string{"F-404", "severity", "high"}, 1, "no such finding: F-404", "problem exists\n"},
+		{"refused key", []string{"F-003", "id", "F-010"}, 1, "key can't be set: id: finding IDs are permanent", "problem write\n"},
+		{"bad severity", []string{"F-003", "severity", "urgent"}, 1, `bad value: severity: "urgent" is not one of`, "problem write\n"},
+		{"missing value", []string{"F-003", "severity"}, 2, "usage: rpt findings set [--if-rev rev] [--dry-run] <id> <key> <value>", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := reportCopy(t)
 			before := folderState(t, dir)
 			code, out, errOut := runIn(t, "", append([]string{"findings", "set", "--report", dir}, tt.args...)...)
-			if code != tt.wantCode || out != "" {
-				t.Errorf("exit %d, stdout %q; want %d and nothing", code, out, tt.wantCode)
+			if out != "" {
+				out = pick(t, out, "kind", "rule")
+			}
+			if code != tt.wantCode || out != tt.wantOut {
+				t.Errorf("exit %d, stdout %q; want %d and %q", code, out, tt.wantCode, tt.wantOut)
 			}
 			if !strings.Contains(errOut, tt.wantInErr) {
 				t.Errorf("stderr = %q, want %q", errOut, tt.wantInErr)
@@ -116,20 +121,37 @@ func TestAdd(t *testing.T) {
 		`{"kind":"finding","title":"Old shape","scope":["S-12"],"severity":"low"}`,                     // 5: refused
 		`{"kind":"finding","title":"Not attributed","targets":[{"host":"10.0.0.5"}],"severity":"low"}`, // 6: refused
 	}, "\n") + "\n"
+	// Three refused records: every one is reported, and nothing is written.
 	code, out, errOut := runIn(t, in, "findings", "add", "--report", dir)
 	if code != 1 {
-		t.Errorf("exit %d, want 1 for the refused record", code)
+		t.Errorf("exit %d, want 1 for the refused records", code)
+	}
+	if want := "problem - 3 write\nproblem - 5 write\nproblem - 6 write\n"; pick(t, out, "kind", "path", "line", "rule") != want {
+		t.Errorf("stdout:\n%s", out)
+	}
+	if want := "rpt: -:3: bad value: severity \"\" is not one of [critical high medium low info]\n" +
+		"rpt: -:5: bad value: scope is from report format 1; it is now targets, a list like [{scope: S-12}] (format 2)\n" +
+		"rpt: -:6: bad value: targets[0]: 10.0.0.5 has no scope ID; run it through rpt scope match first, or add scope\n"; errOut != want {
+		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "findings", "F-004-telnet-enabled.md")); err == nil {
+		t.Error("a record was written though others were refused")
+	}
+
+	// Without the refused records, every finding is written in one go.
+	in = strings.Join(slices.Delete(strings.Split(in, "\n"), 2, 3), "\n")
+	in = strings.Join(slices.DeleteFunc(strings.Split(in, "\n"), func(l string) bool {
+		return strings.Contains(l, "Old shape") || strings.Contains(l, "Not attributed")
+	}), "\n")
+	code, out, errOut = runIn(t, in, "findings", "add", "--report", dir)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	if want := "F-004 findings/F-004-telnet-enabled.md\nS-1 \nF-005 findings/F-005-weak-password-policy.md\n"; pick(t, out, "id", "path") != want {
 		t.Errorf("stdout:\n%s", out)
 	}
 	if !strings.Contains(out, foreign+"\n") {
 		t.Error("foreign record not passed through byte for byte")
-	}
-	if want := "rpt: -:3: bad value: severity \"\" is not one of [critical high medium low info]\n" +
-		"rpt: -:5: bad value: scope is from report format 1; it is now targets, a list like [{scope: S-12}] (format 2)\n" +
-		"rpt: -:6: bad value: targets[0]: 10.0.0.5 has no scope ID; run it through rpt scope match first, or add scope\n"; errOut != want {
-		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 	}
 	for _, f := range []string{"F-004-telnet-enabled.md", "F-005-weak-password-policy.md"} {
 		if _, err := os.Stat(filepath.Join(dir, "findings", f)); err != nil {

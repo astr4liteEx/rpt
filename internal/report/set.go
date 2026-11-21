@@ -24,6 +24,7 @@ var refusedKeys = map[string]string{
 	"id":       "finding IDs are permanent",
 	"kind":     "kind is not stored in the file",
 	"path":     "path is where the file is",
+	"rev":      "rev is the file's revision; rpt sets it on records",
 	"sections": "edit section text in the file",
 	"lines":    "lines are where the file's parts sit",
 }
@@ -32,6 +33,12 @@ var refusedKeys = map[string]string{
 // ID, and returns the finding as now stored. value
 // is YAML. Nothing else in the file changes.
 func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Set(id, key, value) })
+}
+
+// Set is Report.Set as part of the write tx.
+func (tx *Tx) Set(id, key, value string) (sdk.Finding, error) {
+	r := tx.r
 	if why, ok := refusedKeys[key]; ok {
 		return sdk.Finding{}, fmt.Errorf("%w: %s: %s", ErrRefusedKey, key, why)
 	}
@@ -53,28 +60,33 @@ func (r *Report) Set(id, key, value string) (sdk.Finding, error) {
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	return r.edit(rel, func(ff *findingFile) error { return ff.setEntry(key, val) })
+	return tx.edit(id, rel, func(ff *findingFile) error { return ff.setEntry(key, val) })
 }
 
 // unsetRefused are the keys Unset refuses: a finding needs the first four,
 // and the rest aren't stored in the file.
-var unsetRefused = []string{"id", "title", "targets", "severity", "kind", "path", "sections", "lines"}
+var unsetRefused = []string{"id", "title", "targets", "severity", "kind", "path", "rev", "sections", "lines"}
 
 // Unset removes top-level frontmatter keys from the finding with the given
 // ID, and returns the finding as now stored. Keys it doesn't have are no
 // change. A refused key stops every change. Nothing else in the file
 // changes.
 func (r *Report) Unset(id string, keys ...string) (sdk.Finding, error) {
+	return one(r, func(tx *Tx) (sdk.Finding, error) { return tx.Unset(id, keys...) })
+}
+
+// Unset is Report.Unset as part of the write tx.
+func (tx *Tx) Unset(id string, keys ...string) (sdk.Finding, error) {
 	for _, k := range keys {
 		if slices.Contains(unsetRefused, k) {
 			return sdk.Finding{}, fmt.Errorf("%w: %s: a finding needs it, or rpt sets it", ErrRefusedUnset, k)
 		}
 	}
-	rel, err := r.locate(id)
+	rel, err := tx.r.locate(id)
 	if err != nil {
 		return sdk.Finding{}, err
 	}
-	f, err := r.edit(rel, func(ff *findingFile) error {
+	f, err := tx.edit(id, rel, func(ff *findingFile) error {
 		for _, k := range keys {
 			if err := ff.removeEntry(k); err != nil {
 				return err
@@ -107,30 +119,35 @@ func (r *Report) locate(id string) (string, error) {
 	}
 }
 
-// edit reads the finding file rel, applies change, and writes the result
-// atomically if any byte changed. The edited file must still parse, or
-// nothing is written.
-func (r *Report) edit(rel string, change func(*findingFile) error) (sdk.Finding, error) {
-	src, err := r.root.ReadFile(rel)
+// edit reads the finding file rel as this write sees it, refuses if the
+// caller's --if-rev for id doesn't match, applies change, and puts the
+// result in the write if any byte changed. The edited file must still
+// parse, or the write is refused.
+func (tx *Tx) edit(id, rel string, change func(*findingFile) error) (sdk.Finding, error) {
+	src, exists, err := tx.read(rel)
 	if err != nil {
-		return sdk.Finding{}, &FileError{Path: rel, Err: err}
+		return sdk.Finding{}, err
+	}
+	if !exists {
+		return sdk.Finding{}, fmt.Errorf("%w: %s in %s/", ErrNoFinding, id, FindingsDir)
+	}
+	if err := tx.checkRev(id, rel, Rev(src)); err != nil {
+		return sdk.Finding{}, err
 	}
 	ff, err := splitFindingFile(src)
 	if err != nil {
 		return sdk.Finding{}, &FileError{Path: rel, Line: 1, Err: err}
 	}
 	if err := change(&ff); err != nil {
-		return sdk.Finding{}, &FileError{Path: rel, Err: err}
+		return sdk.Finding{}, fmt.Errorf("%w: %s: %v", ErrBadValue, rel, err)
 	}
 	out := ff.bytes()
-	f, err := parseFinding(rel, out, r.headings())
+	f, err := parseFinding(rel, out, tx.r.headings())
 	if err != nil {
-		return sdk.Finding{}, fmt.Errorf("edit would break %s: %w", rel, err)
+		return sdk.Finding{}, fmt.Errorf("%w: the change would break %s: %v", ErrBadValue, rel, err)
 	}
-	if string(out) != string(src) {
-		if err := writeAtomic(r.root, rel, out); err != nil {
-			return sdk.Finding{}, err
-		}
+	if err := tx.put(rel, out, rankFinding); err != nil {
+		return sdk.Finding{}, err
 	}
 	f.Lines = nil
 	return f, nil

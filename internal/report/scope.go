@@ -33,7 +33,7 @@ func (r *Report) Scope() ([]sdk.ScopeRow, error) {
 
 // scopeColumnsReserved are the record members rpt sets on scope records,
 // so no scope.csv column may be named like one.
-var scopeColumnsReserved = []string{"kind", "lines"}
+var scopeColumnsReserved = []string{"kind", "rev", "lines"}
 
 // ScopeWithLines is Scope with each row's Lines set: scope.csv's absolute
 // path and the line the row starts on.
@@ -42,6 +42,12 @@ func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read scope: %w", err)
 	}
+	return parseScope(src, filepath.Join(r.abs, ScopeFile))
+}
+
+// parseScope reads scope.csv's bytes as ScopeWithLines does; file is its
+// absolute path, for Lines.
+func parseScope(src []byte, file string) ([]sdk.ScopeRow, error) {
 	cr := csv.NewReader(bytes.NewReader(src))
 	header, err := cr.Read()
 	if err != nil {
@@ -57,7 +63,7 @@ func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
 			return nil, &FileError{Path: ScopeFile, Line: 1, Err: fmt.Errorf("column %q is reserved: rpt sets it on scope records; rename the column", col)}
 		}
 	}
-	file := filepath.Join(r.abs, ScopeFile)
+	headerText := trimEOL(src[:cr.InputOffset()])
 
 	var (
 		rows []sdk.ScopeRow
@@ -65,6 +71,7 @@ func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
 		seen = map[string]int{} // id -> line of the row that has it
 	)
 	for {
+		start := cr.InputOffset()
 		rec, err := cr.Read()
 		if err == io.EOF {
 			break
@@ -86,10 +93,22 @@ func (r *Report) ScopeWithLines() ([]sdk.ScopeRow, error) {
 			continue
 		}
 		seen[row.ID] = line
+		row.Rev = rowRev(headerText, src[start:cr.InputOffset()])
 		row.Lines = &sdk.ScopeLines{Row: line, File: file}
 		rows = append(rows, row)
 	}
 	return rows, errors.Join(errs...)
+}
+
+// rowRev is a scope row's rev: over the header line and the row's own
+// text, line ends left out, so edits to other rows leave it alone.
+func rowRev(header, row []byte) string {
+	return Rev(slices.Concat(header, []byte("\n"), trimEOL(row)))
+}
+
+// trimEOL drops a line's trailing line end.
+func trimEOL(b []byte) []byte {
+	return bytes.TrimRight(b, "\r\n")
 }
 
 func scopeRow(header, rec []string) (sdk.ScopeRow, error) {
