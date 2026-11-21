@@ -123,6 +123,8 @@ type FileError struct {
 	Path string // relative to the report root, slash-separated
 	Line int    // 1-based, 0 when unknown
 	Err  error
+	// Rule is the validate rule the problem breaks; "" is readable.
+	Rule string
 }
 
 func (e *FileError) Error() string {

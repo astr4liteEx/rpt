@@ -49,8 +49,8 @@ func parseScope(src []byte, exists bool) *Scope {
 	if !exists {
 		return s
 	}
-	fail := func(line int, err error) *Scope {
-		return &Scope{Exists: true, Err: &FileError{Path: ScopeFile, Line: line, Err: err}, src: src}
+	fail := func(line int, err error, rule string) *Scope {
+		return &Scope{Exists: true, Err: &FileError{Path: ScopeFile, Line: line, Err: err, Rule: rule}, src: src}
 	}
 	body := bytes.TrimPrefix(src, bom)
 	skip := len(src) - len(body)
@@ -58,19 +58,19 @@ func parseScope(src []byte, exists bool) *Scope {
 	cr.FieldsPerRecord = -1
 	header, err := cr.Read()
 	if err != nil {
-		return fail(1, fmt.Errorf("header: %w", err))
+		return fail(1, fmt.Errorf("header: %w", err), "")
 	}
 	for i := range header {
 		header[i] = strings.ToLower(strings.TrimSpace(header[i]))
 	}
 	for _, need := range []string{"id", "host"} {
 		if !slices.Contains(header, need) {
-			return fail(1, fmt.Errorf("the header has no %q column", need))
+			return fail(1, fmt.Errorf("the header has no %q column", need), "scope")
 		}
 	}
 	for _, col := range reservedColumns {
 		if slices.Contains(header, col) {
-			return fail(1, fmt.Errorf("the column name %q is reserved: rpt sets it on scope records", col))
+			return fail(1, fmt.Errorf("the column name %q is reserved: rpt sets it on scope records", col), "")
 		}
 	}
 	s.Header, s.headerEnd = header, skip+int(cr.InputOffset())
@@ -93,11 +93,12 @@ func parseScope(src []byte, exists bool) *Scope {
 			err = s.checkRow(row)
 		}
 		if err != nil {
+			rule := "scope"
 			var pe *csv.ParseError
 			if errors.As(err, &pe) {
-				line = pe.Line
+				line, rule = pe.Line, ""
 			}
-			s.RowErrs = append(s.RowErrs, &FileError{Path: ScopeFile, Line: line, Err: err})
+			s.RowErrs = append(s.RowErrs, &FileError{Path: ScopeFile, Line: line, Err: err, Rule: rule})
 			continue
 		}
 		row.Line, row.Start, row.End = line, start, skip+int(cr.InputOffset())
