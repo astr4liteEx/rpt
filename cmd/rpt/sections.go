@@ -21,7 +21,7 @@ func sectionsVerb(e *env, args []string) int {
 	out, err := of.output(e, sectionColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -31,17 +31,17 @@ func sectionsVerb(e *env, args []string) int {
 
 	cfg, err := r.Config()
 	if err != nil {
-		return logReportErrors(e.log, err)
+		return reportErrors(e, out, err)
 	}
 	for _, s := range cfg.SectionList() {
 		if err := out.Write(s); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }
@@ -59,12 +59,12 @@ func sectionsSetVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	text, err := io.ReadAll(e.stdin)
 	if err != nil {
 		e.log.Error("read stdin: " + err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -78,11 +78,11 @@ func sectionsSetVerb(e *env, args []string) int {
 	}
 	if err := out.Write(f); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }

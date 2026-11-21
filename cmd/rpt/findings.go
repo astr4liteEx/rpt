@@ -40,7 +40,7 @@ func findingsVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -56,12 +56,12 @@ func findingsVerb(e *env, args []string) int {
 	for _, f := range list {
 		if err := out.Write(f); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
-	return logReportErrors(e.log, readErr)
+	return reportErrors(e, out, readErr)
 }

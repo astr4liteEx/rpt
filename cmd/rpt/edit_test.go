@@ -126,9 +126,9 @@ func TestAdd(t *testing.T) {
 	if !strings.Contains(out, foreign+"\n") {
 		t.Error("foreign record not passed through byte for byte")
 	}
-	if want := "rpt: stdin:3: bad value: severity \"\" is not one of [critical high medium low info]\n" +
-		"rpt: stdin:5: bad value: scope is from report format 1; it is now targets, a list like [{scope: S-12}] (format 2)\n" +
-		"rpt: stdin:6: bad value: targets[0]: 10.0.0.5 has no scope ID; run it through rpt scope match first, or add scope\n"; errOut != want {
+	if want := "rpt: -:3: bad value: severity \"\" is not one of [critical high medium low info]\n" +
+		"rpt: -:5: bad value: scope is from report format 1; it is now targets, a list like [{scope: S-12}] (format 2)\n" +
+		"rpt: -:6: bad value: targets[0]: 10.0.0.5 has no scope ID; run it through rpt scope match first, or add scope\n"; errOut != want {
 		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 	}
 	for _, f := range []string{"F-004-telnet-enabled.md", "F-005-weak-password-policy.md"} {

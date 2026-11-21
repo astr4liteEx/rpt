@@ -27,7 +27,7 @@ func setVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -41,11 +41,11 @@ func setVerb(e *env, args []string) int {
 	}
 	if err := out.Write(f); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }
@@ -63,7 +63,7 @@ func unsetVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -77,11 +77,11 @@ func unsetVerb(e *env, args []string) int {
 	}
 	if err := out.Write(f); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }
@@ -99,7 +99,7 @@ func isRequestError(err error) bool {
 // logEditError logs an error from editing and returns its exit code. A
 // problem in a report file, or anything wrong with what was asked (an
 // unknown finding, a key that can't be set, a bad value), is exit 1; any
-// other failure, such as a failed write, is exit 2. line > 0 locates the
+// other failure, such as a failed write, is too. line > 0 locates the
 // record on stdin.
 func logEditError(e *env, err error, line int) int {
 	if fe, ok := errors.AsType[*report.FileError](err); ok {
@@ -108,14 +108,14 @@ func logEditError(e *env, err error, line int) int {
 	}
 	if isRequestError(err) {
 		if line > 0 {
-			e.log.Error(err.Error(), "path", "stdin", "line", line)
+			e.log.Error(err.Error(), "path", stdinPath, "line", line)
 		} else {
 			e.log.Error(err.Error())
 		}
 		return cli.ExitProblems
 	}
 	e.log.Error(err.Error())
-	return cli.ExitUsage
+	return cli.ExitProblems
 }
 
 // targetFlags collects repeated --target flags.
@@ -161,7 +161,7 @@ func addVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -181,14 +181,14 @@ func addVerb(e *env, args []string) int {
 		}
 		if err := out.Write(added); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 		return cli.ExitOK
 	}
 	finish := func(code int) int {
 		if err := out.Flush(); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 		return code
 	}
@@ -198,26 +198,21 @@ func addVerb(e *env, args []string) int {
 		return finish(add(f, 0, true))
 	}
 
-	code := cli.ExitOK
-	for rec, err := range sdk.Records(e.stdin) {
-		if le, ok := errors.AsType[*sdk.LineError](err); ok {
-			e.log.Error(le.Err.Error(), "path", "stdin", "line", le.Line)
-			code = cli.ExitProblems
-			continue
-		} else if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitUsage
-		}
+	recs, code, ok := readInput(e, out)
+	if !ok {
+		return finish(code)
+	}
+	for _, rec := range recs {
 		if rec.Kind != "finding" {
 			if err := out.WriteRaw(rec.Raw); err != nil {
 				e.log.Error(err.Error())
-				return cli.ExitUsage
+				return cli.ExitProblems
 			}
 			continue
 		}
 		var f sdk.Finding
 		if err := json.Unmarshal(rec.Raw, &f); err != nil {
-			e.log.Error("finding: "+err.Error(), "path", "stdin", "line", rec.Line)
+			e.log.Error("finding: "+err.Error(), "path", stdinPath, "line", rec.Line)
 			code = cli.ExitProblems
 			continue
 		}
@@ -245,7 +240,7 @@ func deleteVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -262,12 +257,12 @@ func deleteVerb(e *env, args []string) int {
 		}
 		if err := out.Write(f); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return code
 }

@@ -31,7 +31,7 @@ func versionVerb(e *env, args []string) int {
 	}
 	if err := json.MarshalWrite(e.stdout, v); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	fmt.Fprintln(e.stdout)
 	return cli.ExitOK

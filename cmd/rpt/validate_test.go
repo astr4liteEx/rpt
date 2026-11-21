@@ -27,8 +27,8 @@ func fixedReport(t *testing.T) string {
 // Done-when: validate exits 1 on the fixture and 0 once its problem is fixed.
 func TestValidateVerb(t *testing.T) {
 	code, out, errOut := runIn(t, "", "validate", "--report", fixture)
-	if code != 1 || errOut != "" {
-		t.Errorf("fixture: exit %d, stderr %q; want 1 and nothing", code, errOut)
+	if code != 1 || errOut != "rpt: findings/tls-weak.md:5: S-99 is not in scope.csv\n" {
+		t.Errorf("fixture: exit %d, stderr %q; want 1 and the problem as text", code, errOut)
 	}
 	if got := pick(t, out, "path", "line", "level", "rule"); got != "findings/tls-weak.md 5 error scopeIDsExist\n" {
 		t.Errorf("fixture problems = %q", got)
@@ -60,9 +60,8 @@ func TestAssembleVerb(t *testing.T) {
 	if want := "rpt: findings/tls-weak.md:5: warning: \"S-99\" is not in scope.csv; target left out of the finding\n"; errOut != want {
 		t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 	}
-	if strings.Count(out, "\n") != 1 || !strings.HasSuffix(out, "\n") {
-		t.Errorf("stdout is not one JSON line: %q", out)
-	}
+	// The report record, then the warning as a problem record.
+	out, _, _ = strings.Cut(out, "\n")
 	golden := strings.ReplaceAll(string(mustRead(t, "../../testdata/assemble.golden.json")), "$REPORT", fixture)
 	var got, want any
 	if err := json.Unmarshal([]byte(out), &got); err != nil {
@@ -94,6 +93,9 @@ func TestAssembleErrors(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, out, errOut := runIn(t, "", tt.args...)
+			if code == 1 {
+				out = strings.Replace(pick(t, out, "kind", "rule"), "problem readable\n", "", 1) // the unreadable file, as a record
+			}
 			if code != tt.wantCode || out != "" || !strings.Contains(errOut, tt.wantInErr) {
 				t.Errorf("exit %d, stdout %q, stderr %q; want %d, nothing, %q", code, out, errOut, tt.wantCode, tt.wantInErr)
 			}

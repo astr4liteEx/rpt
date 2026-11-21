@@ -33,7 +33,7 @@ func TestScopeByID(t *testing.T) {
 		t.Errorf("stdout = %q, want S-20 then S-12, in the order asked", got)
 	}
 	code, out, errOut = runIn(t, "", "scope", "--report", fixture, "S-12", "S-99")
-	if code != 1 || pick(t, out, "id") != "S-12\n" || !strings.Contains(errOut, "S-99: no such scope row") {
+	if code != 1 || pick(t, out, "kind", "id") != "scope S-12\nproblem \n" || !strings.Contains(errOut, "S-99: no such scope row") {
 		t.Errorf("unknown ID: exit %d, stdout %q, stderr %q; want 1, S-12 printed, S-99 named", code, out, errOut)
 	}
 }
@@ -48,9 +48,9 @@ func TestScopeMatch(t *testing.T) {
 		foreign + "\r", // 3: CRLF
 		"",             // 4: blank
 		`{"kind":"finding","title":"Telnet","targets":[{"host":"10.9.9.9","port":23,"protocol":"tcp"}]}`, // 5: out of scope
-		noTarget,  // 6: nothing to match
-		"garbage", // 7: malformed
-		already,   // 8: unchanged
+		noTarget, // 6: nothing to match
+		"",       // 7: blank (a malformed line now stops the filter: problems_test.go)
+		already,  // 8: unchanged
 		`{"kind":"finding","title":"Mixed","targets":[{"host":"10.0.0.6","port":8443},{"host":"10.9.9.9"}]}`, // 9: half in scope
 	}, "\n") + "\n"
 
@@ -71,29 +71,32 @@ func TestScopeMatch(t *testing.T) {
 			name:    "attributes, passes through, keeps out-of-scope targets",
 			args:    []string{"scope", "match", "--report", fixture},
 			wantOut: []string{ssh, tls, foreign, telnet, noTarget, already, mixed},
-			wantErr: []string{"rpt: stdin:7: not a JSON object"},
+			wantErr: nil,
 		},
 		{
 			name:    "--drop-out-of-scope drops and says so",
 			args:    []string{"scope", "match", "--report", fixture, "--drop-out-of-scope"},
 			wantOut: []string{ssh, tls, foreign, noTarget, already, mixedDropped},
 			wantErr: []string{
-				`rpt: stdin:5: dropped "Telnet": 10.9.9.9 tcp/23 is out of scope`,
-				"rpt: stdin:7: not a JSON object",
-				`rpt: stdin:9: dropped a target of "Mixed": 10.9.9.9 is out of scope`,
+				`rpt: -:5: dropped "Telnet": 10.9.9.9 tcp/23 is out of scope`,
+				`rpt: -:9: dropped a target of "Mixed": 10.9.9.9 is out of scope`,
 			},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			code, out, errOut := runIn(t, in, tt.args...)
-			if code != 1 {
-				t.Errorf("exit %d, want 1 for the malformed line", code)
+			if code != 0 {
+				t.Errorf("exit %d, want 0", code)
 			}
 			if want := strings.Join(tt.wantOut, "\n") + "\n"; out != want {
 				t.Errorf("stdout\n got: %s\nwant: %s", out, want)
 			}
-			if want := strings.Join(tt.wantErr, "\n") + "\n"; errOut != want {
+			want := strings.Join(tt.wantErr, "\n") + "\n"
+			if tt.wantErr == nil {
+				want = ""
+			}
+			if errOut != want {
 				t.Errorf("stderr\n got: %q\nwant: %q", errOut, want)
 			}
 		})

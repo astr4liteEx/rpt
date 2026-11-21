@@ -16,14 +16,14 @@ func writeEvidence(e *env, out *cli.Output, list []sdk.Evidence, readErr error) 
 	for _, ev := range list {
 		if err := out.Write(ev); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
-	return logReportErrors(e.log, readErr)
+	return reportErrors(e, out, readErr)
 }
 
 // evidenceVerb lists every reference the findings make to evidence files,
@@ -40,7 +40,7 @@ func evidenceVerb(e *env, args []string) int {
 	out, err := of.output(e, evidenceColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -65,7 +65,7 @@ func evidencePruneVerb(e *env, args []string) int {
 	out, err := of.output(e, evidenceColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -91,7 +91,7 @@ func evidenceAddVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -105,11 +105,11 @@ func evidenceAddVerb(e *env, args []string) int {
 	}
 	if err := out.Write(f); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }

@@ -126,7 +126,9 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 **Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which one that is, run `rpt ls --current`. To see which reports a folder holds, run `rpt ls`.
 
-**Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file. `2` means a usage error: wrong flags or arguments.
+**Problems.** A broken file, an unknown ID or a bad input line is a `problem` record in the output, after the good records, and a line on stderr. In a terminal table you get the stderr line only. Each problem names the `command` that found it. A command that reads records stops at an error-level problem on its input: it writes nothing, passes the problems on and exits 1. Warnings never stop anything.
+
+**Exit codes.** `0` means success. `1` means problems in the report, in its input, or in what you asked for, such as an unknown ID or a missing file, or a failure such as a write that didn't happen. `2` means a usage error, and only that: wrong flags or arguments.
 
 > [!TIP]
 > Every command that changes a report writes atomically and keeps the author's comments, quoting and line endings. Use them from scripts in place of editing files by hand.
@@ -186,7 +188,7 @@ func main() {
 Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
-> A shell pipeline's exit status is that of its last command. Without `set -o pipefail`, a parser that fails partway through can still leave `rpt findings add` with a partial import. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt findings add < out.jsonl`.
+> A shell pipeline's exit status is that of its last command. A parser that reports its failure as an error-level `problem` record stops `rpt findings add` from writing anything; one that just dies partway through can still leave a partial import, and without `set -o pipefail` the pipeline looks fine. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt findings add < out.jsonl`.
 
 ## Companion projects
 

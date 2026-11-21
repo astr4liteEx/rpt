@@ -35,7 +35,7 @@ func lsVerb(e *env, args []string) int {
 	out, err := of.output(e, locationColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	var (
 		found []sdk.Location
@@ -54,7 +54,7 @@ func lsVerb(e *env, args []string) int {
 	if !*current && found == nil && len(errs) == 1 {
 		if _, ok := errors.AsType[*report.FileError](errs[0]); !ok {
 			e.log.Error(errs[0].Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	for _, err := range errs {
@@ -67,12 +67,12 @@ func lsVerb(e *env, args []string) int {
 	for _, loc := range found {
 		if err := out.Write(loc); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }

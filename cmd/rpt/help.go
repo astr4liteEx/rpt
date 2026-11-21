@@ -81,7 +81,7 @@ func helpVerb(e *env, args []string) int {
 	out, err := of.output(e, commandColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	var list []sdk.Command
 	for _, name := range slices.Sorted(maps.Keys(builtins)) {
@@ -92,12 +92,12 @@ func helpVerb(e *env, args []string) int {
 	for _, v := range append(list, describePlugins(e)...) {
 		if err := out.Write(v); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }
@@ -109,7 +109,7 @@ func describeBuiltin(e *env, b builtin) int {
 	line, err := json.Marshal(d, json.Deterministic(true))
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	fmt.Fprintf(e.stdout, "%s\n", line)
 	return cli.ExitOK

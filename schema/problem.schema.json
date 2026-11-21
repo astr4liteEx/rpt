@@ -2,16 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/problem.schema.json",
   "title": "rpt problem record",
-  "description": "One broken rule found by rpt validate or a checker plugin. Schema version 2.",
+  "description": "One problem: a broken rule, an unreadable file, a missing ID or bad input, found by an rpt command or a plugin. Every command gives problems as records on stdout (unless stdout is a terminal table) and as text on stderr. An error-level problem on stdin stops any rpt command reading records, and any writer or renderer plugin. Schema version 2.",
   "type": "object",
   "properties": {
     "kind": {"const": "problem"},
-    "path": {"type": "string", "description": "File the problem is in, relative to the report root."},
+    "path": {"type": "string", "description": "File the problem is in, relative to the report root; - for a record on stdin, with line its line in the stream."},
     "line": {"type": "integer", "minimum": 1, "description": "1-based line; absent when the problem has no line."},
     "column": {"type": "integer", "minimum": 1, "description": "1-based byte offset in the line; only with line. rpt validate's rules don't set it; plugins may."},
-    "rule": {"type": "string", "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, targets, requiredSections, evidence, config, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Plugins may emit problems under rule names of their own."},
+    "rule": {"type": "string", "description": "The broken rule's name, public API. rpt validate's rules: readable, findingID, title, knownSeverity, scopeIDsExist, targets, requiredSections, evidence, config, scope, and the warnings textBeforeHeading, configUnknownKey and evidenceUnlinked. rpt assemble uses the same names for what it leaves out. Other commands use readable (a file that can't be read), exists (no such ID) and input (a stdin line that isn't a record). Plugins may emit problems under rule names of their own."},
     "level": {"enum": ["error", "warning"]},
-    "message": {"type": "string"}
+    "message": {"type": "string"},
+    "command": {"type": "string", "description": "The command that found the problem, as in rpt <command> (finding get, validate, lint); set by whoever creates the problem and never changed downstream."}
   },
   "required": ["kind", "path", "rule", "level", "message"],
   "additionalProperties": true

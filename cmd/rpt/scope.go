@@ -4,7 +4,6 @@ import (
 	"cmp"
 	"encoding/json/jsontext"
 	"encoding/json/v2"
-	"errors"
 	"fmt"
 	"github.com/spf13/pflag"
 	"slices"
@@ -33,7 +32,7 @@ func scopeVerb(e *env, args []string) int {
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -46,14 +45,13 @@ func scopeVerb(e *env, args []string) int {
 		read = r.ScopeWithLines
 	}
 	rows, readErr := read()
-	missing := false
+	var missing []string
 	if len(ids) > 0 {
 		var picked []sdk.ScopeRow
 		for _, id := range slices.Compact(ids) {
 			i := slices.IndexFunc(rows, func(r sdk.ScopeRow) bool { return r.ID == id })
 			if i < 0 {
-				e.log.Error(fmt.Sprintf("%s: %v", id, report.ErrNoScopeRow), "path", report.ScopeFile)
-				missing = true
+				missing = append(missing, id)
 				continue
 			}
 			picked = append(picked, rows[i])
@@ -63,14 +61,21 @@ func scopeVerb(e *env, args []string) int {
 	for _, row := range rows {
 		if err := out.Write(row); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
+		}
+	}
+	for _, id := range missing {
+		p := sdk.Problem{Path: report.ScopeFile, Rule: ruleExists, Level: sdk.Error, Message: fmt.Sprintf("%s: %v", id, report.ErrNoScopeRow)}
+		if err := e.problem(out, p); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
-	if code := logReportErrors(e.log, readErr); code != cli.ExitOK || !missing {
+	if code := reportErrors(e, out, readErr); code != cli.ExitOK || len(missing) == 0 {
 		return code
 	}
 	return cli.ExitProblems
@@ -93,7 +98,7 @@ func scopeMatchVerb(e *env, args []string) int {
 	out, err := of.output(e, findingColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -101,33 +106,27 @@ func scopeMatchVerb(e *env, args []string) int {
 	}
 	defer r.Close()
 	rows, err := r.Scope()
-	if code := logReportErrors(e.log, err); code != cli.ExitOK {
+	if code := reportErrors(e, out, err); code != cli.ExitOK {
 		return code
 	}
-
-	code := cli.ExitOK
-	for rec, err := range sdk.Records(e.stdin) {
-		if le, ok := errors.AsType[*sdk.LineError](err); ok {
-			e.log.Error(le.Err.Error(), "path", "stdin", "line", le.Line)
-			code = cli.ExitProblems
-			continue
-		} else if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitUsage
-		}
+	recs, code, ok := readInput(e, out)
+	if !ok {
+		return code
+	}
+	for _, rec := range recs {
 		if rec.Kind != "finding" {
 			err = out.WriteRaw(rec.Raw)
 		} else {
 			err = matchFinding(e, out, rec, rows, *drop)
 		}
 		if err != nil {
-			e.log.Error(err.Error(), "path", "stdin", "line", rec.Line)
+			e.log.Error(err.Error(), "path", stdinPath, "line", rec.Line)
 			code = cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return code
 }
@@ -144,7 +143,7 @@ func matchFinding(e *env, out *cli.Output, rec sdk.Rec, rows []sdk.ScopeRow, dro
 		return out.WriteOwn(f, rec.Raw)
 	}
 	info := func(format string, a ...any) {
-		e.log.Info(fmt.Sprintf(format, a...), "path", "stdin", "line", rec.Line)
+		e.log.Info(fmt.Sprintf(format, a...), "path", stdinPath, "line", rec.Line)
 	}
 	kept := make([]sdk.Target, 0, len(f.Targets))
 	var dropped []string
@@ -235,7 +234,7 @@ func scopeAddVerb(e *env, args []string) int {
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -250,14 +249,14 @@ func scopeAddVerb(e *env, args []string) int {
 		}
 		if err := out.Write(added); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 		return cli.ExitOK
 	}
 	finish := func(code int) int {
 		if err := out.Flush(); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 		return code
 	}
@@ -274,26 +273,21 @@ func scopeAddVerb(e *env, args []string) int {
 		return finish(add(row, 0))
 	}
 
-	code := cli.ExitOK
-	for rec, err := range sdk.Records(e.stdin) {
-		if le, ok := errors.AsType[*sdk.LineError](err); ok {
-			e.log.Error(le.Err.Error(), "path", "stdin", "line", le.Line)
-			code = cli.ExitProblems
-			continue
-		} else if err != nil {
-			e.log.Error(err.Error())
-			return cli.ExitUsage
-		}
+	recs, code, ok := readInput(e, out)
+	if !ok {
+		return finish(code)
+	}
+	for _, rec := range recs {
 		if rec.Kind != "scope" {
 			if err := out.WriteRaw(rec.Raw); err != nil {
 				e.log.Error(err.Error())
-				return cli.ExitUsage
+				return cli.ExitProblems
 			}
 			continue
 		}
 		var row sdk.ScopeRow
 		if err := json.Unmarshal(rec.Raw, &row); err != nil {
-			e.log.Error("scope: "+err.Error(), "path", "stdin", "line", rec.Line)
+			e.log.Error("scope: "+err.Error(), "path", stdinPath, "line", rec.Line)
 			code = cli.ExitProblems
 			continue
 		}
@@ -324,7 +318,7 @@ func scopeDeleteVerb(e *env, args []string) int {
 	out, err := of.output(e, scopeColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -341,12 +335,12 @@ func scopeDeleteVerb(e *env, args []string) int {
 		}
 		if err := out.Write(row); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return code
 }

@@ -1,9 +1,6 @@
 package main
 
 import (
-	"encoding/json/v2"
-	"io"
-
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/sdk"
 )
@@ -27,7 +24,7 @@ func validateVerb(e *env, args []string) int {
 	out, err := of.output(e, problemColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -38,21 +35,21 @@ func validateVerb(e *env, args []string) int {
 	problems, err := r.Validate()
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	code := cli.ExitOK
 	for _, p := range problems {
 		if p.Level == sdk.Error {
 			code = cli.ExitProblems
 		}
-		if err := out.Write(p); err != nil {
+		if err := e.problem(out, p); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return code
 }
@@ -74,20 +71,20 @@ func assembleVerb(e *env, args []string) int {
 	}
 	defer r.Close()
 
+	out, _ := cli.NewOutput(e.stdout, false, true, nil) // JSON Lines on a terminal too
 	rep, warnings, err := r.Assemble()
 	if err != nil {
-		return logReportErrors(e.log, err)
+		return reportErrors(e, out, err)
+	}
+	if err := out.Write(rep); err != nil {
+		e.log.Error("write report: " + err.Error())
+		return cli.ExitProblems
 	}
 	for _, w := range warnings {
-		e.log.Warn(w.Message, "path", w.Path, "line", w.Line)
-	}
-	if err := json.MarshalWrite(e.stdout, rep, json.Deterministic(true)); err != nil {
-		e.log.Error("write report: " + err.Error())
-		return cli.ExitUsage
-	}
-	if _, err := io.WriteString(e.stdout, "\n"); err != nil {
-		e.log.Error("write report: " + err.Error())
-		return cli.ExitUsage
+		if err := e.problem(out, w); err != nil {
+			e.log.Error(err.Error())
+			return cli.ExitProblems
+		}
 	}
 	return cli.ExitOK
 }

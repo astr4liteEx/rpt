@@ -116,6 +116,7 @@ type Problem struct {
 	Rule    string `json:"rule"`
 	Level   Level  `json:"level"`
 	Message string `json:"message"`
+	Command string `json:"command,omitzero"` // the command that found it; never changed downstream
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

@@ -20,7 +20,7 @@ func severitiesVerb(e *env, args []string) int {
 	out, err := of.output(e, severityColumns)
 	if err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	r := openReport(e, *of.report)
 	if r == nil {
@@ -30,17 +30,17 @@ func severitiesVerb(e *env, args []string) int {
 
 	cfg, err := r.Config()
 	if err != nil {
-		return logReportErrors(e.log, err)
+		return reportErrors(e, out, err)
 	}
 	for i, s := range cfg.Severities {
 		if err := out.Write(sdk.SeverityLevel{Kind: "severity", Level: s, Rank: i + 1}); err != nil {
 			e.log.Error(err.Error())
-			return cli.ExitUsage
+			return cli.ExitProblems
 		}
 	}
 	if err := out.Flush(); err != nil {
 		e.log.Error(err.Error())
-		return cli.ExitUsage
+		return cli.ExitProblems
 	}
 	return cli.ExitOK
 }

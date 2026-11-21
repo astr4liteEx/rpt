@@ -55,14 +55,15 @@ rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries eve
 
 ## Records
 
-Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `verb`, `location` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
+Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `command`, `location` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
 
 Reading a stream:
 
 - Accept LF or CRLF line ends; write LF.
 - Skip blank lines.
 - Accept lines up to 16 MiB; a longer line is a malformed line.
-- A malformed line (not JSON, or JSON that isn't an object): report it on stderr with its line number (`rpt-x: stdin:12: not a JSON object`), drop it, keep reading, and exit 1 at the end.
+- A malformed line (not JSON, or JSON that isn't an object) is a problem in the input: report it as an error-level `problem` record with `path` `-`, its `line` in the stream and rule `input`, and on stderr (`rpt-x: -:12: not a JSON object`). A filter or checker drops it, keeps reading and exits 1 at the end; a writer or renderer stops, as below.
+- **An error-level `problem` record on stdin** means something upstream failed. A **writer** or **renderer** stops: it changes nothing and renders nothing, passes the problems on, and exits 1, so nothing downstream of an error acts on a partial stream. A **filter** or **checker** passes it through and carries on. Warnings never stop anything. Every rpt command that reads records stops this way.
 
 Filtering a stream (stdin to stdout):
 
@@ -72,8 +73,9 @@ Filtering a stream (stdin to stdout):
 ## Output and exit codes
 
 - stdout carries records only: JSON Lines when stdout is a pipe or file. A table or other human form is allowed on a terminal.
+- **Problems go both ways:** each one is a `problem` record on stdout, in the stream with the other records, and a text line on stderr. On a terminal showing a table, the text alone. A problem names the `command` that found it (your plugin's name, as in `rpt <name>`); never change the `command` of a problem passing through. rpt does the same: a broken finding file in `rpt findings` is a problem record (rule `readable`) after the good findings, and an unknown ID is one with rule `exists`.
 - stderr carries messages, one per line: `<program>: <path>:<line>:<column>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known (most messages have no column).
-- Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could); `2` usage error; `3` the plugin couldn't do its work, such as a tool it needs being missing, failing or timing out, so its output says nothing about the report (say why in one stderr line). `126` belongs to rpt (the plugin couldn't start).
+- Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could), or a failure after the arguments were understood; `2` usage error, and only that; `3` the plugin couldn't do its work, such as a tool it needs being missing, failing or timing out, so its output says nothing about the report (say why in one stderr line). `126` belongs to rpt (the plugin couldn't start).
 
 ## In a pipeline
 

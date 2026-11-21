@@ -92,7 +92,7 @@ func TestScopeAddFromStdin(t *testing.T) {
 		`{"kind":"scope","host":"h","owner":"me"}` + "\n" + // refused: no owner column
 		`{"kind":"scope","host":"10.9.9.9","port":8080}` + "\n"
 	code, out, errOut := runIn(t, in, "scope", "add", "--report", dir)
-	if code != 1 || !strings.Contains(errOut, "stdin:3") {
+	if code != 1 || !strings.Contains(errOut, "-:3") {
 		t.Errorf("exit %d, stderr %q; want 1 naming stdin line 3", code, errOut)
 	}
 	if got := pick(t, out, "kind", "id"); got != "scope S-30\nfinding \nscope S-31\n" {

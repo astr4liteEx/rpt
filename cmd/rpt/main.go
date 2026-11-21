@@ -31,6 +31,7 @@ type env struct {
 	stdin          io.Reader
 	stdout, stderr io.Writer
 	log            *slog.Logger
+	command        string // the command running, as problems name it: "scope match"
 }
 
 // A verb runs one built-in and returns its exit code. Only main calls
@@ -272,6 +273,7 @@ func adapt(e *env, code *int, g globals, name string, v verb, desc sdk.Command) 
 	return &cobra.Command{
 		Use: f[len(f)-1], Short: desc.Summary, DisableFlagParsing: true,
 		Run: func(_ *cobra.Command, args []string) {
+			e := &env{stdin: e.stdin, stdout: e.stdout, stderr: e.stderr, log: e.log, command: name}
 			switch {
 			case len(args) == 1 && args[0] == "--describe" && len(f) == 1:
 				*code = describeBuiltin(e, builtins[name])
@@ -372,24 +374,6 @@ func openReport(e *env, flagValue string) *report.Report {
 		return nil
 	}
 	return r
-}
-
-// logReportErrors logs each error from reading the report and returns the
-// exit code: problems in report files are exit 1, anything else exit 2.
-func logReportErrors(log *slog.Logger, err error) int {
-	if err == nil {
-		return cli.ExitOK
-	}
-	code := cli.ExitProblems
-	for _, e := range unjoin(err) {
-		if fe, ok := errors.AsType[*report.FileError](e); ok {
-			log.Error(fe.Err.Error(), "path", fe.Path, "line", fe.Line)
-			continue
-		}
-		log.Error(e.Error())
-		code = cli.ExitUsage
-	}
-	return code
 }
 
 func unjoin(err error) []error {

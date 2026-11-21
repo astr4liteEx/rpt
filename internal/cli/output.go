@@ -90,6 +90,9 @@ func (o *Output) WriteOwn(rec any, raw []byte) error {
 }
 
 // Flush writes anything buffered, such as a table.
+// Table reports whether o prints a table rather than JSON Lines.
+func (o *Output) Table() bool { return o.mode == modeTable }
+
 func (o *Output) Flush() error {
 	if o.tw != nil {
 		return o.tw.Flush()

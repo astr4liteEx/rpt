@@ -98,7 +98,7 @@ func TestRun(t *testing.T) {
 			name:     "a broken finding is reported, the rest still printed, exit 1",
 			args:     []string{"findings"},
 			env:      "BROKEN",
-			wantCode: 1, wantOut: ids("F-003\nF-002\nF-001\n"),
+			wantCode: 1, wantOut: ids("F-003\nF-002\nF-001\n\n"), // then the problem record
 			wantInErr: "rpt: findings/broken.md:3: ",
 		},
 		{
