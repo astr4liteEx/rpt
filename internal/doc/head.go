@@ -252,9 +252,10 @@ func render(n *yaml.Node, ind int) []byte {
 }
 
 // keepComment gives val the old value's line comment, so setting a value
-// doesn't drop "# why" after it.
+// doesn't drop "# why" after it. Only a value written on one line, a
+// scalar or a flow list or mapping, can keep it.
 func keepComment(old, val *yaml.Node) *yaml.Node {
-	if old.LineComment == "" || val.LineComment != "" || val.Kind != yaml.ScalarNode {
+	if old.LineComment == "" || val.LineComment != "" || val.Kind != yaml.ScalarNode && val.Style&yaml.FlowStyle == 0 {
 		return val
 	}
 	v := *val

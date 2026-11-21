@@ -592,19 +592,21 @@ func (m *Model) editConfig(change func(*doc.Doc) error) error {
 	return nil
 }
 
-// RemoveMode says what removing a page the config names does.
-type RemoveMode int
+// Cited says what to do when a write would leave something pointing at
+// what it removes or changes: a scope row findings cite, a page the
+// config names.
+type Cited int
 
 const (
-	RefuseCited RemoveMode = iota // refuse
-	Force                         // remove it, leaving the config naming it
-	Cleanup                       // remove it and its entries in the config
+	Refuse  Cited = iota // refuse the write
+	Force                // write it, leaving the pointers dangling or unfit
+	Cleanup              // write it and drop the pointers
 )
 
 // Remove removes the document id. A page the config's page lists name is
 // refused, unless mode says otherwise. It returns the document as it was,
 // and the config lists a Force left naming it.
-func (m *Model) Remove(k *Kind, id string, mode RemoveMode) (*Doc, []string, error) {
+func (m *Model) Remove(k *Kind, id string, mode Cited) (*Doc, []string, error) {
 	d, err := m.Get(k, id)
 	if err != nil {
 		return nil, nil, err
@@ -619,7 +621,7 @@ func (m *Model) Remove(k *Kind, id string, mode RemoveMode) (*Doc, []string, err
 		}
 	}
 	switch {
-	case len(cited) > 0 && mode == RefuseCited:
+	case len(cited) > 0 && mode == Refuse:
 		return nil, nil, refuse(d.Path, "%s is in %s's %s: pass --force to leave it there, or --cleanup to drop it", d.ID, ConfigFile, strings.Join(cited, " and "))
 	case len(cited) > 0 && mode == Cleanup:
 		if err := m.dropFromConfig(d.ID); err != nil {

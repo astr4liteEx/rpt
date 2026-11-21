@@ -171,7 +171,7 @@ func TestPagesAndTheConfig(t *testing.T) {
 	if want := "format: 2\npages: [P-005, findings]\nrequired_pages:\n  - P-005\n"; string(m.files[ConfigFile].data) != want {
 		t.Fatalf("config:\n%s", m.files[ConfigFile].data)
 	}
-	if _, _, err := m.Remove(PageKind, "P-005", RefuseCited); !isRefusal(err) {
+	if _, _, err := m.Remove(PageKind, "P-005", Refuse); !isRefusal(err) {
 		t.Fatalf("a cited page: got %v", err)
 	}
 	if _, _, err := m.Remove(PageKind, "P-005", Cleanup); err != nil {
