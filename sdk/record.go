@@ -209,6 +209,11 @@ type Problem struct {
 	Level   Level  `json:"level"`
 	Message string `json:"message"`
 	Command string `json:"command,omitzero"` // the command that found it; never changed downstream
+	// Suggestions are replacements for the text the problem is about, best
+	// first, such as a spelling checker's; EndColumn is the 1-based byte,
+	// inclusive, the text ends at, with Column.
+	Suggestions []string `json:"suggestions,omitzero"`
+	EndColumn   int      `json:"end_column,omitzero"`
 	// Rev is the revision of the finding, page or rpt.yaml the problem is
 	// in, as the check read it; pass it as --if-rev to a fix.
 	Rev string `json:"rev,omitzero"`
@@ -387,31 +392,6 @@ type VersionInfo struct {
 	Version       string `json:"version"`        // release tag, module version, or "dev"
 	SchemaVersion int    `json:"schema_version"` // record schemas this rpt writes
 	Format        int    `json:"format"`         // report format this rpt reads
-
-	// Extra holds any unknown members.
-	Extra map[string]jsontext.Value `json:",embed"`
-}
-
-// Section is one "section" record rpt sections emits: a section of the
-// report's findings, as the report config maps it. Key is the fixed key
-// (description, remediation, poc) or, for a custom section, its heading.
-type Section struct {
-	Kind     string `json:"kind"`
-	Key      string `json:"key"`
-	Heading  string `json:"heading"`
-	Fixed    bool   `json:"fixed"`
-	Required bool   `json:"required"`
-
-	// Extra holds any unknown members.
-	Extra map[string]jsontext.Value `json:",embed"`
-}
-
-// SeverityLevel is one "severity" record rpt severities emits: a level the
-// report allows, with its rank (1 is the most severe).
-type SeverityLevel struct {
-	Kind  string   `json:"kind"`
-	Level Severity `json:"level"`
-	Rank  int      `json:"rank"`
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`

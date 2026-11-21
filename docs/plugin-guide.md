@@ -40,11 +40,14 @@ The [`sdk`](../sdk) package implements the protocol; use it instead of re-derivi
 
 | Need | Use |
 | --- | --- |
-| `main` | `func main() { sdk.Main(plugin) }`, with `plugin` an `sdk.Plugin{Description, Run}` |
-| Tests, `--describe` included | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
-| Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line |
-| Typed records | `sdk.Finding`, `sdk.ScopeRow`, `sdk.Problem`, `sdk.Report`, `sdk.Target`, `sdk.ReportTarget`, `sdk.ReportSection`, `sdk.SeverityLevel`, `sdk.Section`, `sdk.Verb`, `sdk.Location`; unknown members ride in `Extra` |
+| `main` | `func main() { sdk.Main(plugin) }`, with `plugin` an `sdk.Plugin{Description, Run, Complete}` |
+| `--describe`, `--help`, `__complete` | Answered by `sdk.Run` without calling `Run`; `Complete(args, word)` gives completion candidates (`value` or `value\tdescription`), and without it the shell completes file names |
+| Tests | `sdk.Run(plugin, args, stdin, stdout, stderr)`, in-process |
+| Reading a stream | `sdk.Records(stdin)`: yields each record's `Kind`, original bytes and line number, and a `*sdk.LineError` per malformed line. A writer or renderer passes `sdk.StopAtError()`: the first error-level problem comes with `sdk.ErrStopped`, to pass on before exiting 1 |
+| Writing a record | `sdk.Emit(stdout, v)`: one deterministic JSON line |
+| Typed records | `sdk.Finding`, `sdk.Page`, `sdk.ScopeRow`, `sdk.Config`, `sdk.Evidence`, `sdk.Problem`, `sdk.Report` (with `ReportFinding`, `ReportPage`, `ReportTarget`, `ReportSection`, `Asset`), `sdk.Target`, `sdk.Command`, `sdk.Location`, `sdk.VersionInfo`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
-| Calling rpt | `exec.Command(sdk.Bin(), "findings", "--json")` |
+| Settings | `sdk.Settings("<verb>", &settings)` over the defaults already in `settings`, then parse flags |
+| Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again) |
 
 Cleanup goes in `Plugin.Run`: `sdk.Main` exits when `Run` returns.

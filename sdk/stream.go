@@ -34,12 +34,34 @@ func (e *LineError) Unwrap() error { return e.Err }
 
 var errTooLong = fmt.Errorf("line longer than %d bytes", MaxLine)
 
+// ErrStopped comes with the error-level problem record Records stops at,
+// given StopAtError.
+var ErrStopped = errors.New("stopped at an error-level problem")
+
+// A RecordsOption changes how Records reads.
+type RecordsOption func(*recordsOptions)
+
+type recordsOptions struct{ stop bool }
+
+// StopAtError makes Records stop at the first error-level problem record:
+// it yields that record with ErrStopped and nothing after it. A writer or
+// renderer uses it, since it must not act on a stream an earlier stage
+// found broken: it passes the record on, writes nothing, and exits 1.
+// Filters and checkers read on and pass problems through.
+func StopAtError() RecordsOption {
+	return func(o *recordsOptions) { o.stop = true }
+}
+
 // Records reads a JSON Lines stream. It yields each record with its
 // original bytes, so filters can pass through records they don't own byte
 // for byte. Blank lines are skipped; lines may end in \n or \r\n, and the
 // last line needs no newline. A line that isn't a record yields a
 // *LineError and reading continues; a read error is yielded last.
-func Records(r io.Reader) iter.Seq2[Rec, error] {
+func Records(r io.Reader, opts ...RecordsOption) iter.Seq2[Rec, error] {
+	var o recordsOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
 	return func(yield func(Rec, error) bool) {
 		br := bufio.NewReaderSize(r, 64<<10)
 		for n := 1; ; n++ {
@@ -56,6 +78,10 @@ func Records(r io.Reader) iter.Seq2[Rec, error] {
 				}
 			case len(bytes.TrimSpace(line)) > 0:
 				rec, recErr := parseRec(line, n)
+				if recErr == nil && o.stop && rec.Kind == "problem" && isErrorProblem(rec.Raw) {
+					yield(rec, ErrStopped)
+					return
+				}
 				if !yield(rec, recErr) {
 					return
 				}
@@ -116,4 +142,12 @@ func parseRec(line []byte, n int) (Rec, error) {
 		_ = json.Unmarshal(head.Kind, &kind) // a non-string kind is no kind
 	}
 	return Rec{Kind: kind, Raw: line, Line: n}, nil
+}
+
+// isErrorProblem reports whether a problem record is error-level.
+func isErrorProblem(raw []byte) bool {
+	var p struct {
+		Level Level `json:"level"`
+	}
+	return json.Unmarshal(raw, &p) == nil && p.Level == Error
 }

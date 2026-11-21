@@ -13,6 +13,8 @@
     "level": {"enum": ["error", "warning"]},
     "message": {"type": "string"},
     "command": {"type": "string", "description": "The command that found the problem, as in rpt <command> (finding get, validate, lint); set by whoever creates the problem and never changed downstream."},
+    "suggestions": {"type": "array", "items": {"type": "string"}, "description": "Replacements for the text the problem is about, best first, such as a spelling checker's."},
+    "end_column": {"type": "integer", "minimum": 1, "description": "1-based byte in the line, inclusive, where the text the problem is about ends; only with column."},
     "rev": {"type": "string", "description": "The revision of the finding, page or rpt.yaml file the problem is in, as the check read it; absent for scope.csv and stdin. Pass it as --if-rev to a fix, so the fix is refused if the file changed since."}
   },
   "required": ["kind", "path", "rule", "level", "message"],

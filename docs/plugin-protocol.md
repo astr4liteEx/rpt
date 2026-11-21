@@ -77,7 +77,7 @@ Schemas are draft 2020-12; a `$schema` naming another draft is refused. A `$ref`
 
 ## Records
 
-Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `scope`, `problem`, `report`, `plugin`, `version`, `severity`, `section`, `command`, `location` ([`schema/`](../schema)). Every record keeps members it doesn't know, so newer fields survive older programs.
+Data moves as **JSON Lines**: UTF-8, one JSON object per line, each with a `kind` member naming its schema: `finding`, `page`, `scope`, `config`, `evidence`, `problem`, `report`, `version`, `command`, `location` ([`schema/`](../schema)). Kinds a plugin adds are named `x-<command>-…`. Every record keeps members it doesn't know, so newer fields survive older programs.
 
 Reading a stream:
 

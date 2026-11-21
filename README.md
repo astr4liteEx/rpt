@@ -223,7 +223,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | [`docs/report-format.md`](docs/report-format.md) | The report folder (`rpt.yaml`, `scope.csv`, finding files) and every `rpt validate` rule. |
 | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) | What a plugin must do: naming, `--describe`, records, output, exit codes and how it works with a report. |
 | [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which Go `sdk` functions to use. |
-| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `command`, `location` and `version`. |
+| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `page`, `scope`, `config`, `evidence`, `problem`, `report`, `command`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
 
 ## Development

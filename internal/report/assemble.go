@@ -224,12 +224,12 @@ func compareIDs(a, b string) int {
 	return cmp.Compare(a, b)
 }
 
-// reportSections is the config's section list as the report record gives
-// it: key and heading only.
+// reportSections is the config's sections as the report record gives
+// them: each key with this report's heading.
 func reportSections(cfg Config) []sdk.ReportSection {
 	out := []sdk.ReportSection{}
-	for _, s := range cfg.SectionList() {
-		out = append(out, sdk.ReportSection{Key: s.Key, Heading: s.Heading})
+	for _, k := range cfg.sectionKeys() {
+		out = append(out, sdk.ReportSection{Key: k, Heading: cfg.Headings.heading(k)})
 	}
 	return out
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"slices"
+	"strings"
 )
 
 // Description is what a plugin prints for --describe: one JSON object on
@@ -102,12 +103,53 @@ const (
 type Plugin struct {
 	Description
 	Run func(args []string, stdin io.Reader, stdout, stderr io.Writer) int
+	// Complete, if set, gives the candidates for the word being typed,
+	// toComplete, after args: each "value" or "value\tdescription". Unset,
+	// the shell completes file names.
+	Complete func(args []string, toComplete string) []string
 }
 
-// Run runs a plugin: it answers a lone --describe argument itself and
-// otherwise calls p.Run. It never exits and never touches os.Stdin,
+// Shell completion directives, as cobra's __complete protocol ends its
+// answer with ":<directive>".
+const (
+	completeDefault = 0 // the shell may fall back to file names
+	completeNoFiles = 4 // only the candidates given
+)
+
+// Run runs a plugin. It answers these itself, doing no work:
+//   - a lone --describe: the description, one JSON line;
+//   - a lone --help or -h: the usage and summary;
+//   - __complete <args...> <word>: shell completion, from p.Complete.
+//
+// Anything else goes to p.Run. It never exits and never touches os.Stdin,
 // os.Stdout or os.Stderr, so plugin tests call it directly.
 func Run(p Plugin, args []string, stdin io.Reader, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		if p.Usage != "" {
+			fmt.Fprintf(stdout, "Usage: %s\n\n", p.Usage)
+		}
+		fmt.Fprintln(stdout, p.Summary)
+		return 0
+	}
+	if len(args) > 0 && (args[0] == "__complete" || args[0] == "__completeNoDesc") {
+		rest := args[1:]
+		word := ""
+		if len(rest) > 0 {
+			rest, word = rest[:len(rest)-1], rest[len(rest)-1]
+		}
+		directive := completeDefault
+		if p.Complete != nil {
+			for _, c := range p.Complete(rest, word) {
+				if args[0] == "__completeNoDesc" {
+					c, _, _ = strings.Cut(c, "\t")
+				}
+				fmt.Fprintln(stdout, c)
+			}
+			directive = completeNoFiles
+		}
+		fmt.Fprintf(stdout, ":%d\n", directive)
+		return 0
+	}
 	if len(args) == 1 && args[0] == "--describe" {
 		if err := json.MarshalWrite(stdout, p.Description, json.Deterministic(true)); err != nil {
 			fmt.Fprintln(stderr, "describe:", err)
