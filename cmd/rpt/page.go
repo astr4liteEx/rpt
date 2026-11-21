@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
-	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/internal/legacy/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 

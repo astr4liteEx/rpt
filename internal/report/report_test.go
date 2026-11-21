@@ -2,154 +2,146 @@ package report
 
 import (
 	"errors"
-	"maps"
 	"os"
 	"path/filepath"
 	"slices"
 	"testing"
-
-	"github.com/astr4liteEx/rpt/sdk"
 )
 
-const fixture = "../../testdata/fixture"
-
-func openFixture(t *testing.T) *Report {
+// fixture loads a copy of testdata/fixture, changed by edits: file path
+// to content, "" to remove.
+func fixture(t *testing.T, edits map[string]string) *Model {
 	t.Helper()
-	r, err := Open(fixture)
+	dir := t.TempDir()
+	if err := os.CopyFS(dir, os.DirFS("../../testdata/fixture")); err != nil {
+		t.Fatal(err)
+	}
+	for rel, content := range edits {
+		p := filepath.Join(dir, rel)
+		if content == "" {
+			os.Remove(p)
+			continue
+		}
+		os.MkdirAll(filepath.Dir(p), 0o755)
+		if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	m, err := Load(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { r.Close() })
-	return r
+	t.Cleanup(func() { m.Close() })
+	return m
 }
 
-func TestConfig(t *testing.T) {
-	cfg, err := openFixture(t).Config()
+func TestLoadFixture(t *testing.T) {
+	m := fixture(t, nil)
+	if m.Config.Err != nil || m.Config.Format != 2 {
+		t.Fatalf("config: %+v", m.Config)
+	}
+	var ids []string
+	for _, d := range m.Docs(FindingKind) {
+		if d.Err != nil {
+			t.Fatal(d.Err)
+		}
+		ids = append(ids, d.ID+" "+d.Path)
+	}
+	want := []string{"F-003 findings/sqli-login.md", "F-002 findings/tls-weak.md", "F-001 findings/xss-search.md"}
+	if !slices.Equal(ids, want) {
+		t.Errorf("findings %q", ids)
+	}
+	f, err := m.Get(FindingKind, "f-003")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Format != 2 {
-		t.Errorf("format = %d, want 2", cfg.Format)
+	if f.Title != "SQL injection in login" || f.Severity != "high" || len(f.Targets) != 2 || f.Targets[1].Scope != "S-14" || f.Targets[0].Line != 4 {
+		t.Errorf("F-003: %+v", f)
 	}
-	want := []sdk.Severity{"critical", "high", "medium", "low", "info"}
-	if !slices.Equal(cfg.Severities, want) {
-		t.Errorf("severities = %v, want %v", cfg.Severities, want)
+	if len(f.Extra) != 1 || f.Extra[0].Key.Value != "cvss" {
+		t.Errorf("extra: %+v", f.Extra)
 	}
-	if len(cfg.UnknownKeys) != 0 {
-		t.Errorf("unknown keys = %v, want none", cfg.UnknownKeys)
+	if s, ok := f.Section("description"); !ok || s.Heading != "Description" || s.Line != 10 || s.TextLine != 12 {
+		t.Errorf("description: %+v", s)
 	}
-}
-
-// copyFixture gives a test its own writable copy of the fixture report.
-func copyFixture(t *testing.T) string {
-	t.Helper()
-	dir := filepath.Join(t.TempDir(), "report")
-	if err := os.CopyFS(dir, os.DirFS(fixture)); err != nil {
-		t.Fatal(err)
+	if m.NextID(FindingKind) != "F-004" || m.NextID(PageKind) != "P-001" {
+		t.Errorf("next IDs %s %s", m.NextID(FindingKind), m.NextID(PageKind))
 	}
-	return dir
-}
-
-func writeFile(t *testing.T, dir, rel, content string) {
-	t.Helper()
-	if err := os.WriteFile(filepath.Join(dir, rel), []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestConfigDefaultsAndUnknownKeys(t *testing.T) {
-	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 2\nrenderer: typst\nlogo: acme.png\n")
-	r, err := Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	cfg, err := r.Config()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if want := []sdk.Severity{"critical", "high", "medium", "low", "info"}; !slices.Equal(cfg.Severities, want) {
-		t.Errorf("severities = %v, want defaults %v", cfg.Severities, want)
-	}
-	if want := []string{"renderer", "logo"}; !slices.Equal(cfg.UnknownKeys, want) {
-		t.Errorf("unknown keys = %v, want %v", cfg.UnknownKeys, want)
-	}
-}
-
-func TestConfigBadYAMLNamesFileAndLine(t *testing.T) {
-	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 2\nname: [unclosed\n")
-	r, err := Open(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer r.Close()
-	_, err = r.Config()
-	fe, ok := errors.AsType[*FileError](err)
-	if !ok {
-		t.Fatalf("err = %v, want a *FileError", err)
-	}
-	if fe.Path != "rpt.yaml" || fe.Line == 0 {
-		t.Errorf("FileError = %s:%d, want rpt.yaml with a line", fe.Path, fe.Line)
+	if r, err := m.Scope.Row("s-20"); err != nil || r.Host != "10.0.1.0/24" || r.Extra["env"] != "staging" || r.Line != 4 {
+		t.Errorf("S-20: %+v %v", r, err)
 	}
 }
 
-func TestConfigRequiredSectionsAndKeyLines(t *testing.T) {
-	tests := []struct {
-		name string
-		yaml string
-		want []string
-	}{
-		{"absent: the three fixed sections", "format: 2\n", []string{"description", "remediation", "poc"}},
-		{"empty: none required", "format: 2\nrequired_sections: []\n", []string{}},
-		{"custom headings keep their text", "format: 2\nrequired_sections: [description, References]\n", []string{"description", "References"}},
+func TestBrokenFilesAreKept(t *testing.T) {
+	m := fixture(t, map[string]string{
+		"findings/F-009-broken.md": "---\nid: F-009\ntitle: [\n---\n",
+		"findings/reserved.md":     "---\nid: F-010\nkind: x\n---\n",
+	})
+	var errs []string
+	for _, d := range m.Docs(FindingKind) {
+		if d.Err != nil {
+			errs = append(errs, d.Err.Error())
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			dir := copyFixture(t)
-			writeFile(t, dir, "rpt.yaml", tt.yaml)
-			r, err := Open(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			defer r.Close()
-			cfg, err := r.Config()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !slices.Equal(cfg.RequiredSections, tt.want) || cfg.RequiredSections == nil {
-				t.Errorf("required sections = %#v, want %#v", cfg.RequiredSections, tt.want)
-			}
-			if len(cfg.UnknownKeys) != 0 {
-				t.Errorf("unknown keys = %v", cfg.UnknownKeys)
-			}
-		})
+	if len(errs) != 2 {
+		t.Fatalf("errors %q", errs)
 	}
-
-	cfg, err := openFixture(t).Config()
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := map[string]int{"format": 2, "severities": 3}
-	if !maps.Equal(cfg.KeyLines, want) {
-		t.Errorf("key lines = %v, want %v", cfg.KeyLines, want)
+	// A broken file's number is never given out again.
+	if got := m.NextID(FindingKind); got != "F-010" {
+		t.Errorf("next ID %s", got)
 	}
 }
 
-func TestConfigEmptySeveritiesStayEmpty(t *testing.T) {
-	dir := copyFixture(t)
-	writeFile(t, dir, "rpt.yaml", "format: 2\nseverities: []\n")
-	r, err := Open(dir)
-	if err != nil {
-		t.Fatal(err)
+func TestDuplicateIDs(t *testing.T) {
+	m := fixture(t, map[string]string{"findings/dup.md": "---\nid: F-003\ntitle: Dup\n---\n"})
+	if _, err := m.Get(FindingKind, "F-003"); !errors.Is(err, ErrDuplicate) {
+		t.Fatalf("got %v", err)
 	}
-	defer r.Close()
-	cfg, err := r.Config()
-	if err != nil {
-		t.Fatal(err)
+	if !m.Taken(FindingKind, "F-003") {
+		t.Error("a duplicated ID is free")
 	}
-	if len(cfg.Severities) != 0 {
-		t.Errorf("severities = %v; an explicit empty list must not become the defaults, so validate can report it", cfg.Severities)
+}
+
+func TestScopeReading(t *testing.T) {
+	m := fixture(t, map[string]string{ScopeFile: "\xef\xbb\xbf ID , Host,Port\r\nS-1,a,80\r\ns-1,b,\r\nS-2,,\r\n"})
+	s := m.Scope
+	if s.Err != nil {
+		t.Fatal(s.Err)
+	}
+	if len(s.Rows) != 1 || len(s.RowErrs) != 2 {
+		t.Fatalf("rows %+v errs %v", s.Rows, s.RowErrs)
+	}
+	if r := s.Rows[0]; r.ID != "S-1" || r.Port != 80 || string(s.src[r.Start:r.End]) != "S-1,a,80\r\n" {
+		t.Errorf("row %+v", r)
+	}
+}
+
+func TestPageIDsCountTheConfig(t *testing.T) {
+	m := fixture(t, map[string]string{ConfigFile: "format: 2\npages: [P-004, findings]\n"})
+	if got := m.NextID(PageKind); got != "P-005" {
+		t.Errorf("next page ID %s", got)
+	}
+	if !m.Taken(PageKind, "P-004") {
+		t.Error("P-004 is in the config but free")
+	}
+}
+
+func TestRoot(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, ConfigFile), []byte("format: 2\n"), 0o644)
+	sub := filepath.Join(dir, "a", "b")
+	os.MkdirAll(sub, 0o755)
+	if got, err := Root(Where{Cwd: sub}); err != nil || got != dir {
+		t.Errorf("got %s %v", got, err)
+	}
+	if got, _ := Root(Where{Flag: "x", Env: "y", Cwd: sub}); got != "x" {
+		t.Errorf("flag: %s", got)
+	}
+	if _, err := Root(Where{Cwd: t.TempDir()}); !errors.Is(err, ErrNoReport) {
+		t.Errorf("got %v", err)
+	}
+	found, err := Find(filepath.Dir(dir))
+	if err != nil || !slices.Contains(found, dir) {
+		t.Errorf("find: %v %v", found, err)
 	}
 }

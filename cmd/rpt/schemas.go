@@ -13,7 +13,7 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/astr4liteEx/rpt/internal/pluginschema"
-	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/internal/legacy/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 

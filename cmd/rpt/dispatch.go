@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
-	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/internal/legacy/report"
 )
 
 // dispatch runs the plugin rpt-<name> from PATH in place of rpt, with its

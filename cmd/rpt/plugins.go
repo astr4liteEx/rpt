@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/astr4liteEx/rpt/internal/report"
+	"github.com/astr4liteEx/rpt/internal/legacy/report"
 	"github.com/astr4liteEx/rpt/sdk"
 )
 

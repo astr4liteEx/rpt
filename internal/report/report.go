@@ -1,73 +1,127 @@
+// Package report is the report folder as rpt understands it. A command
+// loads the folder once into a Model, reads and changes the model, and
+// saves it: every lookup is a map hit, and every read sees the changes
+// made so far.
+//
+// It knows nothing of the command line: the caller passes in the report's
+// location and gets back values and errors.
 package report
 
 import (
-	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
-	"path/filepath"
+	"path"
 	"regexp"
 	"slices"
 	"strconv"
-
-	"go.yaml.in/yaml/v3"
-
-	"github.com/astr4liteEx/rpt/sdk"
+	"strings"
 )
 
-// ConfigFile is the report config's file name at the report root.
-const ConfigFile = "rpt.yaml"
+// The files and folders a report is made of, relative to its root.
+const (
+	ConfigFile  = "rpt.yaml"
+	ScopeFile   = "scope.csv"
+	FindingsDir = "findings"
+	PagesDir    = "pages"
+)
 
-// DefaultSeverities is the severity order used when the report config has no
-// severities key, most severe first.
-var DefaultSeverities = []sdk.Severity{sdk.Critical, sdk.High, sdk.Medium, sdk.Low, sdk.Info}
+// A Kind is a sort of document in the report: findings and pages are both
+// markdown files with YAML frontmatter, stored and edited the same way.
+type Kind struct {
+	Name        string // "finding" or "page"
+	Prefix      string // "F-" or "P-"
+	Dir         string // the folder its files sit in
+	EvidenceDir string // where rpt evidence add copies its files
+	// Reserved are frontmatter keys a file may not use: rpt sets record
+	// members of those names, or an older format used them.
+	Reserved []string
+	// Sectioned bodies are split into sections at ## headings; other
+	// bodies are free text.
+	Sectioned bool
 
-// DefaultRequiredSections are the sections every finding needs when the
-// report config has no required_sections key.
-var DefaultRequiredSections = []string{"description", "remediation", "poc"}
-
-// Report is an open report folder. Every file access goes through its
-// os.Root, so no path can escape the folder.
-type Report struct {
-	root *os.Root
-	abs  string // the folder's absolute path, for assembled asset paths
-	// configSrc, when set, is rpt.yaml as a write will leave it: Config
-	// reads it instead of the file.
-	configSrc []byte
-	// over, in a view of a write, is the write's staged files.
-	over map[string]*change
+	id, file *regexp.Regexp
 }
 
-// configBytes returns rpt.yaml's bytes.
-func (r *Report) configBytes() ([]byte, error) {
-	if r.configSrc != nil {
-		return r.configSrc, nil
+// The two kinds.
+var (
+	FindingKind = newKind("finding", "F-", FindingsDir, true, "kind", "path", "rev", "sections", "lines", "assets", "scope", "target")
+	PageKind    = newKind("page", "P-", PagesDir, false, "kind", "path", "rev", "lines", "assets", "body")
+	Kinds       = []*Kind{FindingKind, PageKind}
+)
+
+func newKind(name, prefix, dir string, sectioned bool, reserved ...string) *Kind {
+	return &Kind{
+		Name: name, Prefix: prefix, Dir: dir, EvidenceDir: dir + "/evidence",
+		Reserved: reserved, Sectioned: sectioned,
+		id:   regexp.MustCompile(`^` + prefix + `([0-9]{3,})$`),
+		file: regexp.MustCompile(`^` + prefix + `([0-9]{3,})(?:-.*)?\.md$`),
 	}
-	return r.readFile(ConfigFile)
 }
 
-// Open opens the report folder at dir.
-func Open(dir string) (*Report, error) {
-	abs, err := filepath.Abs(dir)
-	if err != nil {
-		return nil, fmt.Errorf("open report %s: %w", dir, err)
+// Valid reports whether id is well formed for the kind: its prefix and at
+// least three digits.
+func (k *Kind) Valid(id string) bool { return k.id.MatchString(id) }
+
+func (k *Kind) number(id string) int {
+	if m := k.id.FindStringSubmatch(id); m != nil {
+		n, _ := strconv.Atoi(m[1])
+		return n
 	}
-	root, err := os.OpenRoot(abs)
-	if err != nil {
-		return nil, fmt.Errorf("open report %s: %w", dir, err)
+	return 0
+}
+
+// KindOf is the kind an ID names by its prefix, or nil for a scope ID.
+func KindOf(id string) *Kind {
+	id = CanonicalID(id)
+	for _, k := range Kinds {
+		if strings.HasPrefix(id, k.Prefix) {
+			return k
+		}
 	}
-	return &Report{root: root, abs: abs}, nil
+	return nil
 }
 
-// Close releases the report folder.
-func (r *Report) Close() error {
-	return r.root.Close()
+// CanonicalID is a finding or page ID with its prefix upper-cased, so f-001
+// names F-001. Other IDs are returned as they are.
+func CanonicalID(id string) string {
+	if len(id) > 2 && id[1] == '-' && (id[0] == 'f' || id[0] == 'p') {
+		return strings.ToUpper(id[:1]) + id[1:]
+	}
+	return id
 }
 
-// FileError is a problem with one file in the report, located by path
-// (relative to the report root) and, when known, a 1-based line.
+// CompareIDs orders IDs by number when both have one, else as text.
+func CompareIDs(a, b string) int {
+	na, errA := strconv.Atoi(a[min(2, len(a)):])
+	nb, errB := strconv.Atoi(b[min(2, len(b)):])
+	switch {
+	case errA == nil && errB == nil && a[:2] == b[:2]:
+		if na != nb {
+			return na - nb
+		}
+	case errA == nil && errB != nil:
+		return -1
+	case errB == nil && errA != nil:
+		return 1
+	}
+	return strings.Compare(a, b)
+}
+
+// Rev is a file's revision: a short hash of its bytes.
+func Rev(b []byte) string {
+	sum := sha256.Sum256(b)
+	return hex.EncodeToString(sum[:8])
+}
+
+// A FileError is a problem with one file of the report, at a line when
+// known.
 type FileError struct {
-	Path string
-	Line int
+	Path string // relative to the report root, slash-separated
+	Line int    // 1-based, 0 when unknown
 	Err  error
 }
 
@@ -80,136 +134,206 @@ func (e *FileError) Error() string {
 
 func (e *FileError) Unwrap() error { return e.Err }
 
-// Config is the report config read from rpt.yaml.
-type Config struct {
-	Format     int
-	Severities []sdk.Severity // most severe first; the only allowed levels
+// Errors a request can make.
+var (
+	ErrNotFound  = errors.New("no such")
+	ErrDuplicate = errors.New("is in more than one file")
+)
 
-	// RequiredSections are the section keys every finding must have and
-	// fill in: description, remediation and poc for the fixed headings,
-	// the exact heading text for any other.
-	RequiredSections []string
-
-	// Sections is the sections key as written: fixed section key to the
-	// heading this report uses for it. Validate checks it.
-	Sections map[string]string
-
-	// Headings maps every fixed section key to its heading: the one
-	// Sections names, else the default.
-	Headings Headings
-
-	// KeyLines maps each top-level key to its 1-based line in rpt.yaml,
-	// so problems can point at it.
-	KeyLines map[string]int
-
-	// Pages orders the pages, with FindingsSlot where the findings go;
-	// RequiredPages must exist with a body.
-	Pages, RequiredPages []string
-
-	// Rules maps a rule name to the level its problems take instead of
-	// the rule's own.
-	Rules map[string]sdk.Level
-
-	// UnknownKeys lists top-level keys rpt doesn't define, other than
-	// x-<plugin> sections, for validate to warn about. They are never copied into an assembled report.
-	UnknownKeys []string
+// A Model is a report loaded into memory, with the changes a command has
+// made to it.
+type Model struct {
+	Dir    string // the report folder, as given
+	root   *os.Root
+	files  map[string]*file // every file read or changed, by path
+	Config *Config
+	Scope  *Scope
+	docs   map[*Kind][]*Doc // in file-name order
 }
 
-// Config reads the report config.
-func (r *Report) Config() (Config, error) {
-	src, err := r.configBytes()
+// A file is one file of the report as this command saw it and as it
+// will leave it.
+type file struct {
+	old     []byte // as read; nil when it didn't exist
+	existed bool
+	data    []byte // as it will be written
+	remove  bool
+	dirty   bool
+}
+
+// Load reads the report in dir. Files that don't parse are kept, with
+// their errors, for Check to report; Load itself fails only when the
+// folder can't be read.
+func Load(dir string) (*Model, error) {
+	root, err := os.OpenRoot(dir)
 	if err != nil {
-		return Config{}, fmt.Errorf("read report config: %w", err)
+		return nil, fmt.Errorf("open report %s: %w", dir, err)
 	}
-	var raw struct {
-		Format           int `yaml:"format"`
-		Severities       []sdk.Severity
-		RequiredSections []string             `yaml:"required_sections"`
-		Sections         map[string]string    `yaml:"sections"`
-		Rules            map[string]sdk.Level `yaml:"rules"`
-		Pages            []string             `yaml:"pages"`
-		RequiredPages    []string             `yaml:"required_pages"`
+	m := &Model{Dir: dir, root: root, files: map[string]*file{}, docs: map[*Kind][]*Doc{}}
+	if err := m.load(); err != nil {
+		root.Close()
+		return nil, err
 	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(normaliseNewlines(src), &doc); err != nil {
-		return Config{}, yamlFileError(ConfigFile, 0, err)
+	return m, nil
+}
+
+func (m *Model) load() error {
+	src, ok, err := m.read(ConfigFile)
+	if err != nil {
+		return err
 	}
-	if err := doc.Decode(&raw); err != nil {
-		return Config{}, yamlFileError(ConfigFile, 0, err)
+	if !ok {
+		return fmt.Errorf("open report %s: %w", m.Dir, ErrNotReport)
 	}
-	cfg := Config{
-		Format:           raw.Format,
-		Severities:       raw.Severities,
-		RequiredSections: raw.RequiredSections,
-		Sections:         raw.Sections,
-		Rules:            raw.Rules,
-		Pages:            raw.Pages,
-		RequiredPages:    raw.RequiredPages,
-		Headings:         newHeadings(raw.Sections),
-		KeyLines:         keyLines(&doc),
+	m.Config = parseConfig(src)
+	if src, ok, err = m.read(ScopeFile); err != nil {
+		return err
 	}
-	// Defaults apply only when a key is absent: an explicit empty list
-	// stays empty, so validate can tell it from no list at all.
-	if _, ok := cfg.KeyLines["severities"]; !ok {
-		cfg.Severities = slices.Clone(DefaultSeverities)
-	}
-	if _, ok := cfg.KeyLines["required_sections"]; !ok {
-		cfg.RequiredSections = slices.Clone(DefaultRequiredSections)
-	} else if cfg.RequiredSections == nil {
-		cfg.RequiredSections = []string{}
-	}
-	for _, k := range unknownKeys(&doc, configKeys...) {
-		if !isPluginKey(k) {
-			cfg.UnknownKeys = append(cfg.UnknownKeys, k)
+	m.Scope = parseScope(src, ok)
+	for _, k := range Kinds {
+		names, err := m.list(k.Dir)
+		if err != nil {
+			return err
+		}
+		for _, name := range names {
+			rel := path.Join(k.Dir, name)
+			src, _, err := m.read(rel)
+			if err != nil {
+				m.docs[k] = append(m.docs[k], &Doc{Kind: k, Path: rel, Err: err})
+				continue
+			}
+			m.docs[k] = append(m.docs[k], parseDoc(k, rel, src, m.Config))
 		}
 	}
-	return cfg, nil
+	return nil
 }
 
-// keyLines maps the top-level keys of doc to their 1-based lines.
-func keyLines(doc *yaml.Node) map[string]int {
-	lines := map[string]int{}
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
-		return lines
+// Close releases the report folder.
+func (m *Model) Close() error { return m.root.Close() }
+
+// ErrNotReport is a folder without rpt.yaml.
+var ErrNotReport = errors.New("not a report: no " + ConfigFile)
+
+// read returns the file at rel as this command sees it, and whether it
+// exists. The first read of a file is what Save checks for changes made
+// meanwhile by others.
+func (m *Model) read(rel string) ([]byte, bool, error) {
+	if f, ok := m.files[rel]; ok {
+		if f.remove {
+			return nil, false, nil
+		}
+		return f.data, f.data != nil || f.existed, nil
 	}
-	m := doc.Content[0].Content
-	for i := 0; i+1 < len(m); i += 2 {
-		lines[m[i].Value] = m[i].Line
+	b, err := m.root.ReadFile(rel)
+	if errors.Is(err, fs.ErrNotExist) {
+		m.files[rel] = &file{}
+		return nil, false, nil
 	}
-	return lines
+	if err != nil {
+		return nil, false, &FileError{Path: rel, Err: err}
+	}
+	m.files[rel] = &file{old: b, existed: true, data: b}
+	return b, true, nil
 }
 
-// unknownKeys returns the top-level mapping keys of doc not in known.
-func unknownKeys(doc *yaml.Node, known ...string) []string {
-	if doc.Kind != yaml.DocumentNode || len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
-		return nil
+// put sets the file at rel to data.
+func (m *Model) put(rel string, data []byte) error {
+	if _, _, err := m.read(rel); err != nil {
+		return err
 	}
-	var unknown []string
-	m := doc.Content[0].Content
-	for i := 0; i+1 < len(m); i += 2 {
-		if k := m[i].Value; !slices.Contains(known, k) {
-			unknown = append(unknown, k)
+	f := m.files[rel]
+	f.data, f.remove, f.dirty = data, false, true
+	return nil
+}
+
+// list names the regular .md files in dir, sorted, as this command sees
+// the folder.
+func (m *Model) list(dir string) ([]string, error) {
+	ents, err := fs.ReadDir(m.root.FS(), dir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return nil, &FileError{Path: dir, Err: err}
+	}
+	var names []string
+	for _, e := range ents {
+		if e.Type().IsRegular() && path.Ext(e.Name()) == ".md" {
+			names = append(names, e.Name())
 		}
 	}
-	return unknown
-}
-
-// yamlLine finds the first line number in a yaml/v3 error message, which
-// is the only place the library reports it.
-var yamlLine = regexp.MustCompile(`line (\d+)`)
-
-// yamlFileError wraps a yaml/v3 error with the file and, when the error
-// names one, its line shifted by offset lines.
-func yamlFileError(path string, offset int, err error) error {
-	line := 0
-	if m := yamlLine.FindStringSubmatch(err.Error()); m != nil {
-		line, _ = strconv.Atoi(m[1])
-		line += offset
+	for rel, f := range m.files {
+		if path.Dir(rel) == dir && path.Ext(rel) == ".md" && f.dirty && !f.remove && !f.existed {
+			names = append(names, path.Base(rel))
+		}
 	}
-	return &FileError{Path: path, Line: line, Err: err}
+	slices.Sort(names)
+	return slices.Compact(names), nil
 }
 
-// normaliseNewlines turns CRLF line endings into LF.
-func normaliseNewlines(b []byte) []byte {
-	return bytes.ReplaceAll(b, []byte("\r\n"), []byte("\n"))
+// Docs lists the documents of a kind in file-name order, broken ones too.
+func (m *Model) Docs(k *Kind) []*Doc { return m.docs[k] }
+
+// Get returns the document with the given ID. It is ErrNotFound when no
+// document has it, and ErrDuplicate when more than one does.
+func (m *Model) Get(k *Kind, id string) (*Doc, error) {
+	id = CanonicalID(id)
+	var found []*Doc
+	for _, d := range m.docs[k] {
+		if d.Err == nil && d.ID == id {
+			found = append(found, d)
+		}
+	}
+	switch len(found) {
+	case 0:
+		return nil, fmt.Errorf("%w %s: %s", ErrNotFound, k.Name, id)
+	case 1:
+		return found[0], nil
+	}
+	var paths []string
+	for _, d := range found {
+		paths = append(paths, d.Path)
+	}
+	return nil, fmt.Errorf("%s %w: %s", id, ErrDuplicate, strings.Join(paths, ", "))
+}
+
+// Taken reports whether id is in use for the kind: by a document, or, for
+// pages, by the config's page lists.
+func (m *Model) Taken(k *Kind, id string) bool {
+	id = CanonicalID(id)
+	if slices.ContainsFunc(m.docs[k], func(d *Doc) bool { return d.ID == id }) {
+		return true
+	}
+	return k == PageKind && m.Config.Err == nil && (slices.Contains(m.Config.Pages, id) || slices.Contains(m.Config.RequiredPages, id))
+}
+
+// NextID is the kind's next free ID: one more than the highest number in
+// use, three digits at least.
+func (m *Model) NextID(k *Kind) string {
+	n := 0
+	for _, v := range m.usedNumbers(k) {
+		n = max(n, v)
+	}
+	return fmt.Sprintf("%s%03d", k.Prefix, n+1)
+}
+
+// usedNumbers are the numbers of every ID the kind uses: documents' IDs,
+// file names (so a broken file's ID is never given out again) and, for
+// pages, the config's lists (so a page --force left there isn't reused).
+func (m *Model) usedNumbers(k *Kind) []int {
+	var out []int
+	for _, d := range m.docs[k] {
+		if n := k.number(d.ID); n > 0 {
+			out = append(out, n)
+		}
+		if mm := k.file.FindStringSubmatch(path.Base(d.Path)); mm != nil {
+			n, _ := strconv.Atoi(mm[1])
+			out = append(out, n)
+		}
+	}
+	if k == PageKind && m.Config.Err == nil {
+		for _, id := range slices.Concat(m.Config.Pages, m.Config.RequiredPages) {
+			if n := k.number(id); n > 0 {
+				out = append(out, n)
+			}
+		}
+	}
+	return out
 }
