@@ -25,7 +25,7 @@ trap 'rm -rf "$tmp"' EXIT
 CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=smoke" -o "$tmp/rpt" ./cmd/rpt
 
 got=$("$tmp/rpt" version --json)
-want='{"kind":"version","version":"smoke","schema_version":2,"format":2}'
+want='{"kind":"version","version":"smoke","schema_version":3,"format":2}'
 if [ "$got" != "$want" ]; then
 	echo "rpt version --json: got $got, want $want" >&2
 	exit 1

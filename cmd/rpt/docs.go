@@ -207,11 +207,15 @@ func (e *env) docSet(k *report.Kind) *cobra.Command {
 		Short: fmt.Sprintf("Change one value of a %s", k.Name),
 		Long: fmt.Sprintf("Change one value of a %s. The path is a frontmatter key, %s or x-<plugin>.<key>. "+
 			"Each value is YAML: high, S-12, '{scope: S-20, port: 443}', \"9.1\"; several make a list. "+
-			"With no value, %s's text is read from stdin. Flags go before the ID, so a value may start with -.", k.Name, text, text),
+			"With no value, %s's text is read from stdin. Flags go before the ID, so a value may start with -; "+
+			"one of the command's own flags after the ID is refused, and -- before the ID writes it as a value.", k.Name, text, text),
 		Args:              cobra.MinimumNArgs(2),
 		ValidArgsFunction: e.completeDocPath(k),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
 			id, key, values := args[0], args[1], args[2:]
+			if err := flagsAmongValues(cmd, values); err != nil {
+				return err
+			}
 			if len(values) == 0 && (strings.HasPrefix(key, "sections.") || key == "body") {
 				b, err := io.ReadAll(e.stdin)
 				if err != nil {

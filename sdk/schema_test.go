@@ -19,28 +19,21 @@ func TestSchemasMatchTypes(t *testing.T) {
 		typ  reflect.Type
 	}{
 		{"finding.schema.json", nil, reflect.TypeFor[Finding]()},
-		{"scope.schema.json", nil, reflect.TypeFor[ScopeRow]()},
-		{"problem.schema.json", nil, reflect.TypeFor[Problem]()},
-		{"report.schema.json", nil, reflect.TypeFor[Report]()},
-		{"report.schema.json", []string{"$defs", "reportMeta"}, reflect.TypeFor[ReportMeta]()},
-		{"report.schema.json", []string{"$defs", "reportSection"}, reflect.TypeFor[ReportSection]()},
-		{"report.schema.json", []string{"$defs", "reportFinding"}, reflect.TypeFor[ReportFinding]()},
 		{"finding.schema.json", []string{"$defs", "target"}, reflect.TypeFor[Target]()},
-		{"report.schema.json", []string{"$defs", "reportTarget"}, reflect.TypeFor[ReportTarget]()},
 		{"finding.schema.json", []string{"$defs", "lines"}, reflect.TypeFor[Lines]()},
-		{"scope.schema.json", []string{"$defs", "lines"}, reflect.TypeFor[ScopeLines]()},
 		{"finding.schema.json", []string{"$defs", "sectionLines"}, reflect.TypeFor[SectionLines]()},
-		{"version.schema.json", nil, reflect.TypeFor[VersionInfo]()},
-		{"command.schema.json", nil, reflect.TypeFor[Command]()},
-		{"location.schema.json", nil, reflect.TypeFor[Location]()},
-		{"evidence.schema.json", nil, reflect.TypeFor[Evidence]()},
-		{"config.schema.json", nil, reflect.TypeFor[Config]()},
-		{"page.schema.json", nil, reflect.TypeFor[Page]()},
-		{"page.schema.json", []string{"properties", "lines"}, reflect.TypeFor[PageLines]()},
-		{"report.schema.json", []string{"$defs", "reportPage"}, reflect.TypeFor[ReportPage]()},
-		{"config.schema.json", []string{"properties", "lines"}, reflect.TypeFor[ConfigLines]()},
 		{"finding.schema.json", []string{"$defs", "position"}, reflect.TypeFor[Position]()},
 		{"finding.schema.json", []string{"$defs", "asset"}, reflect.TypeFor[Asset]()},
+		{"page.schema.json", nil, reflect.TypeFor[Page]()},
+		{"scope.schema.json", nil, reflect.TypeFor[ScopeRow]()},
+		{"config.schema.json", nil, reflect.TypeFor[Config]()},
+		{"evidence.schema.json", nil, reflect.TypeFor[Evidence]()},
+		{"problem.schema.json", nil, reflect.TypeFor[Problem]()},
+		{"report.schema.json", nil, reflect.TypeFor[Report]()},
+		{"report.schema.json", []string{"$defs", "section"}, reflect.TypeFor[Section]()},
+		{"location.schema.json", nil, reflect.TypeFor[Location]()},
+		{"version.schema.json", nil, reflect.TypeFor[VersionInfo]()},
+		{"command.schema.json", nil, reflect.TypeFor[Command]()},
 		{"command.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
 		{"command.schema.json", []string{"$defs", "requires"}, reflect.TypeFor[Requires]()},
 		{"command.schema.json", []string{"$defs", "range"}, reflect.TypeFor[Range]()},
@@ -110,6 +103,12 @@ func loadSchema(t *testing.T, file string, path []string) objectSchema {
 func jsonFields(typ reflect.Type) (all, required []string) {
 	for f := range typ.Fields() {
 		name, opts, _ := strings.Cut(f.Tag.Get("json"), ",")
+		if f.Anonymous && name == "" {
+			// A Go embedded struct is embedded in JSON too.
+			a, r := jsonFields(f.Type)
+			all, required = append(all, a...), append(required, r...)
+			continue
+		}
 		if name == "" || opts == "embed" {
 			continue
 		}

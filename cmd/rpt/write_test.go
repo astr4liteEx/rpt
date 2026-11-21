@@ -143,3 +143,25 @@ func TestEvidenceAddAndPrune(t *testing.T) {
 		t.Error("pruned a linked file")
 	}
 }
+
+func TestAFlagAfterTheValuesIsRefused(t *testing.T) {
+	dir := fixture(t)
+	before := read(t, filepath.Join(dir, "findings/xss-search.md"))
+	for _, args := range [][]string{
+		{"finding", "set", "F-001", "title", "New", "--dry-run"},
+		{"finding", "set", "F-001", "title", "New", "--report=x"},
+		{"config", "set", "x-tag.label", "v", "--if-rev", "abc"},
+		{"scope", "set", "S-12", "env", "-h"},
+	} {
+		if code, _, errOut := rpt(t, "", args...); code != 2 || !strings.Contains(errOut, "would be written") {
+			t.Errorf("rpt %v: exit %d %q", args, code, errOut)
+		}
+	}
+	if read(t, filepath.Join(dir, "findings/xss-search.md")) != before {
+		t.Error("written")
+	}
+	code, out, _ := rpt(t, "", "finding", "set", "--", "F-001", "title", "--dry-run")
+	if code != 0 || records(t, out)[0]["title"] != "--dry-run" {
+		t.Errorf("with --: exit %d %s", code, out)
+	}
+}

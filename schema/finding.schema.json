@@ -2,66 +2,228 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/finding.schema.json",
   "title": "rpt finding record",
-  "description": "One finding in a report. Schema version 2. Unknown members are allowed and must be passed through unchanged.",
+  "description": "One finding in a report. Schema version 3. Unknown members are allowed and must be passed through unchanged.",
   "type": "object",
   "properties": {
-    "kind": {"const": "finding"},
-    "id": {"type": "string", "pattern": "^F-[0-9]{3,}$", "description": "Finding ID; assigned by rpt finding add when absent."},
-    "title": {"type": "string"},
-    "targets": {"type": "array", "items": {"$ref": "#/$defs/target"}, "description": "Where the finding was found, each attributed to a scope row. A finding in a report needs at least one; rpt validate checks them against scope.csv."},
-    "severity": {"type": "string", "description": "A severity level from the report config, e.g. critical, high, medium, low, info."},
-    "path": {"type": "string", "description": "Path of the finding file, relative to the report root."},
-    "rev": {"type": "string", "description": "The finding file's revision, over its bytes as stored. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the file changed since this read."},
-    "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."},
-    "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."},
-    "assets": {"type": "array", "items": {"$ref": "#/$defs/asset"}, "description": "Set by rpt finding get --assets: every file the finding lists or links. rpt finding add copies each in and rewrites its references; never written to the file."},
-    "lines": {"$ref": "#/$defs/lines"}
+    "kind": {
+      "const": "finding"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^F-[0-9]{3,}$",
+      "description": "Finding ID; assigned by rpt finding add when absent."
+    },
+    "title": {
+      "type": "string"
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/target"
+      },
+      "description": "Where the finding was found, each attributed to a scope row. A finding in a report needs at least one; rpt validate checks them against scope.csv."
+    },
+    "severity": {
+      "type": "string",
+      "description": "A severity level from the report config, e.g. critical, high, medium, low, info."
+    },
+    "path": {
+      "type": "string",
+      "description": "Path of the finding file, relative to the report root."
+    },
+    "rev": {
+      "type": "string",
+      "description": "The finding file's revision, over its bytes as stored. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the file changed since this read."
+    },
+    "sections": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Markdown per section: description, remediation, poc, plus any other ## heading under its exact text."
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Evidence file paths, relative to the finding file's folder. Untrusted: must stay inside the report."
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/asset"
+      },
+      "description": "Every file the finding lists or links: set by rpt finding get --assets and by rpt assemble. rpt finding add copies each in and rewrites its references; never written to the file."
+    },
+    "lines": {
+      "$ref": "#/$defs/lines"
+    }
   },
-  "required": ["kind", "title", "targets", "severity"],
+  "required": [
+    "kind",
+    "title",
+    "targets",
+    "severity"
+  ],
   "additionalProperties": true,
   "$defs": {
-    "asset": {"type": "object", "description": "One file the owner lists in its evidence or links in its text. rpt finding add and rpt page add read ref and file only: they copy file into the report and point every reference to ref at the copy.", "properties": {"ref": {"type": "string", "description": "The path as the owner writes it, relative to its file, or absolute."}, "path": {"type": "string", "description": "Relative to the report root."}, "file": {"type": "string", "description": "The file itself: an absolute path, or for add one relative to the folder add runs in."}, "source": {"enum": ["frontmatter", "body"], "description": "frontmatter: the evidence list; body: a link or image in the text. One asset per source and ref."}, "media_type": {"type": "string", "description": "From the file's content, else its extension."}, "text": {"type": "string", "description": "A link's text, its caption."}, "image": {"type": "boolean", "description": "The link is an image."}}, "required": ["ref", "file"], "additionalProperties": true},
+    "asset": {
+      "type": "object",
+      "description": "One file the owner lists in its evidence or links in its text. rpt finding add and rpt page add read ref and file only: they copy file into the report and point every reference to ref at the copy.",
+      "properties": {
+        "ref": {
+          "type": "string",
+          "description": "The path as the owner writes it, relative to its file, or absolute."
+        },
+        "path": {
+          "type": "string",
+          "description": "Relative to the report root; absent when ref leaves the report."
+        },
+        "file": {
+          "type": "string",
+          "description": "The file itself: an absolute path, or for add one relative to the folder add runs in."
+        },
+        "source": {
+          "enum": [
+            "frontmatter",
+            "body"
+          ],
+          "description": "frontmatter: the evidence list; body: a link or image in the text. One asset per source and ref."
+        },
+        "media_type": {
+          "type": "string",
+          "description": "From the file's extension, else its content."
+        },
+        "text": {
+          "type": "string",
+          "description": "A link's text, its caption."
+        },
+        "image": {
+          "type": "boolean",
+          "description": "The link is an image."
+        }
+      },
+      "required": [],
+      "additionalProperties": true
+    },
     "position": {
       "type": "object",
       "description": "A place in a file: the 1-based line, and the 1-based byte in that line.",
       "properties": {
-        "line": {"type": "integer", "minimum": 1},
-        "column": {"type": "integer", "minimum": 1}
+        "line": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "column": {
+          "type": "integer",
+          "minimum": 1
+        }
       },
-      "required": ["line", "column"],
+      "required": [
+        "line",
+        "column"
+      ],
       "additionalProperties": true
     },
     "lines": {
       "type": "object",
-      "description": "Where the finding's parts sit in its file: 1-based lines of the file as stored. Given by rpt finding get --lines; rpt finding add ignores it.",
+      "description": "Where a record's parts sit in its file: 1-based lines of the file as stored, given by --lines and ignored by add. Each record sets the members that apply to it.",
       "properties": {
-        "file": {"type": "string", "description": "Absolute path of the finding file, in the form rpt opened the report by, symlinks not resolved. Use it to load the whole file."},
-        "frontmatter": {"type": "object", "additionalProperties": {"$ref": "#/$defs/position"}, "description": "Where each top-level frontmatter key sits, unknown keys included."},
-        "sections": {"type": "object", "additionalProperties": {"$ref": "#/$defs/sectionLines"}, "description": "Keyed like sections."}
+        "file": {
+          "type": "string",
+          "description": "The file's absolute path, in the form rpt opened the report by, symlinks not resolved."
+        },
+        "keys": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/position"
+          },
+          "description": "Where each top-level frontmatter key (or rpt.yaml key) sits, unknown keys included."
+        },
+        "sections": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/sectionLines"
+          },
+          "description": "A finding's sections, keyed like sections."
+        },
+        "body": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The line a page's body starts on."
+        },
+        "row": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The line a scope row starts on."
+        }
       },
-      "required": ["frontmatter"],
+      "required": [],
       "additionalProperties": true
     },
     "sectionLines": {
       "type": "object",
       "description": "Where one section sits. Line text+n is line n+1 of the section's text.",
       "properties": {
-        "heading": {"type": "integer", "minimum": 1, "description": "Line of the ## heading."},
-        "text": {"type": "integer", "minimum": 1, "description": "First line of the section's text, surrounding blank lines left out; absent when the section is empty."}
+        "heading": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Line of the ## heading."
+        },
+        "text": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "First line of the section's text, surrounding blank lines left out; absent when the section is empty."
+        }
       },
-      "required": ["heading"],
+      "required": [
+        "heading"
+      ],
       "additionalProperties": true
     },
     "target": {
       "type": "object",
       "description": "One place the finding was found on, attributed to a scope row. In a report scope is always set. A parser plugin, which doesn't know the scope, sets host instead, and rpt scope match fills scope from the most specific matching row.",
       "properties": {
-        "scope": {"type": "string", "description": "The ID of the scope row the target falls in."},
-        "host": {"type": "string", "description": "Where inside a range row (a CIDR or *.domain) the finding is. Absent: the whole row, or a row that is one asset. Not allowed with a row that is one asset."},
-        "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Must equal the row's port when the row has one."},
-        "protocol": {"enum": ["tcp", "udp"], "description": "Must equal the row's protocol when the row has one."}
+        "scope": {
+          "type": "string",
+          "description": "The ID of the scope row the target falls in."
+        },
+        "row": {
+          "$ref": "scope.schema.json",
+          "description": "The scope row itself, in an assembled report."
+        },
+        "host": {
+          "type": "string",
+          "description": "Where inside a range row (a CIDR or *.domain) the finding is. Absent: the whole row, or a row that is one asset. Not allowed with a row that is one asset."
+        },
+        "port": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Must equal the row's port when the row has one."
+        },
+        "protocol": {
+          "enum": [
+            "tcp",
+            "udp"
+          ],
+          "description": "Must equal the row's protocol when the row has one."
+        }
       },
-      "anyOf": [{"required": ["scope"]}, {"required": ["host"]}],
+      "anyOf": [
+        {
+          "required": [
+            "scope"
+          ]
+        },
+        {
+          "required": [
+            "host"
+          ]
+        }
+      ],
       "additionalProperties": true
     }
   }

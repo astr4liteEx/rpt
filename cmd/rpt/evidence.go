@@ -209,7 +209,10 @@ func (e *env) evidenceSet() *cobra.Command {
 		Short:             "Change the caption of every link to a file, or move the file and rewrite every reference to it",
 		Args:              cobra.ExactArgs(4),
 		ValidArgsFunction: e.completeEvidence("caption", "path"),
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flagsAmongValues(cmd, args[3:]); err != nil {
+				return err
+			}
 			if args[2] != "caption" && args[2] != "path" {
 				return usagef("the third argument is caption or path, not %q", args[2])
 			}

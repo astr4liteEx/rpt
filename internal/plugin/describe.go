@@ -39,9 +39,11 @@ type cached struct {
 func (d *Describer) Describe(ps []Plugin) map[string]Answer {
 	cache := d.load()
 	out := make(map[string]Answer, len(ps))
-	var mu sync.Mutex
-	var wg sync.WaitGroup
-	changed := false
+	type job struct {
+		p    Plugin
+		info os.FileInfo
+	}
+	var todo []job
 	for _, p := range ps {
 		info, err := os.Stat(p.Path)
 		if err != nil {
@@ -52,18 +54,25 @@ func (d *Describer) Describe(ps []Plugin) map[string]Answer {
 			out[p.Name] = Answer{Desc: c.Desc}
 			continue
 		}
+		todo = append(todo, job{p, info})
+	}
+	answers := make([]Answer, len(todo)) // each goroutine writes its own
+	var wg sync.WaitGroup
+	for i, j := range todo {
 		wg.Go(func() {
-			desc, err := d.ask(p.Path)
-			mu.Lock()
-			defer mu.Unlock()
-			out[p.Name] = Answer{desc, err}
-			if err == nil {
-				cache[p.Path] = cached{info.ModTime().UnixNano(), info.Size(), desc}
-				changed = true
-			}
+			desc, err := d.ask(j.p.Path)
+			answers[i] = Answer{desc, err}
 		})
 	}
 	wg.Wait()
+	changed := false
+	for i, j := range todo {
+		out[j.p.Name] = answers[i]
+		if answers[i].Err == nil {
+			cache[j.p.Path] = cached{j.info.ModTime().UnixNano(), j.info.Size(), answers[i].Desc}
+			changed = true
+		}
+	}
 	if changed {
 		d.save(cache)
 	}

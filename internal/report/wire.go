@@ -70,7 +70,7 @@ func (m *Model) FindingRecord(d *Doc, o RecordOpts) sdk.Finding {
 		}
 	}
 	if o.Lines {
-		f.Lines = &sdk.Lines{File: m.abs(d.Path), Frontmatter: m.keyPositions(d.src)}
+		f.Lines = &sdk.Lines{File: m.abs(d.Path), Keys: m.keyPositions(d.src)}
 		if len(d.Sections) > 0 {
 			f.Lines.Sections = map[string]sdk.SectionLines{}
 			for _, s := range d.Sections {
@@ -91,7 +91,7 @@ func (m *Model) PageRecord(d *Doc, o RecordOpts) sdk.Page {
 		Body: strings.Trim(d.Body(), "\n"), Evidence: d.Evidence, Extra: extra(d.Extra),
 	}
 	if o.Lines {
-		p.Lines = &sdk.PageLines{File: m.abs(d.Path), Frontmatter: m.keyPositions(d.src), Body: d.BodyLine()}
+		p.Lines = &sdk.Lines{File: m.abs(d.Path), Keys: m.keyPositions(d.src), Body: d.BodyLine()}
 	}
 	if o.Assets {
 		p.Assets = m.Assets(d)
@@ -163,7 +163,7 @@ func (m *Model) ScopeRecord(r *Row, lines bool) sdk.ScopeRow {
 		}
 	}
 	if lines {
-		s.Lines = &sdk.ScopeLines{Row: r.Line, File: m.abs(ScopeFile)}
+		s.Lines = &sdk.Lines{Row: r.Line, File: m.abs(ScopeFile)}
 	}
 	return s
 }
@@ -201,7 +201,7 @@ func (m *Model) ConfigRecord(lines bool) sdk.Config {
 		}
 	}
 	if lines {
-		r.Lines = &sdk.ConfigLines{File: m.abs(ConfigFile), Keys: m.keyPositions(c.src)}
+		r.Lines = &sdk.Lines{File: m.abs(ConfigFile), Keys: m.keyPositions(c.src)}
 	}
 	return r
 }

@@ -131,15 +131,16 @@ func readLine(br *bufio.Reader) ([]byte, error) {
 
 // parseRec checks that line is a JSON object and reads its kind.
 func parseRec(line []byte, n int) (Rec, error) {
-	var head struct {
-		Kind jsontext.Value `json:"kind"`
-	}
+	var head map[string]jsontext.Value
 	if err := json.Unmarshal(line, &head); err != nil {
-		return Rec{Line: n}, &LineError{Line: n, Err: errors.New("not a JSON object")}
+		return Rec{Line: n}, &LineError{Line: n, Err: fmt.Errorf("not a record: %w", err)}
+	}
+	if head == nil {
+		return Rec{Line: n}, &LineError{Line: n, Err: errors.New("not a record: null")}
 	}
 	var kind string
-	if len(head.Kind) > 0 {
-		_ = json.Unmarshal(head.Kind, &kind) // a non-string kind is no kind
+	if v, ok := head["kind"]; ok {
+		_ = json.Unmarshal(v, &kind) // a non-string kind is no kind
 	}
 	return Rec{Kind: kind, Raw: line, Line: n}, nil
 }

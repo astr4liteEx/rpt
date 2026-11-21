@@ -333,3 +333,27 @@ func docRecord(m *report.Model, d *report.Doc, o report.RecordOpts) any {
 	}
 	return m.FindingRecord(d, o)
 }
+
+// flagsAmongValues refuses a value that is one of the command's flags. A
+// set command reads everything after the ID as values, so values may
+// start with -; a flag put there by habit would otherwise be written into
+// the report. With -- before the arguments, every one is a value.
+func flagsAmongValues(c *cobra.Command, values []string) error {
+	if c.ArgsLenAtDash() >= 0 {
+		return nil
+	}
+	for _, v := range values {
+		name, ok := strings.CutPrefix(v, "--")
+		if !ok {
+			if len(v) == 2 && v[0] == '-' && c.Flags().ShorthandLookup(v[1:]) != nil {
+				return usagef("%s comes after the values, so it would be written as one: put flags before the arguments, or -- before them to write it", v)
+			}
+			continue
+		}
+		name, _, _ = strings.Cut(name, "=")
+		if c.Flags().Lookup(name) != nil || c.InheritedFlags().Lookup(name) != nil {
+			return usagef("%s comes after the values, so it would be written as one: put flags before the arguments, or -- before them to write it", v)
+		}
+	}
+	return nil
+}

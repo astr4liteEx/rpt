@@ -1,6 +1,7 @@
 package sdk
 
 import (
+	"bytes"
 	"encoding/json/v2"
 	"testing"
 )
@@ -34,10 +35,22 @@ func TestRecordsRoundTrip(t *testing.T) {
 			want: `{"kind":"finding","id":"F-003","title":"SQL injection in login","targets":[{"scope":"S-30","host":"login.acme.com","vhost":"v"},{"scope":"S-14","port":8443,"protocol":"tcp"}],"severity":"high","path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}`,
 		},
 		{
-			name: "finding lines are a declared member, before unknown ones",
+			name: "one lines shape, positions keeping unknown members",
 			run:  roundTrip[Finding],
-			in:   `{"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"frontmatter":{"id":{"line":2,"column":1},"title":{"line":3,"column":1}},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/findings/a.md"}}`,
-			want: `{"kind":"finding","title":"t","targets":[],"severity":"low","lines":{"file":"/r/findings/a.md","frontmatter":{"id":{"line":2,"column":1},"title":{"line":3,"column":1}},"sections":{"description":{"heading":9,"text":11},"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
+			in:   `{"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"keys":{"id":{"line":2,"column":1,"end":9}},"sections":{"poc":{"heading":14,"note":"x"}},"zzz":true,"file":"/r/a.md"}}`,
+			want: `{"kind":"finding","title":"t","targets":[],"severity":"low","lines":{"file":"/r/a.md","keys":{"id":{"line":2,"column":1,"end":9}},"sections":{"poc":{"heading":14,"note":"x"}},"zzz":true},"aaa":1}`,
+		},
+		{
+			name: "evidence is an asset with an owner",
+			run:  roundTrip[Evidence],
+			in:   `{"kind":"evidence","finding":"F-001","ref":"e/a.png","path":"findings/e/a.png","exists":true,"image":true,"x":1}`,
+			want: `{"kind":"evidence","finding":"F-001","ref":"e/a.png","path":"findings/e/a.png","image":true,"exists":true,"x":1}`,
+		},
+		{
+			name: "a command is a description with a name",
+			run:  roundTrip[Command],
+			in:   `{"kind":"command","name":"tag","source":"plugin","summary":"s","requires":{"format":{"min":2}},"x":1}`,
+			want: `{"kind":"command","name":"tag","source":"plugin","summary":"s","requires":{"format":{"min":2}},"x":1}`,
 		},
 		{
 			name: "problem column",
@@ -70,26 +83,16 @@ func TestRecordsRoundTrip(t *testing.T) {
 			want: `{"kind":"problem","path":"scope.csv","rule":"scopeIDsExist","level":"warning","message":"m"}`,
 		},
 		{
-			name: "report nests full scope rows in targets and keeps unknown fields at every level",
+			name: "a report's findings are findings, each target with its row",
 			run:  roundTrip[Report],
-			in: `{"kind":"report","schema_version":1,` +
-				`"report":{"severities":["critical","high","medium","low","info"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],"renderer":"typst"},` +
-				`"summary":{"high":1,"critical":0,"medium":1,"low":0,"info":2},` +
-				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
-				`"findings":[{"id":"F-003","path":"findings/sqli-login.md","title":"SQL injection in login","severity":"high",` +
-				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
-				`"sections":{"description":"d","remediation":"r","poc":"p"},` +
-				`"assets":[{"ref":"evidence/F-003-login.png","path":"findings/evidence/F-003-login.png","file":"/engagements/acme/findings/evidence/F-003-login.png","source":"frontmatter","media_type":"image/png"}],"cvss":"9.1"}],` +
-				`"pages":[],"generator":"rpt 0.1.0"}`,
-			want: `{"kind":"report","schema_version":1,` +
-				`"report":{"severities":["critical","high","medium","low","info"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],"renderer":"typst"},` +
-				`"summary":{"critical":0,"high":1,"info":2,"low":0,"medium":1},` +
-				`"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443}],` +
-				`"findings":[{"id":"F-003","path":"findings/sqli-login.md","title":"SQL injection in login","severity":"high",` +
-				`"targets":[{"scope":{"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"env":"prod"},"port":443,"note":"n"}],` +
-				`"sections":{"description":"d","poc":"p","remediation":"r"},` +
-				`"assets":[{"ref":"evidence/F-003-login.png","path":"findings/evidence/F-003-login.png","file":"/engagements/acme/findings/evidence/F-003-login.png","source":"frontmatter","media_type":"image/png"}],"cvss":"9.1"}],` +
-				`"pages":[],"generator":"rpt 0.1.0"}`,
+			in: `{"kind":"report","schema_version":3,"severities":["high"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],` +
+				`"summary":{"high":1},"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5"}],` +
+				`"findings":[{"kind":"finding","id":"F-003","title":"t","severity":"high","targets":[{"scope":"S-12","row":{"kind":"scope","id":"S-12","host":"10.0.0.5","env":"prod"},"note":"n"}],"cvss":"9.1"}],` +
+				`"pages":[],"generator":"x"}`,
+			want: `{"kind":"report","schema_version":3,"severities":["high"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],` +
+				`"summary":{"high":1},"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5"}],` +
+				`"findings":[{"kind":"finding","id":"F-003","title":"t","targets":[{"scope":"S-12","row":{"kind":"scope","id":"S-12","host":"10.0.0.5","env":"prod"},"note":"n"}],"severity":"high","cvss":"9.1"}],` +
+				`"pages":[],"generator":"x"}`,
 		},
 	}
 	for _, tt := range tests {
@@ -98,5 +101,15 @@ func TestRecordsRoundTrip(t *testing.T) {
 				t.Errorf("round trip\n got: %s\nwant: %s", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestEmitSetsKind(t *testing.T) {
+	var b bytes.Buffer
+	if err := Emit(&b, Problem{Path: ".", Rule: "r", Level: Warning, Message: "m"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := b.String(); got != `{"kind":"problem","path":".","rule":"r","level":"warning","message":"m"}`+"\n" {
+		t.Errorf("got %s", got)
 	}
 }

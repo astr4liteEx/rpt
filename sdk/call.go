@@ -102,7 +102,7 @@ func settings(ctx context.Context, plugin string, v any) error {
 			return fmt.Errorf("settings: %w", err)
 		}
 		raw, ok := m[member]
-		if !ok {
+		if !ok || string(raw) == "null" {
 			return nil // nothing set: the defaults stand
 		}
 		if err := json.Unmarshal(raw, v); err != nil {
@@ -113,12 +113,22 @@ func settings(ctx context.Context, plugin string, v any) error {
 	return nil
 }
 
-// Emit writes v as one record: one deterministic JSON line. v is usually
-// one of this package's record types, with Kind set.
+// Emit writes v as one record: one deterministic JSON line. When v is
+// one of this package's record types with Kind unset, Emit sets it.
 func Emit(w io.Writer, v any) error {
 	b, err := json.Marshal(v, json.Deterministic(true))
 	if err != nil {
 		return err
+	}
+	if r, ok := v.(Record); ok {
+		var head struct {
+			Kind string `json:"kind"`
+		}
+		if json.Unmarshal(b, &head) == nil && head.Kind == "" {
+			if b, err = SetMember(b, "kind", r.RecordKind()); err != nil {
+				return err
+			}
+		}
 	}
 	_, err = w.Write(append(b, '\n'))
 	return err

@@ -5,11 +5,26 @@
   "description": "One report found by rpt ls at or under the folder searched, in path order. format and findings are absent when the report's rpt.yaml doesn't parse.",
   "type": "object",
   "properties": {
-    "kind": {"const": "location"},
-    "path": {"type": "string", "description": "Absolute path of the report root."},
-    "format": {"type": "integer", "description": "The format key of its rpt.yaml."},
-    "findings": {"type": "integer", "minimum": 0, "description": "How many of its finding files parse."}
+    "kind": {
+      "const": "location"
+    },
+    "path": {
+      "type": "string",
+      "description": "Absolute path of the report root."
+    },
+    "format": {
+      "type": "integer",
+      "description": "The format key of its rpt.yaml."
+    },
+    "findings": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "How many of its finding files parse."
+    }
   },
-  "required": ["kind", "path"],
+  "required": [
+    "kind",
+    "path"
+  ],
   "additionalProperties": true
 }

@@ -232,7 +232,10 @@ func (e *env) configSet() *cobra.Command {
 			"or x-<plugin>[.<key>...], each value YAML. A heading rewritten here is rewritten in every finding.",
 		Args:              cobra.MinimumNArgs(2),
 		ValidArgsFunction: e.completeConfigPath,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flagsAmongValues(cmd, args[1:]); err != nil {
+				return err
+			}
 			var rs []report.Rename
 			for _, r := range renames {
 				old, nw, ok := strings.Cut(r, "=")

@@ -6,6 +6,7 @@ import (
 	"encoding/json/v2"
 	"errors"
 	"fmt"
+	"io"
 )
 
 // SetMember returns the JSON object raw with its member name set to value.
@@ -62,5 +63,11 @@ func SetMember(raw []byte, name string, value any) ([]byte, error) {
 		out.Write(member)
 	}
 	out.WriteByte('}')
+	if _, err := dec.ReadToken(); err != nil {
+		return nil, fmt.Errorf("set %q: %w", name, err)
+	}
+	if _, err := dec.ReadToken(); err != io.EOF {
+		return nil, fmt.Errorf("set %q: not one JSON object: more follows it", name)
+	}
 	return out.Bytes(), nil
 }

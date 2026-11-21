@@ -36,13 +36,15 @@ func TestRecords(t *testing.T) {
 		"not json\n" + // 4: malformed
 		"[1,2]\n" + // 5: JSON but not an object
 		`{"no":"kind"}` + "\n" + // 6: no kind: still a record
-		`{"kind":"scope", "id":"S-1"}` // 7: no final newline; inner spacing kept
+		"null\n" + // 7: null isn't a record
+		`{"kind":"scope", "id":"S-1"}` // 8: no final newline; inner spacing kept
 	want := []got{
 		{kind: "finding", raw: `{"kind":"finding","id":"F-1"}`, line: 1},
 		{errLine: 4},
 		{errLine: 5},
 		{kind: "", raw: `{"no":"kind"}`, line: 6},
-		{kind: "scope", raw: `{"kind":"scope", "id":"S-1"}`, line: 7},
+		{errLine: 7},
+		{kind: "scope", raw: `{"kind":"scope", "id":"S-1"}`, line: 8},
 	}
 	gotRecs := collect(t, in)
 	if len(gotRecs) != len(want) {
@@ -71,5 +73,19 @@ func TestRecordsLongLines(t *testing.T) {
 	}
 	if gotRecs[2].kind != "scope" || gotRecs[2].line != 3 {
 		t.Errorf("line after the oversized one = %+v, want scope on line 3", gotRecs[2])
+	}
+}
+
+func TestLineErrorsSayWhatIsWrong(t *testing.T) {
+	for in, want := range map[string]string{
+		"null":     "not a record: null",
+		"[1]":      "not a record: json: ",
+		`{"a":1,}`: "not a record: jsontext: ",
+	} {
+		for _, err := range Records(strings.NewReader(in)) {
+			if err == nil || !strings.HasPrefix(errors.Unwrap(err).Error(), want) {
+				t.Errorf("%s: %v, want %s...", in, err, want)
+			}
+		}
 	}
 }

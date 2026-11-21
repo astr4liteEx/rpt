@@ -23,15 +23,15 @@ func TestAssemble(t *testing.T) {
 		t.Errorf("findings %v", ids)
 	}
 	x := r.Findings[0]
-	if len(x.Targets) != 1 || x.Targets[0].Scope.ID != "S-12" || x.Targets[0].Scope.Rev != "" {
+	if len(x.Targets) != 1 || x.Targets[0].Scope != "S-12" || x.Targets[0].Row == nil || x.Targets[0].Row.Rev != "" {
 		t.Errorf("targets %+v", x.Targets)
 	}
 	abs := filepath.ToSlash(filepath.Join(m.Dir, "findings/evidence/F-003-login.png"))
 	if want := "![shot](<" + abs + "> \"t\") and [web](https://x.test/a.png)"; x.Sections["description"] != want {
 		t.Errorf("description %q", x.Sections["description"])
 	}
-	if !slices.Equal(r.Report.Order, []string{"P-002", "findings"}) || r.Pages[0].Body != `<img src="`+abs+`">` {
-		t.Errorf("order %v page %q", r.Report.Order, r.Pages[0].Body)
+	if !slices.Equal(r.Order, []string{"P-002", "findings"}) || r.Pages[0].Body != `<img src="`+abs+`">` {
+		t.Errorf("order %v page %q", r.Order, r.Pages[0].Body)
 	}
 	got := problems(warn)
 	want := []string{
@@ -43,4 +43,21 @@ func TestAssemble(t *testing.T) {
 	if !slices.Equal(got, want) {
 		t.Errorf("warnings\n%s", strings.Join(got, "\n"))
 	}
+}
+
+func TestAssembleResolvesReferenceLinksAcrossSections(t *testing.T) {
+	m := fixture(t, map[string]string{
+		"findings/x.md": "---\nid: F-009\ntitle: X\ntargets: [{scope: S-12}]\nseverity: low\n---\n\n## Description\n\nSee [the shot][1] and ![thumb][1].\n\n## Remediation\n\nr\n\n[1]: evidence/F-003-login.png \"t\"\n",
+	})
+	r, _ := m.Assemble()
+	abs := filepath.ToSlash(filepath.Join(m.Dir, "findings/evidence/F-003-login.png"))
+	for _, f := range r.Findings {
+		if f.ID == "F-009" {
+			if want := "See [the shot](" + abs + ") and ![thumb](" + abs + ")."; f.Sections["description"] != want {
+				t.Errorf("description %q, want %q", f.Sections["description"], want)
+			}
+			return
+		}
+	}
+	t.Error("F-009 missing")
 }

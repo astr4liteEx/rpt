@@ -194,7 +194,10 @@ func (e *env) scopeSet() *cobra.Command {
 		Short:             "Change one column of a scope row; a new id or host carries into the findings citing it",
 		Args:              cobra.ExactArgs(3),
 		ValidArgsFunction: e.completeScopeColumn,
-		RunE: func(_ *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := flagsAmongValues(cmd, args[2:]); err != nil {
+				return err
+			}
 			return e.write(&w, rowRevs(args[0]), func(b *batch) error {
 				ch, err := b.m.SetScope(args[0], args[1], args[2], w.mode())
 				if err != nil {

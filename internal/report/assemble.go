@@ -25,7 +25,7 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 	cfg := m.Config
 	r := sdk.Report{
 		Kind: "report", SchemaVersion: SchemaVersion,
-		Summary: map[sdk.Severity]int{}, Scope: []sdk.ScopeRow{}, Findings: []sdk.ReportFinding{}, Pages: []sdk.ReportPage{},
+		Summary: map[sdk.Severity]int{}, Scope: []sdk.ScopeRow{}, Findings: []sdk.Finding{}, Pages: []sdk.Page{},
 	}
 	var fe *FileError
 	if errors.As(cfg.Err, &fe) {
@@ -33,15 +33,15 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 		cfg = parseConfig([]byte(fmt.Sprintf("format: %d\n", FormatVersion)))
 	}
 	for _, s := range cfg.Severities {
-		r.Report.Severities = append(r.Report.Severities, sdk.Severity(s))
+		r.Severities = append(r.Severities, sdk.Severity(s))
 		r.Summary[sdk.Severity(s)] = 0
 	}
 	for _, k := range FixedSections {
-		r.Report.Sections = append(r.Report.Sections, sdk.ReportSection{Key: k, Heading: cfg.Heading(k)})
+		r.Sections = append(r.Sections, sdk.Section{Key: k, Heading: cfg.Heading(k)})
 	}
 	for _, h := range cfg.RequiredSections {
 		if k := cfg.SectionKey(h); !slices.Contains(FixedSections, k) {
-			r.Report.Sections = append(r.Report.Sections, sdk.ReportSection{Key: k, Heading: h})
+			r.Sections = append(r.Sections, sdk.Section{Key: k, Heading: h})
 		}
 	}
 
@@ -63,10 +63,8 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 		if !m.usable(d, leave) {
 			continue
 		}
-		f := sdk.ReportFinding{
-			ID: d.ID, Path: d.Path, Title: d.Title, Severity: sdk.Severity(d.Severity),
-			Targets: []sdk.ReportTarget{}, Sections: map[string]string{}, Assets: m.Assets(d), Extra: extra(d.Extra),
-		}
+		f := m.FindingRecord(d, RecordOpts{Assets: true})
+		f.Rev, f.Targets, f.Sections = "", []sdk.Target{}, map[string]string{}
 		for _, t := range d.Targets {
 			row, err := m.Scope.Row(t.Scope)
 			switch {
@@ -82,7 +80,7 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 			}
 			rec := m.ScopeRecord(row, false)
 			rec.Rev = ""
-			f.Targets = append(f.Targets, sdk.ReportTarget{Scope: rec, Host: t.Host, Port: t.Port, Protocol: t.Protocol, Extra: extra(t.Extra)})
+			f.Targets = append(f.Targets, sdk.Target{Scope: row.ID, Row: &rec, Host: t.Host, Port: t.Port, Protocol: t.Protocol, Extra: extra(t.Extra)})
 		}
 		for _, s := range sectionsOf(m.absolute(d), cfg) {
 			if _, dup := f.Sections[s.Key]; !dup {
@@ -98,7 +96,7 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 		}
 		return len(cfg.Severities)
 	}
-	slices.SortStableFunc(r.Findings, func(a, b sdk.ReportFinding) int {
+	slices.SortStableFunc(r.Findings, func(a, b sdk.Finding) int {
 		return cmp.Or(cmp.Compare(rank(a.Severity), rank(b.Severity)), CompareIDs(a.ID, b.ID))
 	})
 
@@ -108,16 +106,15 @@ func (m *Model) Assemble() (sdk.Report, []Problem) {
 			pages[d.ID] = d
 		}
 	}
-	r.Report.Order = m.PageOrder()
-	for _, id := range r.Report.Order {
+	r.Order = m.PageOrder()
+	for _, id := range r.Order {
 		d, ok := pages[id]
 		if !ok {
 			continue
 		}
-		r.Pages = append(r.Pages, sdk.ReportPage{
-			ID: d.ID, Path: d.Path, Title: d.Title, Assets: m.Assets(d), Extra: extra(d.Extra),
-			Body: strings.Trim(string(m.absolute(d).Body()), "\n"),
-		})
+		p := m.PageRecord(d, RecordOpts{Assets: true})
+		p.Rev, p.Body = "", strings.Trim(string(m.absolute(d).Body()), "\n")
+		r.Pages = append(r.Pages, p)
 	}
 	SortProblems(warn)
 	return r, warn
@@ -160,11 +157,24 @@ func (m *Model) absolute(d *Doc) *doc.Doc {
 	var spans []doc.Span
 	seen := map[int]bool{}
 	for _, r := range refs {
-		if r.Link == nil || r.Path == "" || !m.exists(r.Path) || seen[r.Link.DestStart] {
+		if r.Link == nil || r.Path == "" || !m.exists(r.Path) {
+			continue
+		}
+		dest := filepath.ToSlash(m.abs(r.Path))
+		if l := r.Link; l.Label != "" {
+			// A reference link becomes an inline one: a renderer gets each
+			// section on its own, and the definition may be in another.
+			text := string(d.src.Body()[l.TextStart:l.TextEnd])
+			inline := "[" + text + "](" + markdownDest(dest) + ")"
+			if l.Image {
+				inline = "!" + inline
+			}
+			spans = append(spans, doc.Span{Start: l.Start, End: l.End, Text: inline})
+		}
+		if seen[r.Link.DestStart] {
 			continue
 		}
 		seen[r.Link.DestStart] = true
-		dest := filepath.ToSlash(m.abs(r.Path))
 		switch {
 		case r.Link.HTML:
 			dest = strings.ReplaceAll(dest, `"`, "&quot;")

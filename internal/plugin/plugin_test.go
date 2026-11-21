@@ -147,3 +147,22 @@ func TestCheckSchemas(t *testing.T) {
 		t.Errorf("wanted %v", w)
 	}
 }
+
+// Several plugins described at once, under -race, with a warm and a cold
+// cache.
+func TestDescribeManyAtOnce(t *testing.T) {
+	dir := t.TempDir()
+	var ps []Plugin
+	for _, n := range []string{"a", "b", "c", "d"} {
+		ps = append(ps, Plugin{n, script(t, dir, n, `echo '{"summary":"`+n+`"}'`)})
+	}
+	d := &Describer{Env: os.Environ(), CacheFile: filepath.Join(dir, "cache.json")}
+	for range 2 {
+		got := d.Describe(ps)
+		for _, p := range ps {
+			if got[p.Name].Desc.Summary != p.Name {
+				t.Errorf("%s: %+v", p.Name, got[p.Name])
+			}
+		}
+	}
+}

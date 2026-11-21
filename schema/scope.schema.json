@@ -2,29 +2,44 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/scope.schema.json",
   "title": "rpt scope record",
-  "description": "One in-scope asset, a row of scope.csv. Schema version 2. Other CSV columns appear as extra string members; no column may be named kind or lines.",
+  "description": "One in-scope asset, a row of scope.csv. Schema version 3. Other CSV columns appear as extra string members; no column may be named kind or lines.",
   "type": "object",
   "properties": {
-    "kind": {"const": "scope"},
-    "id": {"type": "string"},
-    "host": {"type": "string", "description": "Host name, address or range."},
-    "port": {"type": "integer", "minimum": 1, "maximum": 65535, "description": "Absent: every port."},
-    "protocol": {"enum": ["tcp", "udp"], "description": "Absent: any protocol."},
-    "rev": {"type": "string", "description": "The row's revision, over scope.csv's header and the row's own text: edits to other rows leave it alone. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the row changed since this read."},
-    "lines": {"$ref": "#/$defs/lines"}
-  },
-  "required": ["kind", "id", "host"],
-  "additionalProperties": true,
-  "$defs": {
+    "kind": {
+      "const": "scope"
+    },
+    "id": {
+      "type": "string"
+    },
+    "host": {
+      "type": "string",
+      "description": "Host name, address or range."
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535,
+      "description": "Absent: every port."
+    },
+    "protocol": {
+      "enum": [
+        "tcp",
+        "udp"
+      ],
+      "description": "Absent: any protocol."
+    },
+    "rev": {
+      "type": "string",
+      "description": "The row's revision, over scope.csv's header and the row's own text: edits to other rows leave it alone. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the row changed since this read."
+    },
     "lines": {
-      "type": "object",
-      "description": "Where the row sits in scope.csv. Given by rpt scope get --lines; rpt scope add ignores it.",
-      "properties": {
-        "row": {"type": "integer", "minimum": 1, "description": "The 1-based line of scope.csv the row starts on. A quoted field can span lines, and blank lines are skipped, so count from here, not from the row's position."},
-        "file": {"type": "string", "description": "Absolute path of scope.csv, in the form rpt opened the report by, symlinks not resolved."}
-      },
-      "required": ["row"],
-      "additionalProperties": true
+      "$ref": "finding.schema.json#/$defs/lines"
     }
-  }
+  },
+  "required": [
+    "kind",
+    "id",
+    "host"
+  ],
+  "additionalProperties": true
 }

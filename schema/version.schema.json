@@ -5,11 +5,29 @@
   "description": "Which rpt this is, emitted by rpt version.",
   "type": "object",
   "properties": {
-    "kind": {"const": "version"},
-    "version": {"type": "string", "description": "The release tag, the module version go install recorded, or dev."},
-    "schema_version": {"type": "integer", "minimum": 1, "description": "Version of the record schemas this rpt writes."},
-    "format": {"type": "integer", "minimum": 1, "description": "The report format version (rpt.yaml's format key) this rpt reads."}
+    "kind": {
+      "const": "version"
+    },
+    "version": {
+      "type": "string",
+      "description": "The release tag, the module version go install recorded, or dev."
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Version of the record schemas this rpt writes."
+    },
+    "format": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The report format version (rpt.yaml's format key) this rpt reads."
+    }
   },
-  "required": ["kind", "version", "schema_version", "format"],
+  "required": [
+    "kind",
+    "version",
+    "schema_version",
+    "format"
+  ],
   "additionalProperties": true
 }

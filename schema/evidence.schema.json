@@ -2,25 +2,72 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://github.com/astr4liteEx/rpt/schema/evidence.schema.json",
   "title": "rpt evidence record",
-  "description": "One reference a finding or page makes to an evidence file, from its evidence list or a link in its text, as rpt evidence get emits it; with --orphans, also each file in findings/evidence/ or pages/evidence/ that nothing references, which has no owner, ref or source. rpt evidence add reads records with a file member: the file to add. Schema version 2.",
+  "description": "One reference a finding or page makes to an evidence file, from its evidence list or a link in its text, as rpt evidence get emits it; with --orphans, also each file in findings/evidence/ or pages/evidence/ that nothing references, which has no owner, ref or source. rpt evidence add reads records with a file member: the file to add. Schema version 3.",
   "type": "object",
   "properties": {
-    "kind": {"const": "evidence"},
-    "finding": {"type": "string", "description": "ID of the finding that makes the reference. A record has finding or page, not both."},
-    "page": {"type": "string", "description": "ID of the page that makes the reference."},
-    "ref": {"type": "string", "description": "The path as the owner writes it, relative to the owner's file."},
-    "source": {"enum": ["frontmatter", "body"], "description": "frontmatter: the evidence list; body: an image or link in the text."},
-    "path": {"type": "string", "description": "Relative to the report root. Absent when ref leaves the report."},
-    "file": {"type": "string", "description": "Absolute path, symlinks not resolved; use it to open the file. Absent when ref leaves the report."},
-    "exists": {"type": "boolean", "description": "Whether a file is there."},
-    "media_type": {"type": "string", "description": "The file's media type, detected from its content, else from its extension, such as image/png. Absent when there is no file."},
-    "text": {"type": "string", "description": "A link's text, or an image's alt text: its caption."},
-    "image": {"type": "boolean", "description": "The link is an image, ![text](ref)."},
-    "section": {"type": "string", "description": "The key of the finding section the link is in."},
-    "line": {"type": "integer", "minimum": 1, "description": "The line of the owner's file the link starts on."},
-    "column": {"type": "integer", "minimum": 1, "description": "The byte in that line the link starts at."},
-    "rev": {"type": "string", "description": "The owner's revision; an evidence file's own bytes aren't tracked. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the owner changed since this read."}
+    "kind": {
+      "const": "evidence"
+    },
+    "finding": {
+      "type": "string",
+      "description": "ID of the finding that makes the reference. A record has finding or page, not both."
+    },
+    "page": {
+      "type": "string",
+      "description": "ID of the page that makes the reference."
+    },
+    "ref": {
+      "type": "string",
+      "description": "The path as the owner writes it, relative to the owner's file."
+    },
+    "source": {
+      "enum": [
+        "frontmatter",
+        "body"
+      ],
+      "description": "frontmatter: the evidence list; body: an image or link in the text."
+    },
+    "path": {
+      "type": "string",
+      "description": "Relative to the report root. Absent when ref leaves the report."
+    },
+    "file": {
+      "type": "string",
+      "description": "Absolute path, symlinks not resolved; use it to open the file. Absent when ref leaves the report."
+    },
+    "exists": {
+      "type": "boolean",
+      "description": "Whether a file is there."
+    },
+    "media_type": {
+      "type": "string",
+      "description": "The file's media type, detected from its content, else from its extension, such as image/png. Absent when there is no file."
+    },
+    "text": {
+      "type": "string",
+      "description": "A link's text, or an image's alt text: its caption."
+    },
+    "image": {
+      "type": "boolean",
+      "description": "The link is an image, ![text](ref)."
+    },
+    "section": {
+      "type": "string",
+      "description": "The key of the finding section the link is in."
+    },
+    "line": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "The line of the owner's file the link starts on."
+    },
+    "rev": {
+      "type": "string",
+      "description": "The owner's revision; an evidence file's own bytes aren't tracked. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the owner changed since this read."
+    }
   },
-  "required": ["kind", "exists"],
+  "required": [
+    "kind",
+    "exists"
+  ],
   "additionalProperties": true
 }

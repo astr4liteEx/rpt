@@ -5,74 +5,95 @@
   "description": "The whole render-ready document emitted by rpt assemble, as one record on one line.",
   "type": "object",
   "properties": {
-    "kind": {"const": "report"},
-    "schema_version": {"type": "integer", "minimum": 1},
-    "report": {"$ref": "#/$defs/reportMeta"},
-    "summary": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}, "description": "Finding count per severity level."},
-    "scope": {"type": "array", "items": {"$ref": "scope.schema.json"}},
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/reportFinding"}, "description": "Sorted by the config's severity order, then by ID."},
-    "pages": {"type": "array", "items": {"$ref": "#/$defs/reportPage"}, "description": "The pages in report order; report.order says where the findings go among them."}
+    "kind": {
+      "const": "report"
+    },
+    "schema_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "severities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The report's severity levels, most severe first."
+    },
+    "sections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/section"
+      },
+      "description": "The report's sections in the order rpt writes them: the fixed ones with this report's headings, then the custom ones it requires, as rpt config get gives them."
+    },
+    "order": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "The report's parts in reading order: each page's ID, and findings where the findings go."
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      },
+      "description": "Finding count per severity level."
+    },
+    "scope": {
+      "type": "array",
+      "items": {
+        "$ref": "scope.schema.json"
+      },
+      "description": "Every scope row."
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "$ref": "finding.schema.json"
+      },
+      "description": "Findings by severity, then ID; each target carries its row, links name files by absolute path, and assets is set."
+    },
+    "pages": {
+      "type": "array",
+      "items": {
+        "$ref": "page.schema.json"
+      },
+      "description": "Pages in order, links naming files by absolute path, assets set."
+    }
   },
-  "required": ["kind", "schema_version", "report", "summary", "scope", "findings", "pages"],
+  "required": [
+    "kind",
+    "schema_version",
+    "severities",
+    "sections",
+    "order",
+    "summary",
+    "scope",
+    "findings",
+    "pages"
+  ],
   "additionalProperties": true,
   "$defs": {
-    "reportPage": {
-      "type": "object",
-      "description": "A page of report-level prose, its body links made absolute.",
-      "properties": {
-        "id": {"type": "string"},
-        "path": {"type": "string", "description": "The page file, relative to the report root."},
-        "title": {"type": "string"},
-        "body": {"type": "string", "description": "Markdown; ## headings in it are the page's own."},
-        "assets": {"type": "array", "items": {"$ref": "finding.schema.json#/$defs/asset"}, "description": "Every file the page lists or links, one per source and ref; links in body now name file."}
-      },
-      "required": ["id", "path", "title", "body", "assets"],
-      "additionalProperties": true
-    },
-    "reportMeta": {
+    "section": {
       "type": "object",
       "properties": {
-        "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."},
-        "sections": {"type": "array", "items": {"$ref": "#/$defs/reportSection"}, "description": "The report's sections in the order rpt writes them: the fixed ones with this report's headings, then the custom ones it requires, as rpt config get gives them."},
-        "order": {"type": "array", "items": {"type": "string"}, "description": "The report's parts in reading order: each page's ID, and findings where the findings go."}
+        "key": {
+          "type": "string",
+          "description": "The key a finding's sections use: description, remediation, poc, or a custom section's heading."
+        },
+        "heading": {
+          "type": "string",
+          "description": "The heading this report gives the section, for a reader."
+        }
       },
-      "required": ["severities", "sections", "order"],
-      "additionalProperties": true
-    },
-    "reportSection": {
-      "type": "object",
-      "properties": {
-        "key": {"type": "string", "description": "The key a finding's sections use: description, remediation, poc, or a custom section's heading."},
-        "heading": {"type": "string", "description": "The heading this report gives the section, for a reader."}
-      },
-      "required": ["key", "heading"],
-      "additionalProperties": true
-    },
-    "reportFinding": {
-      "type": "object",
-      "properties": {
-        "id": {"type": "string"},
-        "path": {"type": "string", "description": "The finding file, relative to the report root."},
-        "title": {"type": "string"},
-        "severity": {"type": "string"},
-        "targets": {"type": "array", "items": {"$ref": "#/$defs/reportTarget"}, "description": "The finding's targets, each with its full scope row in place of the scope ID."},
-        "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Markdown per section."},
-        "assets": {"type": "array", "items": {"$ref": "finding.schema.json#/$defs/asset"}, "description": "Every file the finding lists or links, one per source and ref; links in sections now name file."}
-      },
-      "required": ["id", "path", "title", "severity", "targets", "sections", "assets"],
-      "additionalProperties": true
-    },
-    "reportTarget": {
-      "type": "object",
-      "description": "A finding target with its scope row in full; host, port and protocol as in finding.schema.json#/$defs/target.",
-      "properties": {
-        "scope": {"$ref": "scope.schema.json"},
-        "host": {"type": "string"},
-        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
-        "protocol": {"enum": ["tcp", "udp"]}
-      },
-      "required": ["scope"],
-      "additionalProperties": true
+      "required": [
+        "key",
+        "heading"
+      ],
+      "additionalProperties": true,
+      "description": "One finding section: the key a finding's sections use and the heading this report gives it."
     }
   }
 }

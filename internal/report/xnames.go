@@ -7,7 +7,7 @@ import (
 
 // The versions this rpt reads and writes.
 const (
-	SchemaVersion = 2 // the record schemas
+	SchemaVersion = 3 // the record schemas
 	FormatVersion = 2 // the report format
 )
 

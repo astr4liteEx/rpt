@@ -23,3 +23,14 @@ func TestSetMember(t *testing.T) {
 		})
 	}
 }
+
+func TestSetMemberRefusesTrailingBytes(t *testing.T) {
+	for _, in := range []string{`{"a":1} {"b":2}`, `{"a":1}x`, `[1]`} {
+		if _, err := SetMember([]byte(in), "scope", 1); err == nil {
+			t.Errorf("%s: no error", in)
+		}
+	}
+	if _, err := SetMember([]byte(`{"a":1} `+"\n"), "scope", 1); err != nil {
+		t.Errorf("trailing space: %v", err)
+	}
+}

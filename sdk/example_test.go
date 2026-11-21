@@ -113,7 +113,7 @@ func run(t *testing.T, stdin string, args ...string) (int, string, string) {
 
 func TestExamplePlugin(t *testing.T) {
 	dir := report(t)
-	if out, err := exec.Command(rptBin, "config", "set", "x-tag.label", "verified", "--report", dir).CombinedOutput(); err != nil {
+	if out, err := exec.Command(rptBin, "--report", dir, "config", "set", "x-tag.label", "verified").CombinedOutput(); err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
 	code, out, errOut := run(t, `{"kind":"finding","id":"F-001"}`+"\n"+`{"kind":"note"}`+"\n")
@@ -158,7 +158,7 @@ func TestRunAnswersWithoutWork(t *testing.T) {
 
 func TestCallStale(t *testing.T) {
 	report(t)
-	res, err := sdk.Call(context.Background(), nil, "finding", "set", "F-001", "title", "New", "--if-rev", "0000")
+	res, err := sdk.Call(context.Background(), nil, "finding", "set", "--if-rev", "0000", "F-001", "title", "New")
 	if err != nil || res.Code != 1 || !res.Stale() || len(res.Problems()) != 1 {
 		t.Errorf("%+v, %v", res, err)
 	}
@@ -174,4 +174,15 @@ func ExampleRange_String() {
 	// up to 1
 	// 2
 	// 2 to 3
+}
+
+func TestNullSettingsKeepTheDefaults(t *testing.T) {
+	dir := report(t)
+	if out, err := exec.Command(rptBin, "--report", dir, "config", "set", "x-tag", "null").CombinedOutput(); err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	_, out, errOut := run(t, `{"kind":"finding","id":"F-001"}`+"\n")
+	if !strings.Contains(out, `"x-tag-label":"triaged"`) {
+		t.Errorf("stdout %q, stderr %q", out, errOut)
+	}
 }

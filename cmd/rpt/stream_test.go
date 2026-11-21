@@ -88,7 +88,7 @@ func TestPluginRunsWithItsArgumentsAndEnvironment(t *testing.T) {
 	dir := fixture(t)
 	plugins(t, map[string]string{"echo": `printf '%s|' "$@"; echo "$RPT_REPORT_DIR $RPT_SCHEMA_VERSION"; exit 3`})
 	code, _, _ := rpt(t, "", "echo", "a b", "--report", "x", "--json")
-	want := "a b|--report|x|--json|" + dir + " 2\n"
+	want := "a b|--report|x|--json|" + dir + " 3\n"
 	if code != 3 || pluginOut.String() != want {
 		t.Errorf("exit %d, plugin printed %q, want %q", code, pluginOut.String(), want)
 	}
