@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/astr4liteEx/rpt/schema/page.schema.json",
+  "title": "rpt page record",
+  "description": "One page of report-level prose, such as an executive summary: a file in pages/. Unknown frontmatter keys appear as extra members. Schema version 2.",
+  "type": "object",
+  "properties": {
+    "kind": {"const": "page"},
+    "id": {"type": "string", "pattern": "^P-[0-9]{3,}$", "description": "Page ID; assigned by rpt page add when absent."},
+    "title": {"type": "string"},
+    "path": {"type": "string", "description": "The page file, relative to the report root. rpt page add ignores it."},
+    "body": {"type": "string", "description": "Markdown after the frontmatter. ## headings in it are the page's own, not sections."},
+    "evidence": {"type": "array", "items": {"type": "string"}, "description": "Evidence files, relative to the page file."},
+    "rev": {"type": "string", "description": "The page file's revision. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the page changed since this read."},
+    "lines": {
+      "type": "object",
+      "description": "Where the page's parts sit in its file. Given by rpt page get --lines; rpt page add ignores it.",
+      "properties": {
+        "file": {"type": "string", "description": "Absolute path of the page file, in the form rpt opened the report by, symlinks not resolved."},
+        "frontmatter": {"type": "object", "additionalProperties": {"$ref": "finding.schema.json#/$defs/position"}, "description": "Where each top-level frontmatter key sits."},
+        "body": {"type": "integer", "minimum": 1, "description": "The line the body starts on."}
+      },
+      "required": ["frontmatter", "body"],
+      "additionalProperties": true
+    }
+  },
+  "required": ["kind", "id", "title", "body"],
+  "additionalProperties": true
+}

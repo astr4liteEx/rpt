@@ -14,15 +14,17 @@ const scopeHeader = "id,host,port,protocol\n"
 
 // New creates an empty report at dir: a report config naming this format
 // version and the default severities and required sections, a scope.csv
-// with only its header row, and an empty findings folder. Parent folders
+// with only its header row, and empty findings and pages folders. Parent folders
 // are created as needed. It refuses, changing nothing, when dir is anything
 // but a missing path or an empty folder, or lies inside a report.
 func New(dir string) error {
 	if err := checkNewDir(dir); err != nil {
 		return fmt.Errorf("new report %s: %w", dir, err)
 	}
-	if err := os.MkdirAll(filepath.Join(dir, FindingsDir), 0o755); err != nil {
-		return fmt.Errorf("new report: %w", err)
+	for _, d := range []string{FindingsDir, PagesDir} {
+		if err := os.MkdirAll(filepath.Join(dir, d), 0o755); err != nil {
+			return fmt.Errorf("new report: %w", err)
+		}
 	}
 	sevs := make([]string, len(DefaultSeverities))
 	for i, s := range DefaultSeverities {

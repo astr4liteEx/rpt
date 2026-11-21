@@ -63,6 +63,33 @@ type Position struct {
 	Column int `json:"column"`
 }
 
+// Page is a "page" record: one page of report-level prose, such as an
+// executive summary, as rpt page get emits it.
+type Page struct {
+	Kind     string   `json:"kind"`
+	ID       string   `json:"id"`
+	Title    string   `json:"title"`
+	Path     string   `json:"path,omitzero"` // relative to the report root, slash-separated
+	Body     string   `json:"body"`          // markdown; ## headings in it are the page's own
+	Evidence []string `json:"evidence,omitzero"`
+	// Rev is the page file's revision; pass it back as --if-rev.
+	Rev   string     `json:"rev,omitzero"`
+	Lines *PageLines `json:"lines,omitzero"` // set by rpt page get --lines; rpt page add ignores it
+
+	// Extra holds unknown frontmatter keys and members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// PageLines is where a page's parts sit in its file.
+type PageLines struct {
+	File        string              `json:"file,omitzero"` // the page file's absolute path, symlinks kept
+	Frontmatter map[string]Position `json:"frontmatter"`   // top-level key -> where it sits
+	Body        int                 `json:"body"`          // the line the body starts on
+
+	// Extra holds any unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
 // Config is a "config" record: the report config, rpt.yaml, as in effect:
 // an absent severities, required_sections or sections key gives the
 // defaults. Plugin sections (x-<plugin>) are in Extra; other keys rpt
@@ -74,6 +101,10 @@ type Config struct {
 	Sections         map[string]string `json:"sections,omitzero"`          // fixed section key -> its heading
 	RequiredSections []string          `json:"required_sections,omitzero"` // section keys, or a custom section's heading
 	Rules            map[string]Level  `json:"rules,omitzero"`             // rule name -> the level its problems take
+	// Pages orders the pages: page IDs, and "findings" where the findings
+	// go. Pages it doesn't list come last, by ID.
+	Pages         []string `json:"pages,omitzero"`
+	RequiredPages []string `json:"required_pages,omitzero"` // pages that must exist with a body
 	// Rev is rpt.yaml's revision; pass it back as --if-rev.
 	Rev string `json:"rev,omitzero"`
 	// Lines is where each top-level key sits in rpt.yaml, set by rpt
@@ -173,6 +204,7 @@ type Report struct {
 	Summary       map[Severity]int `json:"summary"` // finding count per level
 	Scope         []ScopeRow       `json:"scope"`
 	Findings      []ReportFinding  `json:"findings"` // in severity order, then by ID
+	Pages         []ReportPage     `json:"pages"`    // in report order; report.order says where the findings go
 
 	// Extra holds any unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
@@ -191,6 +223,10 @@ type ReportMeta struct {
 	// requires, as rpt config get gives them. A finding's sections are keyed
 	// by Key; Heading is what a reader sees.
 	Sections []ReportSection `json:"sections"`
+
+	// Order is the report's parts in reading order: each page's ID, and
+	// "findings" where the findings go.
+	Order []string `json:"order"`
 
 	// Extra holds unknown members of the record. rpt never copies unknown
 	// config keys here.
@@ -219,6 +255,18 @@ type ReportFinding struct {
 	Assets   []string          `json:"assets"`   // absolute paths
 
 	// Extra holds the finding's unknown members.
+	Extra map[string]jsontext.Value `json:",embed"`
+}
+
+// ReportPage is a page inside a Report, its evidence paths and body links
+// made absolute like a finding's.
+type ReportPage struct {
+	ID     string   `json:"id"`
+	Title  string   `json:"title"`
+	Body   string   `json:"body"`
+	Assets []string `json:"assets"` // absolute paths
+
+	// Extra holds the page's unknown members.
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 

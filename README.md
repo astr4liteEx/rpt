@@ -105,6 +105,11 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt finding set <id> <path> <value>...` | Changes one value, given as YAML. The path is a frontmatter key, `sections.<key>` (the text from stdin when no value is given, adding the section if it's missing) or `x-<plugin>.<key>`. Several values make a list: `targets S-12 '{scope: S-20, port: 443}'`. Setting `id` renames the finding, and its file when the name starts with the old ID. Only the lines that change are rewritten. |
 | `rpt finding unset <id> <path>...` | Removes frontmatter keys, sections and plugin keys. A finding's `id`, `title` and `severity` can't be removed. |
 | `rpt finding remove <id>...` | Removes findings, after asking on a terminal; elsewhere pass `--yes`. Their evidence files stay. |
+| `rpt page get [id...]` | Prints the report's pages of prose, such as an executive summary. `--lines` adds where each page's parts sit in its file. |
+| `rpt page add` | Writes each page record on stdin as a new page file, or one empty page from `--title` (and `--id`). |
+| `rpt page set <id> <path> <value>...` | Changes a page's `title`, `evidence`, `body` (from stdin when no value is given) or another key. Setting `id` rewrites `pages` and `required_pages` in `rpt.yaml` too. |
+| `rpt page unset <id> <path>...` | Removes keys from a page; `body` empties it. |
+| `rpt page remove <id>...` | Removes pages, after asking on a terminal; elsewhere pass `--yes`. A page `rpt.yaml` lists is refused unless you pass `--force` (leave the entry) or `--cleanup` (drop it). |
 | `rpt scope get [id...]` | Prints scope rows, or only those with the IDs given. `--lines` adds the line of `scope.csv` each row starts on. |
 | `rpt scope add` | Appends each scope record on stdin to `scope.csv`, or one row from `--host` (and `--port`, `--protocol`, `--id`, `--col name=value`). A row without an ID gets the next free `S-NNN`, counting the IDs findings cite as well as the rows. |
 | `rpt scope set <id> <column> <value>` | Changes one cell of a row. Setting `id` renames the row and every finding target citing it. A change that leaves a citing target unfit (a new port, say) is refused unless you pass `--force` (leave it) or `--cleanup` (drop it). |

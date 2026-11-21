@@ -306,6 +306,12 @@ func checkReservedKeys(rel string, doc *yaml.Node) error {
 // extraFields converts the frontmatter keys rpt doesn't declare into JSON
 // values, so they pass through in Finding.Extra.
 func extraFields(doc *yaml.Node) (map[string]jsontext.Value, error) {
+	return extraFieldsBut(doc, frontmatterKeys)
+}
+
+// extraFieldsBut returns doc's top-level keys other than known, each as
+// JSON.
+func extraFieldsBut(doc *yaml.Node, known []string) (map[string]jsontext.Value, error) {
 	if len(doc.Content) == 0 || doc.Content[0].Kind != yaml.MappingNode {
 		return nil, nil
 	}
@@ -313,7 +319,7 @@ func extraFields(doc *yaml.Node) (map[string]jsontext.Value, error) {
 	m := doc.Content[0].Content
 	for i := 0; i+1 < len(m); i += 2 {
 		key := m[i].Value
-		if slices.Contains(frontmatterKeys, key) {
+		if slices.Contains(known, key) {
 			continue
 		}
 		var v any

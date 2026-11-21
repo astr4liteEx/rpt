@@ -1,16 +1,18 @@
 # The rpt report format
 
-A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. `rpt new <dir>` starts one: it writes `rpt.yaml` with the defaults spelled out, a `scope.csv` holding only its header row, and an empty `findings/`. It refuses a folder that isn't empty or that lies inside another report. [`testdata/fixture`](../testdata/fixture) is a filled-in example.
+A report is a plain folder. rpt reads and checks it; nothing else is stored anywhere. `rpt new <dir>` starts one: it writes `rpt.yaml` with the defaults spelled out, a `scope.csv` holding only its header row, and empty `findings/` and `pages/`. It refuses a folder that isn't empty or that lies inside another report. [`testdata/fixture`](../testdata/fixture) is a filled-in example.
 
 ```
 acme-external/
 ├── rpt.yaml              report config
 ├── scope.csv             in-scope hosts
-└── findings/
-    ├── F-001-reflected-xss-in-search.md
-    ├── F-003-sql-injection-in-login.md
-    └── evidence/
-        └── F-003-login.png
+├── findings/
+│   ├── F-001-reflected-xss-in-search.md
+│   ├── F-003-sql-injection-in-login.md
+│   └── evidence/
+│       └── F-003-login.png
+└── pages/                report-level prose
+    └── P-001-executive-summary.md
 ```
 
 rpt finds the report from `--report <dir>`, else `$RPT_REPORT_DIR`, else the nearest folder at or above the current one that holds `rpt.yaml`. `rpt ls --current` prints the report those rules pick, as one `location` record with its absolute path; it exits 1 when they find none, or when `--report` or `$RPT_REPORT_DIR` names a folder without `rpt.yaml`. `rpt ls [dir]` searches the other way: it lists every report at or under a folder, never looking inside a report for another (reports don't nest), and skipping hidden folders and symlinks.
@@ -37,6 +39,8 @@ x-spag:
 | `severities` | no | The allowed levels, most severe first. It is also the order findings are sorted in. Default: `critical, high, medium, low, info`. Any names work, e.g. `[urgent, normal]`. |
 | `required_sections` | no | Sections every finding must have, non-empty. Default: `description, remediation, poc`. `[]` requires none. A fixed section is listed by its key or its heading; a custom one by its exact text. |
 | `sections` | no | Renames fixed sections: maps `description`, `remediation` or `poc` to the heading this report uses for it. Unnamed ones keep their default heading. Records and renderers still see the fixed key, whatever the heading. |
+| `pages` | no | The order of the pages, with `findings` where the findings go: `[P-001, findings, P-002]`. Pages it doesn't list come last, by ID; without `findings`, the findings come after the listed pages. |
+| `required_pages` | no | Page IDs that must exist with a non-empty body. |
 | `rules` | no | Gives `rpt validate` rules (and plugin rules) another level: `error` or `warning`. A rule not listed keeps its own. |
 | `x-<plugin>` | no | A plugin's settings, kept and edited by `rpt config`, never read by rpt and never copied into the assembled report. |
 
@@ -114,6 +118,21 @@ The file name is free. `rpt finding add` names new files `F-NNN-<title-slug>.md`
 
 Evidence files can sit anywhere inside the report, but `findings/evidence/` is where `rpt evidence add` puts them. It names each copy `<id>-<slug>.<ext>`: the slug is the source file's name without its extension, lowercased, with each run of other characters than `a`–`z` and `0`–`9` turned into one `-`, at most 40 characters, or `evidence` if nothing is left; the extension is lowercased. A name that's taken gets `-2`, `-3` and so on. A file in `findings/evidence/` that no finding lists or links to is an orphan: `rpt validate` warns about it, and `rpt evidence prune` removes it. Hidden files there, such as `.gitkeep`, are left alone.
 
+## Pages
+
+Report-level prose, such as an executive summary or methodology, is a page: one markdown file in `pages/`.
+
+```markdown
+---
+id: P-001
+title: Executive summary
+---
+
+We tested Acme's external perimeter from 2 to 6 November.
+```
+
+A page has an `id` (`P-` and at least three digits), a `title`, an optional `evidence` list like a finding's, and a free body: `##` headings in it are the page's own, not sections. Other frontmatter keys are kept. `rpt page add` names new files `P-NNN-<title-slug>.md` and takes the next free ID, counting the IDs `pages` and `required_pages` name, so an entry left by `rpt page remove --force` is never taken by a new page. Changing a page's ID with `rpt page set <id> id <new>` rewrites `pages` and `required_pages` and renames a file named for the old ID.
+
 ## `rpt validate` rules
 
 `rpt validate` prints one problem per broken rule, with the file and line, and exits 1 if any is an error. The levels below are the defaults; `rules` in `rpt.yaml` changes them. The rule names are stable, so scripts and CI can filter on them.
@@ -128,7 +147,11 @@ Evidence files can sit anywhere inside the report, but `findings/evidence/` is w
 | `targets` | error | Every finding has at least one target; each names a scope row, and fits it: a host only inside a range row, and the row's port and protocol if it has them. |
 | `requiredSections` | error | Every finding has each required section, and it isn't empty. |
 | `evidence` | error | Every evidence file and linked file stays inside the report, exists, and is a regular file. |
-| `config` | error | `format` is 2; `severities` and `required_sections` have no empty or repeated names, and `severities` isn't empty; `sections` renames only fixed sections, to non-empty headings, no two alike; `rules` gives only `error` or `warning`. |
+| `config` | error | `format` is 2; `severities` and `required_sections`, `pages` and `required_pages` have no empty or repeated names, and `severities` isn't empty; `sections` renames only fixed sections, to non-empty headings, no two alike; `rules` gives only `error` or `warning`. |
+| `pageID` | error | Every page has an `id` of the form `P-NNN`, and no two share one. |
+| `pageTitle` | error | Every page has a title. |
+| `pageOrder` | error | Every entry in `pages` is `findings` or a page that exists. |
+| `requiredPages` | error | Every page in `required_pages` exists, and its body isn't empty. |
 | `scope` | error | `scope.csv` exists, has `id` and `host` columns, and every row has a unique id and a host. |
 | `textBeforeHeading` | warning | Text before a finding's first `##` heading, which no section holds. |
 | `configUnknownKey` | warning | A key in `rpt.yaml` that rpt doesn't define, other than an `x-<plugin>` section. |

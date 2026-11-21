@@ -73,6 +73,21 @@ func (r *Report) Assemble() (sdk.Report, []sdk.Problem, error) {
 	slices.SortStableFunc(findings, func(x, y sdk.ReportFinding) int {
 		return cmp.Or(cmp.Compare(rank(x.Severity), rank(y.Severity)), compareIDs(x.ID, y.ID))
 	})
+
+	pages, err := r.Pages()
+	for _, e := range unjoin(err) {
+		if e != nil {
+			a.warnError(RuleReadable, e)
+		}
+	}
+	pages = slices.DeleteFunc(pages, func(p sdk.Page) bool { return !ValidPageID(p.ID) }) // validate reports them
+	order := PageOrder(cfg.Pages, pages)
+	reportPages := []sdk.ReportPage{}
+	for _, id := range order {
+		if i := slices.IndexFunc(pages, func(p sdk.Page) bool { return p.ID == id }); i >= 0 {
+			reportPages = append(reportPages, a.page(pages[i]))
+		}
+	}
 	slices.SortStableFunc(a.warnings, func(x, y sdk.Problem) int {
 		return cmp.Or(cmp.Compare(x.Path, y.Path), cmp.Compare(x.Line, y.Line), cmp.Compare(x.Rule, y.Rule), cmp.Compare(x.Message, y.Message))
 	})
@@ -83,10 +98,12 @@ func (r *Report) Assemble() (sdk.Report, []sdk.Problem, error) {
 		Report: sdk.ReportMeta{
 			Severities: cfg.Severities,
 			Sections:   reportSections(cfg),
+			Order:      order,
 		},
 		Summary:  summary,
 		Scope:    nonNilRows(rows),
 		Findings: findings,
+		Pages:    reportPages,
 	}, a.warnings, nil
 }
 
@@ -171,6 +188,37 @@ func (a *assembly) finding(ff findingSrc, byID map[string]sdk.ScopeRow) sdk.Repo
 		rf.Sections[key] = text
 	}
 	return rf
+}
+
+// page turns one page into its report form: evidence and body links made
+// absolute and listed as assets.
+func (a *assembly) page(p sdk.Page) sdk.ReportPage {
+	rp := sdk.ReportPage{ID: p.ID, Title: p.Title, Body: p.Body, Assets: []string{}, Extra: p.Extra}
+	f := sdk.Finding{Path: p.Path}
+	addAsset := func(rel string) string {
+		abs := filepath.Join(a.r.abs, filepath.FromSlash(rel))
+		if !slices.Contains(rp.Assets, abs) {
+			rp.Assets = append(rp.Assets, abs)
+		}
+		return abs
+	}
+	for _, e := range p.Evidence {
+		rel, msg := a.r.checkEvidence(f, e)
+		if msg != "" {
+			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
+			continue
+		}
+		addAsset(rel)
+	}
+	for _, l := range relLinks([]byte(p.Body)) {
+		rel, msg := a.r.checkEvidence(f, l.path)
+		if msg != "" {
+			a.warn(p.Path, 0, RuleEvidence, "%s; left out", msg)
+			continue
+		}
+		rp.Body = rewriteLink(rp.Body, l.dest, linkTarget(addAsset(rel)))
+	}
+	return rp
 }
 
 // rewriteLink points every inline link and reference definition with the

@@ -26,7 +26,7 @@ const ConfigID = "config"
 
 // configKeys are the top-level keys rpt.yaml may hold besides x-<plugin>
 // sections.
-var configKeys = []string{"format", "severities", "required_sections", "sections", "rules"}
+var configKeys = []string{"format", "severities", "required_sections", "sections", "rules", "pages", "required_pages"}
 
 // isPluginKey reports whether a config key or frontmatter key is a
 // plugin's: x-<plugin>.
@@ -50,6 +50,8 @@ func (r *Report) ConfigRecord(withLines bool) (sdk.Config, error) {
 		Sections:         maps.Clone(map[string]string(cfg.Headings)),
 		RequiredSections: cfg.RequiredSections,
 		Rules:            cfg.Rules,
+		Pages:            cfg.Pages,
+		RequiredPages:    cfg.RequiredPages,
 		Rev:              Rev(src),
 	}
 	var doc yaml.Node
@@ -294,7 +296,7 @@ func (tx *Tx) configRecord() (sdk.Config, error) {
 // configValue makes the YAML value values give config path p, checking
 // its form.
 func configValue(p string, values []string) (*yaml.Node, error) {
-	list := p == "severities" || p == "required_sections"
+	list := slices.Contains([]string{"severities", "required_sections", "pages", "required_pages"}, p)
 	var val *yaml.Node
 	var err error
 	if len(values) == 1 && (!list || strings.HasPrefix(strings.TrimSpace(values[0]), "[")) {
@@ -308,7 +310,9 @@ func configValue(p string, values []string) (*yaml.Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	scalar := func(n *yaml.Node) bool { return n.Kind == yaml.ScalarNode && n.Tag != "!!null" && strings.TrimSpace(n.Value) != "" }
+	scalar := func(n *yaml.Node) bool {
+		return n.Kind == yaml.ScalarNode && n.Tag != "!!null" && strings.TrimSpace(n.Value) != ""
+	}
 	switch {
 	case p == "format":
 		if _, err := strconv.Atoi(val.Value); val.Kind != yaml.ScalarNode || err != nil {

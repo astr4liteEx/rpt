@@ -24,12 +24,14 @@ func Rev(b []byte) string {
 
 // Commit order: referring files before the things they refer to, so that
 // running a half-done write again finishes it. New files that others will
-// refer to (evidence copies) go first.
+// refer to (evidence copies) go first. rpt.yaml refers to pages, so a page
+// file goes after it.
 const (
 	rankAsset   = iota // evidence files
 	rankFinding        // finding files
 	rankScope          // scope.csv
 	rankConfig         // rpt.yaml
+	rankPage           // page files
 )
 
 // RevError refuses a write because a thing changed since the caller read

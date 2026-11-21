@@ -100,6 +100,10 @@ type Config struct {
 	// so problems can point at it.
 	KeyLines map[string]int
 
+	// Pages orders the pages, with FindingsSlot where the findings go;
+	// RequiredPages must exist with a body.
+	Pages, RequiredPages []string
+
 	// Rules maps a rule name to the level its problems take instead of
 	// the rule's own.
 	Rules map[string]sdk.Level
@@ -121,6 +125,8 @@ func (r *Report) Config() (Config, error) {
 		RequiredSections []string             `yaml:"required_sections"`
 		Sections         map[string]string    `yaml:"sections"`
 		Rules            map[string]sdk.Level `yaml:"rules"`
+		Pages            []string             `yaml:"pages"`
+		RequiredPages    []string             `yaml:"required_pages"`
 	}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(normaliseNewlines(src), &doc); err != nil {
@@ -135,6 +141,8 @@ func (r *Report) Config() (Config, error) {
 		RequiredSections: raw.RequiredSections,
 		Sections:         raw.Sections,
 		Rules:            raw.Rules,
+		Pages:            raw.Pages,
+		RequiredPages:    raw.RequiredPages,
 		Headings:         newHeadings(raw.Sections),
 		KeyLines:         keyLines(&doc),
 	}

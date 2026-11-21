@@ -14,7 +14,7 @@ func TestHelpListsCommands(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nconfig\nevidence\nfinding\nhelp\nls\nnew\nscope\nvalidate\nversion\n"
+	want := "assemble\nconfig\nevidence\nfinding\nhelp\nls\nnew\npage\nscope\nvalidate\nversion\n"
 	if names != want {
 		t.Errorf("commands listed\n got: %q\nwant: %q", names, want)
 	}
@@ -158,6 +158,12 @@ func TestUsageMatchesTable(t *testing.T) {
 		"help":           {{"--no-such-flag"}},
 		"ls":             {{"a", "b"}, {"--no-such-flag"}},
 		"new":            {{}, {"a", "b"}, {"--no-such-flag"}},
+		"page":           {{}, {"extra"}, {"--no-such-flag"}},
+		"page get":       {{"--no-such-flag"}},
+		"page add":       {{"extra"}, {"--id", "P-001"}, {"--no-such-flag"}},
+		"page set":       {{}, {"P-001", "title"}, {"--no-such-flag"}},
+		"page unset":     {{}, {"P-001"}, {"--no-such-flag"}},
+		"page remove":    {{}, {"P-001", "--yes", "--force", "--cleanup"}, {"--no-such-flag"}},
 		"scope":          {{}, {"extra"}, {"--no-such-flag"}},
 		"scope match":    {{"extra"}, {"--no-such-flag"}},
 		"scope add":      {{"extra"}, {"--port", "1"}, {"--no-such-flag"}},

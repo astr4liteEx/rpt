@@ -159,10 +159,11 @@ func (tx *Tx) rename(id, to string) (sdk.Finding, error) {
 	return f, nil
 }
 
-// CanonicalID writes a finding ID the way it is stored: f-001 is F-001.
+// CanonicalID writes a finding or page ID the way it is stored: f-001 is
+// F-001, p-001 is P-001.
 func CanonicalID(id string) string {
-	if len(id) > 2 && (id[:2] == "f-") {
-		return "F-" + id[2:]
+	if len(id) > 2 && (id[:2] == "f-" || id[:2] == "p-") {
+		return strings.ToUpper(id[:1]) + id[1:]
 	}
 	return id
 }

@@ -11,6 +11,8 @@
     "sections": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Each fixed section's key (description, remediation, poc) and the heading this report gives it."},
     "required_sections": {"type": "array", "items": {"type": "string"}, "description": "The sections every finding must have and fill in: a fixed section's key, or a custom section's heading."},
     "rules": {"type": "object", "additionalProperties": {"enum": ["error", "warning"]}, "description": "Rule name to the level its problems take, overriding the rule's own; absent rules keep theirs."},
+    "pages": {"type": "array", "items": {"type": "string"}, "description": "The order of the pages: page IDs, and findings where the findings go. Pages it doesn't list come last, by ID."},
+    "required_pages": {"type": "array", "items": {"type": "string"}, "description": "Page IDs that must exist with a non-empty body."},
     "rev": {"type": "string", "description": "rpt.yaml's revision. Opaque: compare it, never compute it. Pass it back as --if-rev so a write is refused if the config changed since this read."},
     "lines": {
       "type": "object",

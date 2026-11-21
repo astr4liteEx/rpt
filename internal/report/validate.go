@@ -31,6 +31,10 @@ const (
 	RuleConfig            = "config"
 	RuleConfigUnknownKey  = "configUnknownKey" // warning
 	RuleScope             = "scope"
+	RulePageID            = "pageID"
+	RulePageTitle         = "pageTitle"
+	RuleRequiredPages     = "requiredPages"
+	RulePageOrder         = "pageOrder"
 )
 
 // Validate checks the report against every rule and returns the problems
@@ -60,6 +64,7 @@ func (r *Report) Validate() ([]sdk.Problem, error) {
 		v.evidence(ff)
 		v.textBeforeHeading(ff)
 	}
+	v.checkPages()
 	// Orphans are only knowable when every finding's references are.
 	if !slices.ContainsFunc(files, func(ff findingSrc) bool { return ff.err != nil }) {
 		v.evidenceUnlinked()
@@ -132,6 +137,8 @@ func (v *validation) checkConfig() {
 	}
 	checkList("severities", cfg.Severities, bad)
 	checkList("required_sections", cfg.RequiredSections, bad)
+	checkList("pages", cfg.Pages, bad)
+	checkList("required_pages", cfg.RequiredPages, bad)
 	checkSections(cfg, bad)
 	for _, rule := range slices.Sorted(maps.Keys(cfg.Rules)) {
 		if lv := cfg.Rules[rule]; lv != sdk.Error && lv != sdk.Warning {
@@ -384,4 +391,70 @@ func (r *Report) findingFiles() ([]findingSrc, error) {
 		out = append(out, findingSrc{rel: rel, f: f, keyLines: lines, body: body, first: bodyFirstLine(head)})
 	}
 	return out, nil
+}
+
+// checkPages runs the page rules: each page file reads, has a well-formed
+// unique ID and a title, and its evidence is in the report; the config's
+// pages list names pages that exist; each required page exists with a
+// body.
+func (v *validation) checkPages() {
+	pages, err := v.r.PagesWithLines()
+	for _, e := range unjoin(err) {
+		if e != nil {
+			v.fileError(RuleReadable, e)
+		}
+	}
+	ids := map[string]string{}
+	byID := map[string]sdk.Page{}
+	for _, p := range pages {
+		line := func(k string) int { return p.Lines.Frontmatter[k].Line }
+		switch {
+		case p.ID == "":
+			v.add(p.Path, 1, RulePageID, sdk.Error, "page has no id")
+		case !ValidPageID(p.ID):
+			v.add(p.Path, line("id"), RulePageID, sdk.Error, "id %q is not P- and at least three digits", p.ID)
+		case ids[p.ID] != "":
+			v.add(p.Path, line("id"), RulePageID, sdk.Error, "%s is already the id of %s", p.ID, ids[p.ID])
+		default:
+			ids[p.ID] = p.Path
+			byID[p.ID] = p
+		}
+		if strings.TrimSpace(p.Title) == "" {
+			v.add(p.Path, max(line("title"), 1), RulePageTitle, sdk.Error, "page has no title")
+		}
+		f := sdk.Finding{Path: p.Path}
+		for _, e := range p.Evidence {
+			if _, msg := v.r.checkEvidence(f, e); msg != "" {
+				v.add(p.Path, line("evidence"), RuleEvidence, sdk.Error, "%s", msg)
+			}
+		}
+		body := []byte(p.Body)
+		for _, l := range relLinks(body) {
+			if _, msg := v.r.checkEvidence(f, l.path); msg != "" {
+				v.add(p.Path, p.Lines.Body+bytes.Count(body[:l.off], []byte("\n")), RuleEvidence, sdk.Error, "%s", msg)
+			}
+		}
+	}
+	if !v.cfgOK || (err != nil && len(pages) == 0) {
+		return
+	}
+	seen := map[string]bool{}
+	for _, e := range v.cfg.Pages {
+		switch {
+		case seen[e]:
+			// the config rule reports repeats
+		case e != FindingsSlot && byID[e].ID == "":
+			v.add(ConfigFile, v.cfg.KeyLines["pages"], RulePageOrder, sdk.Error, "pages lists %s, which is no page; add it, or drop it from the list", e)
+		}
+		seen[e] = true
+	}
+	for _, id := range v.cfg.RequiredPages {
+		p, ok := byID[id]
+		switch {
+		case !ok:
+			v.add(ConfigFile, v.cfg.KeyLines["required_pages"], RuleRequiredPages, sdk.Error, "required page %s is missing; add it with rpt page add --id %s --title ...", id, id)
+		case strings.TrimSpace(p.Body) == "":
+			v.add(p.Path, p.Lines.Body, RuleRequiredPages, sdk.Error, "required page %s is empty", id)
+		}
+	}
 }

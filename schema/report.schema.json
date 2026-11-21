@@ -10,18 +10,32 @@
     "report": {"$ref": "#/$defs/reportMeta"},
     "summary": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}, "description": "Finding count per severity level."},
     "scope": {"type": "array", "items": {"$ref": "scope.schema.json"}},
-    "findings": {"type": "array", "items": {"$ref": "#/$defs/reportFinding"}, "description": "Sorted by the config's severity order, then by ID."}
+    "findings": {"type": "array", "items": {"$ref": "#/$defs/reportFinding"}, "description": "Sorted by the config's severity order, then by ID."},
+    "pages": {"type": "array", "items": {"$ref": "#/$defs/reportPage"}, "description": "The pages in report order; report.order says where the findings go among them."}
   },
-  "required": ["kind", "schema_version", "report", "summary", "scope", "findings"],
+  "required": ["kind", "schema_version", "report", "summary", "scope", "findings", "pages"],
   "additionalProperties": true,
   "$defs": {
+    "reportPage": {
+      "type": "object",
+      "description": "A page of report-level prose, its evidence and body links made absolute.",
+      "properties": {
+        "id": {"type": "string"},
+        "title": {"type": "string"},
+        "body": {"type": "string", "description": "Markdown; ## headings in it are the page's own."},
+        "assets": {"type": "array", "items": {"type": "string"}, "description": "Absolute paths of the page's evidence and linked files."}
+      },
+      "required": ["id", "title", "body", "assets"],
+      "additionalProperties": true
+    },
     "reportMeta": {
       "type": "object",
       "properties": {
         "severities": {"type": "array", "items": {"type": "string"}, "description": "The report's severity levels, most severe first."},
-        "sections": {"type": "array", "items": {"$ref": "#/$defs/reportSection"}, "description": "The report's sections in the order rpt writes them: the fixed ones with this report's headings, then the custom ones it requires, as rpt sections gives them."}
+        "sections": {"type": "array", "items": {"$ref": "#/$defs/reportSection"}, "description": "The report's sections in the order rpt writes them: the fixed ones with this report's headings, then the custom ones it requires, as rpt config get gives them."},
+        "order": {"type": "array", "items": {"type": "string"}, "description": "The report's parts in reading order: each page's ID, and findings where the findings go."}
       },
-      "required": ["severities", "sections"],
+      "required": ["severities", "sections", "order"],
       "additionalProperties": true
     },
     "reportSection": {
