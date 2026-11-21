@@ -11,15 +11,15 @@ Decide what the plugin is, since that decides which protocol sections bind it:
 - **Sink**: consumes records (a renderer reading `$RPT_BIN assemble`). Checks `schema_version`. Records key sections by fixed key (`remediation`), not heading; a renderer printing headings takes this report's from the report record's `report.sections`, so it needs only stdin, after a redaction filter too.
 - **Checker**: emits `problem` records under its own rule names, located with `$RPT_BIN findings --json --lines`, which also gives each finding file's absolute path (`lines.file`) for loading the whole file.
 
-Done when the plugin has a verb name that is not an rpt built-in (`rpt verbs --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
+Done when the plugin has a verb name that is not an rpt built-in (`rpt help --json | jq -r 'select(.source=="builtin").name'` lists them) and a one-line summary.
 
 ## 2. Write `--describe`
 
-Print the description object and exit 0, before any other work. Declare `input` and `output` (`records`, or a data type like `xml/nessus`; see the protocol's `--describe` section), reusing names other plugins already use for the same data (`rpt verbs --json | jq -r '.input, .output'`). Declare `roles` too, so tools find the plugin by what it is: `checker` or `filter` if step 1 placed it there, and `writer` if it changes the report; declare only roles whose promise (the same section) it keeps every run. Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
+Print the description object and exit 0, before any other work. Declare `input` and `output` (`records`, or a data type like `xml/nessus`; see the protocol's `--describe` section), reusing names other plugins already use for the same data (`rpt help --json | jq -r '.input, .output'`). Declare `roles` too, so tools find the plugin by what it is: `checker` or `filter` if step 1 placed it there, and `writer` if it changes the report; declare only roles whose promise (the same section) it keeps every run. Done when `rpt-<verb> --describe | jq -e .summary` prints the summary and exits 0.
 
 ## 3. Write the work
 
-Read and write records as the protocol's Records section says; reach the report only through `$RPT_BIN` (falling back to `rpt`). Done when every record kind the plugin reads or writes has been checked against its schema, member by member.
+Read and write records as the protocol's Records section says; reach the report only through `$RPT_BIN` (falling back to `rpt`). Done when every record kind the plugin reads or writes has been checked against its schema, member by member. If the plugin has settings, read them as the protocol's Settings section says: the user's `config.yaml`, then its own section of the report's `.rpt-plugins.yaml`, then flags.
 
 ## 4. Prove it
 
@@ -31,7 +31,7 @@ Run every check; the plugin is done when all pass:
 - [ ] An unknown member on a record the plugin changes survives (filters).
 - [ ] The plugin works with no `RPT_*` variable set.
 - [ ] Findings it writes go into a scratch copy of a report with `rpt findings add`, and `rpt validate` on that copy reports no new errors (sources).
-- [ ] With the plugin on `PATH`, `rpt verbs` lists it with `source` `plugin`, its summary, IO and roles, not shadowed, and `rpt <verb>` runs it.
+- [ ] With the plugin on `PATH`, `rpt help` lists it with `source` `plugin`, its summary, IO and roles, not shadowed, and `rpt <verb>` runs it.
 - [ ] It reads the report only through rpt: no parsing of finding files, `rpt.yaml` or `scope.csv` (stock and community plugins). Loading a whole finding file read-only at the path rpt gives, to lint or scan it, is allowed. If it can't do its job without that, stop and file a feature request for rpt instead (the protocol's "Ask, don't re-derive").
 
 ## Go plugins

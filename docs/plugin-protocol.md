@@ -7,10 +7,10 @@ Supported systems: Linux.
 ## Finding and running a plugin
 
 - **Name:** an executable regular file named `rpt-<verb>` in a `PATH` folder. `<verb>` is lowercase letters, digits and hyphens.
-- **Lookup:** `rpt <verb>` runs the built-in verb if there is one (`rpt verbs` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
+- **Lookup:** `rpt <verb>` runs the built-in command if there is one (`rpt help` lists them); built-ins always win. Otherwise it runs the first `rpt-<verb>` in `PATH` order, skipping empty and relative `PATH` entries.
 - **Arguments:** passed byte for byte, without the verb: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
 - **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
-- **Listing:** `rpt verbs` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `verb` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <verb>` never runs it.
+- **Listing:** `rpt help` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `command` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <verb>` never runs it. `rpt --help` also lists every plugin that isn't shadowed, under "Plugin commands".
 
 ## Environment
 
@@ -30,15 +30,15 @@ Given the single argument `--describe`, print one JSON object on one line and ex
 {"summary":"Parse nuclei JSON Lines into finding records","usage":"rpt parse-nuclei < results.jsonl","version":"0.3.1","input":"jsonl/nuclei","output":"records"}
 ```
 
-`summary` is required; the shape is `$defs/description` in [`schema/verb.schema.json`](../schema/verb.schema.json). A plugin that is slower, fails or prints anything else is still listed by `rpt verbs`, with a warning and no summary. Every built-in answers `--describe` the same way.
+`summary` is required; the shape is `$defs/description` in [`schema/command.schema.json`](../schema/command.schema.json). A plugin that is slower, fails or prints anything else is still listed by `rpt help`, with a warning and no summary. Every built-in answers `--describe` the same way.
 
-`input` and `output` name the data the plugin takes and gives, so a person sees what it does at a glance and another plugin can find, say, the parser for Nessus XML in `rpt verbs --json`:
+`input` and `output` name the data the plugin takes and gives, so a person sees what it does at a glance and another plugin can find, say, the parser for Nessus XML in `rpt help --json`:
 
 - `records`: an rpt JSON Lines stream (see Records).
 - Anything else: `<format>` or `<format>/<tool>`, lowercase, e.g. `xml/nessus`, `jsonl/nuclei`, `pdf`. The format alone is the plain answer; the tool tells two files of one format apart. There is no registry: reuse a name another plugin already uses for the same data.
 - Leave a side out when there is nothing to say; absent means "not said", not "none".
 
-`roles` names what the plugin is, which `input` and `output` can't say: a checker and an importer both give `records`. A tool on top of rpt reads it from `rpt verbs --json`, say to run every checker from one key. It is an array, since a plugin can hold several roles, and each role is a promise:
+`roles` names what the plugin is, which `input` and `output` can't say: a checker and an importer both give `records`. A tool on top of rpt reads it from `rpt help --json`, say to run every checker from one key. It is an array, since a plugin can hold several roles, and each role is a promise:
 
 - `checker`: emits `problem` records about the report; exits 1 only when one is an error; never changes the report. `rpt validate` is one.
 - `filter`: reads records on stdin and writes records on stdout, such as redaction or `rpt scope match`.
@@ -51,7 +51,7 @@ Declare only roles whose promise the plugin keeps every run. Absent means "not s
 {"summary":"Lint finding files with rumdl","usage":"rpt lint [file...]","output":"records","roles":["checker"]}
 ```
 
-rpt never checks or acts on `input`, `output` or `roles`. `rpt verbs` carries every member of the answer into the plugin's `verb` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
+rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries every member of the answer into the plugin's `command` record, unknown ones too, except `kind`, `name`, `source`, `path` and `shadowed`, which are rpt's.
 
 ## Records
 
@@ -94,3 +94,12 @@ A plugin is one stage of a shell pipeline, so its failures reach the other stage
 - **Ask, don't re-derive.** rpt is the only parser of report files. A stock plugin (shipped in rpt-plugins) or a community plugin never parses finding files, `rpt.yaml` or `scope.csv` itself. Loading a finding file whole and read-only, at the path rpt gives (for example to lint it or scan it for secrets, or to hand it unchanged to a tool that does), is not parsing it; working out its frontmatter or sections yourself is, so take those from `findings --json --lines`. When it needs something rpt doesn't give and every plugin would want it, that is a feature request for rpt, not code in the plugin. A local plugin, one you keep for yourself, may do whatever works for you.
 - A plugin reading `report` records checks that `schema_version` is one it knows. `$RPT_BIN version --json` tells it, before reading, which record schema and report format that rpt uses.
 - A report holds no engagement details: no client, title or dates. A renderer takes them from its own input (flags, environment, its own file), as in `rpt assemble | rpt-render-pdf --client Acme --period 2026-11-02..2026-11-06 --out report.pdf`. The report record does carry the report's section headings, `report.sections`, so a renderer needs nothing but stdin.
+
+## Settings
+
+A plugin's settings never go in `rpt.yaml`: rpt warns about keys it doesn't define (`configUnknownKey`) and never passes them on. Plugins share one convention instead, so a report and a user configure every plugin the same way:
+
+- **Per report:** `.rpt-plugins.yaml` at the report root. Find the root with `$RPT_BIN ls --current --json`. The file holds `format: 1` and one top-level section per verb (`lint:`, `spag:`, and so on). A plugin reads only its own section and ignores the rest, so plugins never clash. An unknown key in its own section is a stderr warning, not a failure. The file is optional; a missing file or section means defaults.
+- **Per user:** `$XDG_CONFIG_HOME/rpt/plugins/<verb>/config.yaml` (default `~/.config/rpt/plugins/<verb>/config.yaml`), holding the same keys as the report section. Files the plugin needs beside it, such as word lists, live in the same folder.
+- **Precedence:** the plugin's built-in defaults, then the user file, then the report file, then flags. A later layer replaces a single value and adds to a list.
+- rpt itself never reads either file. Like any other dot-file in the report, `.rpt-plugins.yaml` is not part of the report format, and reading it is not parsing a report file.
