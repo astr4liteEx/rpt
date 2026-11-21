@@ -211,8 +211,8 @@ func (a *assembly) page(p sdk.Page) sdk.ReportPage {
 // compareIDs orders finding IDs by number, so F-999 comes before F-1000;
 // malformed IDs sort after well-formed ones, by text.
 func compareIDs(a, b string) int {
-	na, errA := strconv.Atoi(strings.TrimPrefix(a, "F-"))
-	nb, errB := strconv.Atoi(strings.TrimPrefix(b, "F-"))
+	na, errA := strconv.Atoi(strings.TrimPrefix(strings.TrimPrefix(a, "F-"), "P-"))
+	nb, errB := strconv.Atoi(strings.TrimPrefix(strings.TrimPrefix(b, "F-"), "P-"))
 	switch {
 	case errA == nil && errB == nil:
 		return cmp.Or(cmp.Compare(na, nb), cmp.Compare(a, b))

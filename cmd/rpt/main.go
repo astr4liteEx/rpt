@@ -32,6 +32,9 @@ type env struct {
 	stdout, stderr io.Writer
 	log            *slog.Logger
 	command        string // the command running, as problems name it: "scope match"
+	// probe, when set, makes the verb's flag parsing hand over its flags
+	// and stop, so completion learns them without running the verb.
+	probe **pflag.FlagSet
 }
 
 // A verb runs one built-in and returns its exit code. Only main calls
@@ -61,7 +64,8 @@ var builtins map[string]builtin
 
 func init() {
 	builtins = map[string]builtin{
-		"assemble": {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
+		"assemble":   {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
+		"completion": {completionVerb, sdk.Command{Summary: "Print the shell completion script for bash, zsh, fish or powershell", Usage: "rpt completion bash|zsh|fish|powershell"}, nil},
 		"config": {nounVerb("config"), sdk.Command{Summary: "Get, set and unset the report config, plugin settings included", Usage: "rpt config <action>", Output: "records"}, []sub{
 			{"get", configGetVerb, "rpt config get [--lines] [path], or rpt config get --merged x-<plugin>"},
 			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>..."},
@@ -245,8 +249,15 @@ func newRoot(e *env, code *int, g globals, plugins bool) *cobra.Command {
 		b := builtins[name]
 		c := adapt(e, code, g, name, b.run, b.desc)
 		c.GroupID = "builtin"
+		if len(b.subs) == 0 {
+			c.ValidArgsFunction = completer(e, name, b.run)
+		} else {
+			c.ValidArgsFunction = nounCompleter(b.subs)
+		}
 		for _, s := range b.subs {
-			c.AddCommand(adapt(e, code, g, name+" "+s.name, s.run, sdk.Command{Summary: s.usage}))
+			sc := adapt(e, code, g, name+" "+s.name, s.run, sdk.Command{Summary: s.usage})
+			sc.ValidArgsFunction = completer(e, name+" "+s.name, s.run)
+			c.AddCommand(sc)
 		}
 		if name == "help" {
 			root.SetHelpCommand(c)
@@ -261,7 +272,8 @@ func newRoot(e *env, code *int, g globals, plugins bool) *cobra.Command {
 			}
 			root.AddCommand(&cobra.Command{
 				Use: p.Name, Short: "the plugin " + p.Path, GroupID: "plugin", DisableFlagParsing: true,
-				Run: func(_ *cobra.Command, args []string) { *code = dispatch(e, p.Name, args, g) },
+				ValidArgsFunction: pluginCompleter(p.Path),
+				Run:               func(_ *cobra.Command, args []string) { *code = dispatch(e, p.Name, args, g) },
 			})
 		}
 	}
@@ -331,6 +343,10 @@ type flagSet struct {
 }
 
 func (f *flagSet) Parse(args []string) error {
+	if f.e.probe != nil {
+		*f.e.probe = f.FlagSet
+		return errProbed
+	}
 	err := f.FlagSet.Parse(args)
 	if err != nil && !errors.Is(err, pflag.ErrHelp) { // pflag printed the usage for --help
 		fmt.Fprintf(f.e.stderr, "rpt: %v\n", err)
@@ -338,6 +354,9 @@ func (f *flagSet) Parse(args []string) error {
 	}
 	return err
 }
+
+// errProbed stops a verb run only to learn its flags.
+var errProbed = errors.New("flags probed")
 
 // outputFlags are the global flags as one built-in parsed them.
 type outputFlags struct {

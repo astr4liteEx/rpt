@@ -62,6 +62,17 @@ scripts/install.sh
 > [!IMPORTANT]
 > rpt supports Linux only.
 
+**Shell completion:** Tab completes commands, actions, flags, IDs with their titles or hosts, severity levels, config keys and evidence references, read fresh from the report each time; a plugin completes its own arguments. Load the script for your shell:
+
+```sh
+source <(rpt completion bash)                                  # in ~/.bashrc
+rpt completion zsh > "${fpath[1]}/_rpt"                        # zsh
+rpt completion fish > ~/.config/fish/completions/rpt.fish      # fish
+rpt completion powershell | Out-String | Invoke-Expression     # PowerShell profile
+```
+
+In nushell, run `generate completions rpt`: nushell's own command builds a completer that calls rpt.
+
 ## Quick start
 
 `rpt new` creates an empty report. Add scope rows with `rpt scope add`, pipe finding records into `rpt finding add`, and `rpt validate` checks the result:
@@ -127,6 +138,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt validate [id...]` | Checks the report, or only the findings, pages and scope rows named, and prints the problems. Exits 1 on any error. A problem in a finding, page or `rpt.yaml` carries the file's `rev`. |
 | `rpt validate -` | Checks the records on stdin as if they were written, together, so a finding may cite a scope row from the same stream: an existing ID is a replacement, no ID is new, and a `config` record is the new `rpt.yaml`. A clean stream passes through unchanged; otherwise only problems come out (at path `-` and the record's line) and it exits 1, so `rpt validate - < new.jsonl \| rpt finding add` adds nothing when the input is broken. |
 | `rpt assemble` | Prints the whole report as one JSON record for renderers. |
+| `rpt completion <shell>` | Prints the completion script for `bash`, `zsh`, `fish` or `powershell`. |
 | `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed; one whose `requires` this rpt doesn't fit is hidden, and `--all` lists it marked incompatible. With a command, prints its usage, as `rpt <command> --help` does. |
 | `rpt version` | Prints the rpt version, the record schema version and the report format version. |
 

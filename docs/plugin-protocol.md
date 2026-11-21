@@ -22,6 +22,15 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 | `RPT_REPORT_DIR` | Absolute path of the report folder, found from `$RPT_REPORT_DIR` or the nearest folder holding `rpt.yaml`. Unset when there is no report, and when the plugin runs on its own: to open a finding file, use `lines.file` from `$RPT_BIN findings --json --lines` | The plugin's own `--report` flag, or none |
 | `RPT_SCHEMA_VERSION` | Version of the record schemas this rpt writes, now `2` | `schema_version` in the records read |
 
+## `--help` and `__complete`
+
+Like `--describe`, these do no work, need no report and read no stdin:
+
+- `--help` (or `-h`) alone: print the usage and what the plugin does, as text, and exit 0. `rpt help <plugin>` and `rpt <plugin> --help` show it.
+- `__complete <args...> <word>`: shell completion, in cobra's format. Print one candidate per line, `value` or `value<TAB>description`, starting with `<word>` (ignore case), then a last line `:<directive>`: `:4` for "only these", `:0` to let the shell add file names, `:16` for directories only. Exit 0. rpt calls it with stdin from `/dev/null` and the 2-second `--describe` timeout; if the plugin fails, times out or prints anything else, the shell completes file names.
+
+The Go `sdk.Run` answers both; give `sdk.Plugin` a `Complete` function for candidates.
+
 ## `--describe`
 
 Given the single argument `--describe`, print one JSON object on one line and exit 0, within 2 seconds, with no other effect:

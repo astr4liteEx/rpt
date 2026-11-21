@@ -14,7 +14,7 @@ func TestHelpListsCommands(t *testing.T) {
 		t.Fatalf("exit %d, stderr %q", code, errOut)
 	}
 	names := pick(t, out, "name")
-	want := "assemble\nconfig\nevidence\nfinding\nhelp\nls\nnew\npage\nscope\nvalidate\nversion\n"
+	want := "assemble\ncompletion\nconfig\nevidence\nfinding\nhelp\nls\nnew\npage\nscope\nvalidate\nversion\n"
 	if names != want {
 		t.Errorf("commands listed\n got: %q\nwant: %q", names, want)
 	}
@@ -175,6 +175,7 @@ func TestUsageMatchesTable(t *testing.T) {
 		"scope set":       {{}, {"S-12", "port"}, {"S-12", "port", "1", "--force", "--cleanup"}, {"--no-such-flag"}},
 		"scope unset":     {{}, {"S-12"}, {"--no-such-flag"}},
 		"scope remove":    {{}, {"S-12", "--yes", "--force", "--cleanup"}, {"--no-such-flag"}},
+		"completion":      {{}, {"tcsh"}, {"bash", "zsh"}, {"--no-such-flag"}},
 		"validate":        {{"-", "F-001"}, {"--no-such-flag"}},
 		"version":         {{"extra"}, {"--no-such-flag"}},
 	}
