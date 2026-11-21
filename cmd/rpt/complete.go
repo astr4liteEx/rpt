@@ -163,7 +163,7 @@ func (c *completion) filter(cands []string) []string {
 
 func (c *completion) flagValue() ([]string, cobra.ShellCompDirective) {
 	switch c.flag {
-	case "report":
+	case "report", "like":
 		return nil, dirs
 	case "severity":
 		return c.filter(c.levels()), noFiles

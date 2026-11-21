@@ -92,7 +92,7 @@ func init() {
 		}},
 		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
-		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
+		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new [--like report [--with-pages]] [--json] <dir>"}, nil},
 		"page": {nounVerb("page"), sdk.Command{Summary: "Get, add, set, unset and remove pages of report-level prose", Usage: "rpt page <action>", Input: "records", Output: "records"}, []sub{
 			{"get", pageGetVerb, "rpt page get [--lines] [--assets] [id...]", "Print pages, or those with the IDs given"},
 			{"add", pageAddVerb, "rpt page add [--dry-run] < records.jsonl, or rpt page add --title t [--id P-NNN] [--dry-run]", "Add pages from records on stdin or from flags"},
