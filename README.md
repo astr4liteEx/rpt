@@ -142,7 +142,12 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed; one whose `requires` this rpt doesn't fit is hidden, and `--all` lists it marked incompatible. With a command, prints its usage, as `rpt <command> --help` does. |
 | `rpt version` | Prints the rpt version, the record schema version and the report format version. |
 
-**Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`.
+**Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`. In a terminal:
+
+- A list is a bordered table in your terminal's own colours, with severities coloured and a findings table followed by a count per severity.
+- `finding get` and `page get` with IDs show each one for reading: ID, title, severity, scope and path between rules, then the markdown as written, with headings coloured and prose wrapped at 80 columns. It copies cleanly. `--table` gives the table instead.
+- Problems on stderr are compiler-style: `error[rule] message`, `--> path:line`, the source line with a caret under the column when known, then the totals.
+- `NO_COLOR` or `TERM=dumb` drops the colour and keeps the layout. Piped output is never styled.
 
 **Flags.** Flags are GNU-style (`--json`, not `-json`) and may come before, among or after the arguments. `--report` and `--json` work on every command, before or after its name. A value that starts with `-` goes after `--`.
 

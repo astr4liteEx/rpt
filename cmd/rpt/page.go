@@ -23,6 +23,7 @@ func pageGetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "page get")
 	withLines := flags.Bool("lines", false, "add each page's lines: its file's absolute path, where its frontmatter keys sit and the line its body starts on")
 	withAssets := flags.Bool("assets", false, "add each page's assets: every file it lists or links, with its absolute path, to carry it to another report with rpt page add")
+	asTable := flags.Bool("table", false, "on a terminal, show the pages named as a table rather than for reading")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -64,6 +65,16 @@ func pageGetVerb(e *env, args []string) int {
 			}
 			list[i].Assets = assets
 		}
+	}
+	if out.Table() && len(ids) > 0 && !*asTable {
+		v := cli.NewReadingView(e.stdout)
+		for _, p := range list {
+			if err := v.Record(p.ID, p.Title, cli.Dim(p.Path), p.Body); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		list = nil
 	}
 	for _, p := range list {
 		if err := out.Write(p); err != nil {

@@ -8,8 +8,11 @@ import (
 	"encoding/json/v2"
 	"fmt"
 	"io"
+	"slices"
 	"strings"
-	"text/tabwriter"
+
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
 )
 
 // Column is one column of a terminal table: its header and the record's
@@ -20,6 +23,8 @@ type Column struct {
 	// Value, when set, computes the cell from the record's JSON object
 	// instead of reading Field.
 	Value func(map[string]any) string
+	// Severity colours the cell as the severity level it names.
+	Severity bool
 }
 
 type mode int
@@ -34,8 +39,11 @@ type Output struct {
 	w       io.Writer
 	mode    mode
 	columns []Column
-	tw      *tabwriter.Writer
-	rows    int // table rows written; the header goes out with the first
+	rows    [][]string       // a table's rows, rendered by Flush
+	recs    []map[string]any // the records behind them, for Totals
+	// Totals, when set, gives a line under a table, such as a count per
+	// severity, from its records.
+	Totals func([]map[string]any) string
 }
 
 // NewOutput picks the output mode once: JSON Lines when jsonFlag is set or
@@ -47,7 +55,6 @@ func NewOutput(w io.Writer, terminal, jsonFlag bool, columns []Column) (*Output,
 		o.mode = modeJSONLines
 	default:
 		o.mode, o.columns = modeTable, columns
-		o.tw = tabwriter.NewWriter(w, 0, 8, 2, ' ', 0)
 	}
 	return o, nil
 }
@@ -89,30 +96,54 @@ func (o *Output) WriteOwn(rec any, raw []byte) error {
 	return o.Write(rec)
 }
 
-// Flush writes anything buffered, such as a table.
 // Table reports whether o prints a table rather than JSON Lines.
 func (o *Output) Table() bool { return o.mode == modeTable }
 
+// Flush writes anything buffered: a table, with rounded grey borders, as
+// wide as the terminal allows, and its totals line. A table with no rows
+// prints nothing.
 func (o *Output) Flush() error {
-	if o.tw != nil {
-		return o.tw.Flush()
+	if o.mode != modeTable || len(o.rows) == 0 {
+		return nil
 	}
-	return nil
+	headers := make([]string, len(o.columns))
+	for i, c := range o.columns {
+		headers[i] = c.Header
+	}
+	rows := o.rows
+	t := table.New().
+		Border(lipgloss.RoundedBorder()).
+		BorderStyle(lipgloss.NewStyle().Foreground(grey)).
+		Headers(headers...).
+		Rows(rows...).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			s := lipgloss.NewStyle().Padding(0, 1)
+			switch {
+			case row == table.HeaderRow:
+				return s.Bold(true)
+			case o.columns[col].Severity:
+				if c, ok := severityColors[rows[row][col]]; ok {
+					return s.Foreground(c)
+				}
+			}
+			return s
+		})
+	if w := Width(o.w); w > 0 && lipgloss.Width(t.Render()) > w {
+		t = t.Width(w)
+	}
+	out := t.Render() + "\n"
+	if o.Totals != nil {
+		if line := o.Totals(o.recs); line != "" {
+			out += line + "\n"
+		}
+	}
+	_, err := io.WriteString(Styled(o.w), out)
+	o.rows, o.recs = nil, nil
+	return err
 }
 
-// writeRow adds one table row; lists are joined with commas. The header
-// comes before the first row, so a table with no rows prints nothing.
+// writeRow adds one table row; lists are joined with commas.
 func (o *Output) writeRow(rec any) error {
-	if o.rows == 0 {
-		headers := make([]string, len(o.columns))
-		for i, c := range o.columns {
-			headers[i] = c.Header
-		}
-		if _, err := fmt.Fprintln(o.tw, strings.Join(headers, "\t")); err != nil {
-			return err
-		}
-	}
-	o.rows++
 	m, err := jsonMap(rec)
 	if err != nil {
 		return err
@@ -125,8 +156,37 @@ func (o *Output) writeRow(rec any) error {
 			cells[i] = cell(m[c.Field])
 		}
 	}
-	_, err = fmt.Fprintln(o.tw, strings.Join(cells, "\t"))
-	return err
+	o.rows = append(o.rows, cells)
+	o.recs = append(o.recs, m)
+	return nil
+}
+
+// SeverityTotals is a findings table's totals line: how many, then each
+// level in its colour with its count, in the order given, then any level
+// not given.
+func SeverityTotals(order []string) func([]map[string]any) string {
+	return func(recs []map[string]any) string {
+		count := map[string]int{}
+		var extra []string
+		for _, m := range recs {
+			s, _ := m["severity"].(string)
+			if count[s] == 0 && !slices.Contains(order, s) && !slices.Contains(extra, s) {
+				extra = append(extra, s)
+			}
+			count[s]++
+		}
+		noun := "findings"
+		if len(recs) == 1 {
+			noun = "finding"
+		}
+		parts := []string{dim.Render(fmt.Sprintf("%d %s", len(recs), noun))}
+		for _, s := range append(slices.Clone(order), extra...) {
+			if count[s] > 0 {
+				parts = append(parts, Severity(s)+dim.Render(fmt.Sprintf(" %d", count[s])))
+			}
+		}
+		return strings.Join(parts, dim.Render(" · "))
+	}
 }
 
 // cell renders one JSON value for a table. Tabs and newlines would break

@@ -3,6 +3,10 @@ package cli
 import (
 	"bytes"
 	"fmt"
+	"github.com/charmbracelet/x/ansi"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,9 +58,12 @@ func TestOutputModes(t *testing.T) {
 		{name: "pipe gets JSON Lines", want: jsonl},
 		{name: "--json forces JSON Lines on a terminal", terminal: true, json: true, want: jsonl},
 		{name: "terminal gets a table, lists joined with commas", terminal: true, want: "" +
-			"ID     SEVERITY  TITLE                   SCOPE\n" +
-			"F-003  high      SQL injection in login  S-12,S-14\n" +
-			"F-001  medium    Reflected XSS           S-14\n"},
+			"╭───────┬──────────┬────────────────────────┬───────────╮\n" +
+			"│ ID    │ SEVERITY │ TITLE                  │ SCOPE     │\n" +
+			"├───────┼──────────┼────────────────────────┼───────────┤\n" +
+			"│ F-003 │ high     │ SQL injection in login │ S-12,S-14 │\n" +
+			"│ F-001 │ medium   │ Reflected XSS          │ S-14      │\n" +
+			"╰───────┴──────────┴────────────────────────┴───────────╯\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -83,7 +90,7 @@ func TestOutputComputedColumn(t *testing.T) {
 	if err := out.Flush(); err != nil {
 		t.Fatal(err)
 	}
-	if want := "ID     WHERE\nF-001  [S-14] !\n"; buf.String() != want {
+	if want := "╭───────┬──────────╮\n│ ID    │ WHERE    │\n├───────┼──────────┤\n│ F-001 │ [S-14] ! │\n╰───────┴──────────╯\n"; buf.String() != want {
 		t.Errorf("table\n got: %q\nwant: %q", buf.String(), want)
 	}
 }
@@ -129,8 +136,11 @@ func TestOutputWriteOwn(t *testing.T) {
 	}{
 		{name: "JSON Lines keeps the original bytes", want: string(raw) + "\n"},
 		{name: "a table shows the decoded record", terminal: true, want: "" +
-			"ID     SEVERITY  TITLE                   SCOPE\n" +
-			"F-003  high      SQL injection in login  S-12,S-14\n"},
+			"╭───────┬──────────┬────────────────────────┬───────────╮\n" +
+			"│ ID    │ SEVERITY │ TITLE                  │ SCOPE     │\n" +
+			"├───────┼──────────┼────────────────────────┼───────────┤\n" +
+			"│ F-003 │ high     │ SQL injection in login │ S-12,S-14 │\n" +
+			"╰───────┴──────────┴────────────────────────┴───────────╯\n"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -163,5 +173,58 @@ func TestEmptyTableIsSilent(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Errorf("a table with no rows printed %q; want nothing, not a bare header", buf.String())
+	}
+}
+
+func TestSeverityTotals(t *testing.T) {
+	recs := []map[string]any{{"severity": "high"}, {"severity": "low"}, {"severity": "high"}, {"severity": "odd"}}
+	if got := ansi.Strip(SeverityTotals([]string{"critical", "high", "low"})(recs)); got != "4 findings · high 2 · low 1 · odd 1" {
+		t.Errorf("got %q", got)
+	}
+}
+
+func TestMarkdownCopiesClean(t *testing.T) {
+	md := "## Description\n\n" + strings.Repeat("word ", 30) + "\n\n```\n" + strings.Repeat("x", 100) + "\n```\n"
+	got := Markdown(md)
+	for _, l := range strings.Split(got, "\n") {
+		if strings.HasSuffix(l, " ") {
+			t.Errorf("trailing space: %q", l)
+		}
+		if len(l) > ReadingWidth && !strings.HasPrefix(l, "x") {
+			t.Errorf("prose not wrapped: %q", l)
+		}
+	}
+	if !strings.Contains(got, strings.Repeat("x", 100)) {
+		t.Error("code was wrapped")
+	}
+}
+
+func TestReadingViewSharesRules(t *testing.T) {
+	var buf bytes.Buffer
+	v := NewReadingView(&buf)
+	_ = v.Record("F-001", "One", Facts("high", "S-1"), "Body one.")
+	_ = v.Record("F-002", "Two", "", "")
+	rule := strings.Repeat("─", ReadingWidth)
+	want := rule + "\nF-001  One\nhigh  ·  S-1\n" + rule + "\n\nBody one.\n\n" + rule + "\nF-002  Two\n" + rule + "\n" + rule + "\n"
+	if buf.String() != want {
+		t.Errorf("got\n%s\nwant\n%s", buf.String(), want)
+	}
+}
+
+func TestDiagnostics(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "f.md"), []byte("---\ntitle: [broken\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	d := NewDiagnostics(&buf)
+	d.Root = dir
+	d.Print(Diagnostic{Path: "f.md", Rule: "readable", Message: "bad yaml", Error: true, Line: 2, Column: 8, End: 14})
+	d.Print(Diagnostic{Path: "g.md", Message: "missing section"})
+	d.Totals()
+	want := "error[readable] bad yaml\n  --> f.md:2:8\n   |\n 2 | title: [broken\n   |        ^^^^^^^\n\n" +
+		"warning missing section\n  --> g.md\n\n1 error, 1 warning\n"
+	if buf.String() != want {
+		t.Errorf("got\n%s\nwant\n%s", buf.String(), want)
 	}
 }

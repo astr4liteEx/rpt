@@ -31,20 +31,26 @@ func (e *env) problem(out *cli.Output, p sdk.Problem) error {
 	if p.Command == "" {
 		p.Command = e.command
 	}
-	logProblem(e.log, p)
+	e.logProblem(p)
 	if out == nil || out.Table() {
 		return nil
 	}
 	return out.Write(p)
 }
 
-// logProblem writes p as one text line on stderr.
-func logProblem(log *slog.Logger, p sdk.Problem) {
+// logProblem writes p on stderr: compiler-style on a terminal, else as
+// one text line.
+func (e *env) logProblem(p sdk.Problem) {
+	if e.diag != nil {
+		e.diag.Print(cli.Diagnostic{Path: p.Path, Rule: p.Rule, Message: p.Message, Error: p.Level == sdk.Error,
+			Line: p.Line, Column: p.Column, End: p.EndColumn})
+		return
+	}
 	level := slog.LevelError
 	if p.Level != sdk.Error {
 		level = slog.LevelWarn
 	}
-	log.Log(context.Background(), level, p.Message, "path", p.Path, "line", p.Line)
+	e.log.Log(context.Background(), level, p.Message, "path", p.Path, "line", p.Line)
 }
 
 // reportErrors reports each error from reading the report: a problem in a
@@ -100,7 +106,7 @@ func readInput(e *env, out *cli.Output) (recs []sdk.Rec, code int, ok bool) {
 		if out.Table() {
 			var p sdk.Problem
 			if json.Unmarshal(rec.Raw, &p) == nil {
-				logProblem(e.log, p)
+				e.logProblem(p)
 			}
 			continue
 		}

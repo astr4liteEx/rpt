@@ -2,6 +2,7 @@ package report
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/csv"
 	"io/fs"
 	"path"
@@ -92,4 +93,18 @@ func (r *Report) ScopeHeader() ([]string, error) {
 	}
 	defer f.Close()
 	return csv.NewReader(f).Read()
+}
+
+// Body is the markdown after the frontmatter of the finding or page file
+// at rel, as written.
+func (r *Report) Body(rel string) (string, error) {
+	src, err := r.readFile(rel)
+	if err != nil {
+		return "", err
+	}
+	_, body, err := splitFrontmatter(bytes.ReplaceAll(src, []byte("\r\n"), []byte("\n")))
+	if err != nil {
+		return "", &FileError{Path: rel, Err: err}
+	}
+	return string(body), nil
 }

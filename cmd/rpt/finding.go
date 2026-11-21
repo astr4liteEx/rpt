@@ -18,7 +18,7 @@ import (
 )
 
 var findingColumns = []cli.Column{
-	{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity"},
+	{Header: "ID", Field: "id"}, {Header: "SEVERITY", Field: "severity", Severity: true},
 	{Header: "TITLE", Field: "title"}, {Header: "SCOPE", Value: findingScope},
 }
 
@@ -34,6 +34,15 @@ func findingScope(m map[string]any) string {
 		}
 	}
 	return strings.Join(ids, ",")
+}
+
+// scopeMap gives findingScope a finding's targets as its record has them.
+func scopeMap(f sdk.Finding) map[string]any {
+	var targets []any
+	for _, t := range f.Targets {
+		targets = append(targets, map[string]any{"scope": t.Scope})
+	}
+	return map[string]any{"targets": targets}
 }
 
 // nounVerb is a noun given no action: it prints the noun's usage and exits
@@ -73,6 +82,7 @@ func findingGetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "finding get")
 	withLines := flags.Bool("lines", false, "add each finding's lines: its file's absolute path and where its frontmatter keys and sections sit in it")
 	withAssets := flags.Bool("assets", false, "add each finding's assets: every file it lists or links, with its absolute path, to carry it to another report with rpt finding add")
+	asTable := flags.Bool("table", false, "on a terminal, show the findings named as a table rather than for reading")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -115,6 +125,29 @@ func findingGetVerb(e *env, args []string) int {
 			}
 			list[i].Assets = assets
 		}
+	}
+	if cfg, err := r.Config(); err == nil {
+		var order []string
+		for _, l := range cfg.Severities {
+			order = append(order, string(l))
+		}
+		out.Totals = cli.SeverityTotals(order)
+	}
+	if out.Table() && len(ids) > 0 && !*asTable {
+		v := cli.NewReadingView(e.stdout)
+		for _, f := range list {
+			body, err := r.Body(f.Path)
+			if err != nil {
+				readErr = errors.Join(readErr, err)
+				continue
+			}
+			facts := cli.Facts(cli.Severity(string(f.Severity)), cli.Dim(findingScope(scopeMap(f))), cli.Dim(f.Path))
+			if err := v.Record(f.ID, f.Title, facts, body); err != nil {
+				e.log.Error(err.Error())
+				return cli.ExitProblems
+			}
+		}
+		list = nil
 	}
 	for _, f := range list {
 		if err := out.Write(f); err != nil {
@@ -415,18 +448,21 @@ func confirm(e *env, noun string, things, effects []string) bool {
 	if len(things) != 1 {
 		name += "s"
 	}
-	fmt.Fprintf(e.stderr, "Remove %d %s:\n", len(things), name)
+	lines := []string{cli.Bold(fmt.Sprintf("Remove %d %s:", len(things), name))}
 	for i, t := range things {
 		if i == most {
-			fmt.Fprintf(e.stderr, "  …and %d more\n", len(things)-most)
+			lines = append(lines, fmt.Sprintf("  …and %d more", len(things)-most))
 			break
 		}
-		fmt.Fprintf(e.stderr, "  %s\n", t)
+		lines = append(lines, "  "+t)
 	}
-	for _, eff := range effects {
-		fmt.Fprintf(e.stderr, "%s\n", eff)
+	if len(effects) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, effects...)
 	}
-	fmt.Fprint(e.stderr, "Remove? [y/N] ")
+	w := cli.Styled(e.stderr)
+	fmt.Fprintln(w, cli.Box(strings.Join(lines, "\n")))
+	fmt.Fprint(w, cli.Bold("Remove?")+" "+cli.Dim("[y/N]")+" ")
 	answer, _ := bufio.NewReader(e.stdin).ReadString('\n')
 	switch strings.ToLower(strings.TrimSpace(answer)) {
 	case "y", "yes":

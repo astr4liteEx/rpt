@@ -273,7 +273,7 @@ func validateStream(e *env, out *cli.Output, r *report.Report) int {
 	failed := len(incoming) > 0 || slices.ContainsFunc(problems, func(p sdk.Problem) bool { return p.Level == sdk.Error })
 	if !failed {
 		for _, p := range problems {
-			logProblem(e.log, p)
+			e.logProblem(p)
 		}
 		if _, err := e.stdout.Write(input); err != nil {
 			e.log.Error(err.Error())

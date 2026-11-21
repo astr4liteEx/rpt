@@ -35,6 +35,9 @@ type env struct {
 	// probe, when set, makes the verb's flag parsing hand over its flags
 	// and stop, so completion learns them without running the verb.
 	probe **pflag.FlagSet
+	// diag prints problems compiler-style when stderr is a terminal; nil
+	// otherwise, when they are text lines.
+	diag *cli.Diagnostics
 }
 
 // A verb runs one built-in and returns its exit code. Only main calls
@@ -53,9 +56,10 @@ type builtin struct {
 
 // A sub is a subcommand of a built-in: rpt <command> <name> [args].
 type sub struct {
-	name  string
-	run   verb
-	usage string
+	name    string
+	run     verb
+	usage   string
+	summary string
 }
 
 // builtins maps each built-in command's name to it. It is the command
@@ -67,42 +71,42 @@ func init() {
 		"assemble":   {assembleVerb, sdk.Command{Summary: "Print the whole report as one record for renderers", Usage: "rpt assemble [--report dir]", Output: "records"}, nil},
 		"completion": {completionVerb, sdk.Command{Summary: "Print the shell completion script for bash, zsh, fish or powershell", Usage: "rpt completion bash|zsh|fish|powershell"}, nil},
 		"config": {nounVerb("config"), sdk.Command{Summary: "Get, set and unset the report config, plugin settings included", Usage: "rpt config <action>", Output: "records"}, []sub{
-			{"get", configGetVerb, "rpt config get [--lines] [path], or rpt config get --merged x-<plugin>"},
-			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>..."},
-			{"unset", configUnsetVerb, "rpt config unset [--force] [--if-rev rev] [--dry-run] <path>..."},
+			{"get", configGetVerb, "rpt config get [--lines] [path], or rpt config get --merged x-<plugin>", "Print the config, or one value of it"},
+			{"set", configSetVerb, "rpt config set [--rename old=new]... [--force] [--if-rev rev] [--dry-run] <path> <value>...", "Change one value of the config"},
+			{"unset", configUnsetVerb, "rpt config unset [--force] [--if-rev rev] [--dry-run] <path>...", "Remove values from the config"},
 		}},
 		"evidence": {nounVerb("evidence"), sdk.Command{Summary: "Get, add, set, unset and remove the evidence findings and pages list and link; prune removes files nothing references", Usage: "rpt evidence <action>", Input: "records", Output: "records"}, []sub{
-			{"get", evidenceGetVerb, "rpt evidence get [owner...], or rpt evidence get --orphans"},
-			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--link section [--text caption]] [--if-rev rev] [--dry-run] <owner> <file>..., or rpt evidence add [--dry-run] < records.jsonl"},
-			{"set", evidenceSetVerb, "rpt evidence set [--if-rev rev] [--dry-run] <owner> <ref> caption|path <value>"},
-			{"unset", evidenceUnsetVerb, "rpt evidence unset [--if-rev rev] [--dry-run] <owner> <ref> caption"},
-			{"remove", evidenceRemoveVerb, "rpt evidence remove [--yes] [--drop-text] [--if-rev rev] [--dry-run] <owner> <ref>"},
-			{"prune", evidencePruneVerb, "rpt evidence prune [--yes] [--dry-run]"},
+			{"get", evidenceGetVerb, "rpt evidence get [owner...], or rpt evidence get --orphans", "Print the evidence findings and pages reference, or the files nothing references"},
+			{"add", evidenceAddVerb, "rpt evidence add [--as name] [--link section [--text caption]] [--if-rev rev] [--dry-run] <owner> <file>..., or rpt evidence add [--dry-run] < records.jsonl", "Copy files into the report and list or link them"},
+			{"set", evidenceSetVerb, "rpt evidence set [--if-rev rev] [--dry-run] <owner> <ref> caption|path <value>", "Change a reference's caption, or move its file"},
+			{"unset", evidenceUnsetVerb, "rpt evidence unset [--if-rev rev] [--dry-run] <owner> <ref> caption", "Empty a reference's caption"},
+			{"remove", evidenceRemoveVerb, "rpt evidence remove [--yes] [--drop-text] [--if-rev rev] [--dry-run] <owner> <ref>", "Remove a reference; the file stays for prune"},
+			{"prune", evidencePruneVerb, "rpt evidence prune [--yes] [--dry-run]", "Delete the evidence files nothing references"},
 		}},
 		"finding": {nounVerb("finding"), sdk.Command{Summary: "Get, add, set, unset and remove findings", Usage: "rpt finding <action>", Input: "records", Output: "records"}, []sub{
-			{"get", findingGetVerb, "rpt finding get [--lines] [--assets] [id...]"},
-			{"add", findingAddVerb, "rpt finding add [--scaffold] [--dry-run] < records.jsonl, or rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold] [--dry-run]"},
-			{"set", findingSetVerb, "rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>..."},
-			{"unset", findingUnsetVerb, "rpt finding unset [--if-rev rev] [--dry-run] <id> <path>..."},
-			{"remove", findingRemoveVerb, "rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>..."},
+			{"get", findingGetVerb, "rpt finding get [--lines] [--assets] [id...]", "Print findings, or those with the IDs given"},
+			{"add", findingAddVerb, "rpt finding add [--scaffold] [--dry-run] < records.jsonl, or rpt finding add --title t --severity s [--target S-N]... [--id F-NNN] [--no-scaffold] [--dry-run]", "Add findings from records on stdin or from flags"},
+			{"set", findingSetVerb, "rpt finding set [--if-rev rev] [--dry-run] <id> <path> <value>...", "Change one value of a finding"},
+			{"unset", findingUnsetVerb, "rpt finding unset [--if-rev rev] [--dry-run] <id> <path>...", "Remove values from a finding"},
+			{"remove", findingRemoveVerb, "rpt finding remove [--yes] [--if-rev id=rev]... [--dry-run] <id>...", "Remove findings"},
 		}},
 		"help": {helpVerb, sdk.Command{Summary: "List the commands rpt can run, built-in and plugin; with a command, show its usage", Usage: "rpt help [--all] [--json] [command [sub]]", Output: "records"}, nil},
 		"ls":   {lsVerb, sdk.Command{Summary: "List the reports at or under a folder, or with --current the one rpt acts on", Usage: "rpt ls [--json] [dir], or rpt ls --current [--json] [--report dir]", Output: "records"}, nil},
 		"new":  {newVerb, sdk.Command{Summary: "Create an empty report in a new or empty folder", Usage: "rpt new <dir>"}, nil},
 		"page": {nounVerb("page"), sdk.Command{Summary: "Get, add, set, unset and remove pages of report-level prose", Usage: "rpt page <action>", Input: "records", Output: "records"}, []sub{
-			{"get", pageGetVerb, "rpt page get [--lines] [--assets] [id...]"},
-			{"add", pageAddVerb, "rpt page add [--dry-run] < records.jsonl, or rpt page add --title t [--id P-NNN] [--dry-run]"},
-			{"set", pageSetVerb, "rpt page set [--if-rev rev] [--dry-run] <id> <path> <value>..."},
-			{"unset", pageUnsetVerb, "rpt page unset [--if-rev rev] [--dry-run] <id> <path>..."},
-			{"remove", pageRemoveVerb, "rpt page remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>..."},
+			{"get", pageGetVerb, "rpt page get [--lines] [--assets] [id...]", "Print pages, or those with the IDs given"},
+			{"add", pageAddVerb, "rpt page add [--dry-run] < records.jsonl, or rpt page add --title t [--id P-NNN] [--dry-run]", "Add pages from records on stdin or from flags"},
+			{"set", pageSetVerb, "rpt page set [--if-rev rev] [--dry-run] <id> <path> <value>...", "Change one value of a page"},
+			{"unset", pageUnsetVerb, "rpt page unset [--if-rev rev] [--dry-run] <id> <path>...", "Remove values from a page"},
+			{"remove", pageRemoveVerb, "rpt page remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>...", "Remove pages"},
 		}},
 		"scope": {nounVerb("scope"), sdk.Command{Summary: "Get, add, set, unset and remove scope rows; match attributes finding targets to them", Usage: "rpt scope <action>", Input: "records", Output: "records"}, []sub{
-			{"get", scopeGetVerb, "rpt scope get [--lines] [id...]"},
-			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]... [--dry-run]"},
-			{"set", scopeSetVerb, "rpt scope set [--force|--cleanup] [--if-rev rev] [--dry-run] <id> <column> <value>"},
-			{"unset", scopeUnsetVerb, "rpt scope unset [--if-rev rev] [--dry-run] <id> <column>..."},
-			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>..."},
-			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl"},
+			{"get", scopeGetVerb, "rpt scope get [--lines] [id...]", "Print scope rows, or those with the IDs given"},
+			{"add", scopeAddVerb, "rpt scope add [--dry-run] < records.jsonl, or rpt scope add --host h [--port n] [--protocol tcp|udp] [--id S-NNN] [--col name=value]... [--dry-run]", "Add scope rows from records on stdin or from flags"},
+			{"set", scopeSetVerb, "rpt scope set [--force|--cleanup] [--if-rev rev] [--dry-run] <id> <column> <value>", "Change one column of a scope row"},
+			{"unset", scopeUnsetVerb, "rpt scope unset [--if-rev rev] [--dry-run] <id> <column>...", "Empty columns of a scope row"},
+			{"remove", scopeRemoveVerb, "rpt scope remove [--yes] [--force|--cleanup] [--if-rev id=rev]... [--dry-run] <id>...", "Remove scope rows"},
+			{"match", scopeMatchVerb, "rpt scope match [--drop-out-of-scope] < records.jsonl", "Attribute the targets of findings on stdin to scope rows"},
 		}},
 		"validate": {validateVerb, sdk.Command{Summary: "Check the report, or the records on stdin, and print the problems", Usage: "rpt validate [--json] [--report dir] [id...], or rpt validate - < records.jsonl", Input: "records", Output: "records", Roles: []string{sdk.RoleChecker}}, nil},
 		"version":  {versionVerb, sdk.Command{Summary: "Print the rpt, record schema and report format versions", Usage: "rpt version [--json]", Output: "records"}, nil},
@@ -141,20 +145,20 @@ const (
 // the global flags before the name are rpt's.
 func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	e := &env{stdin: stdin, stdout: stdout, stderr: stderr, log: cli.NewLogger(stderr)}
+	if isTerminal(stderr) {
+		e.diag = cli.NewDiagnostics(stderr)
+		defer e.diag.Totals()
+	}
 	g, rest, err := splitGlobals(args)
 	if err != nil {
 		fmt.Fprintf(stderr, "rpt: %v\n", err)
 		return cli.ExitUsage
 	}
 	if len(rest) == 0 {
-		root := newRoot(e, nil, g, true)
 		if g.help {
-			root.SetOut(stdout)
-			root.Help()
-			return cli.ExitOK
+			return fangHelp(e, stdout, nil)
 		}
-		root.SetOut(stderr)
-		root.Help()
+		fangHelp(e, stderr, nil)
 		return cli.ExitUsage
 	}
 	if name := rest[0]; !isBuiltin(name) && !strings.HasPrefix(name, "__complete") {
@@ -301,12 +305,12 @@ func adapt(e *env, code *int, g globals, name string, v verb, desc sdk.Command) 
 	return &cobra.Command{
 		Use: f[len(f)-1], Short: desc.Summary, DisableFlagParsing: true,
 		Run: func(_ *cobra.Command, args []string) {
-			e := &env{stdin: e.stdin, stdout: e.stdout, stderr: e.stderr, log: e.log, command: name}
+			e := &env{stdin: e.stdin, stdout: e.stdout, stderr: e.stderr, log: e.log, diag: e.diag, command: name}
 			switch {
 			case len(args) == 1 && args[0] == "--describe" && len(f) == 1:
 				*code = describeBuiltin(e, builtins[name])
 			case wantsHelp(args):
-				*code = printHelp(e, v)
+				*code = fangHelp(e, e.stdout, f)
 			default:
 				*code = v(e, append(g.args(), args...))
 			}
@@ -325,14 +329,6 @@ func wantsHelp(args []string) bool {
 		}
 	}
 	return false
-}
-
-// printHelp prints a built-in's usage line and flags on stdout. The
-// built-in prints them itself: asked for --help, its flag parsing stops
-// before it does anything and prints the usage it would on a bad flag.
-func printHelp(e *env, v verb) int {
-	v(&env{stdin: strings.NewReader(""), stdout: io.Discard, stderr: e.stdout, log: e.log}, []string{"--help"})
-	return cli.ExitOK
 }
 
 // A flagSet is a built-in's flags. Parse reports a bad flag with the
@@ -407,6 +403,9 @@ func openReport(e *env, flagValue string) *report.Report {
 	if err != nil {
 		e.log.Error(err.Error())
 		return nil
+	}
+	if e.diag != nil {
+		e.diag.Root = dir
 	}
 	return r
 }
