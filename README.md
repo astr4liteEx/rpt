@@ -117,10 +117,12 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt severities` | Lists the report's severity levels, most severe first. |
 | `rpt validate` | Checks the report and prints its problems. Exits 1 on any error. |
 | `rpt assemble` | Prints the whole report as one JSON record for renderers. |
-| `rpt verbs` | Lists the built-in verbs, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed. |
+| `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed. With a command, prints its usage, as `rpt <command> --help` does. |
 | `rpt version` | Prints the rpt version, the record schema version and the report format version. |
 
 **Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`.
+
+**Flags.** Flags are GNU-style (`--json`, not `-json`) and may come before, among or after the arguments. `--report` and `--json` work on every command, before or after its name. A value that starts with `-` goes after `--`.
 
 **Picking the report.** rpt uses `--report <dir>` if you pass it, then `$RPT_REPORT_DIR`, then the nearest folder at or above the current one that holds `rpt.yaml`. To see which one that is, run `rpt ls --current`. To see which reports a folder holds, run `rpt ls`.
 
@@ -131,7 +133,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 ## Plugins
 
-When a verb isn't built in, `rpt <verb>` runs `rpt-<verb>` from your `PATH` and passes it the arguments unchanged. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
+When a command isn't built in, `rpt <command>` runs `rpt-<command>` from your `PATH` and passes it the arguments unchanged. A `--report` given before the plugin's name reaches it as `$RPT_REPORT_DIR`. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
 
 ![rpt verbs lists an importer after the built-ins; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt findings add](docs/demo/pipeline.gif)
 
@@ -181,7 +183,7 @@ func main() {
 }
 ```
 
-Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt verbs` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
+Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
 > A shell pipeline's exit status is that of its last command. Without `set -o pipefail`, a parser that fails partway through can still leave `rpt findings add` with a partial import. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt findings add < out.jsonl`.
@@ -195,7 +197,7 @@ rpt itself stays small: it defines the report format and checks it. Two companio
 | [**rpt-tui**](https://github.com/astr4liteEx/rpt-tui) | A text user interface for working on a report without memorising the commands. |
 | [**rpt-plugins**](https://github.com/astr4liteEx/rpt-plugins) | Stock plugins for common jobs, ready to put on your `PATH`. |
 
-Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PATH` they run through rpt: `rpt-tui` runs as `rpt tui`, and `rpt verbs` lists each of them.
+Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PATH` they run through rpt: `rpt-tui` runs as `rpt tui`, and `rpt help` lists each of them.
 
 > [!NOTE]
 > rpt-tui and rpt-plugins are not published yet. They will appear under the same GitHub account, and these links will work once they do.
@@ -207,7 +209,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | [`docs/report-format.md`](docs/report-format.md) | The report folder (`rpt.yaml`, `scope.csv`, finding files) and every `rpt validate` rule. |
 | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) | What a plugin must do: naming, `--describe`, records, output, exit codes and how it works with a report. |
 | [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which Go `sdk` functions to use. |
-| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `verb`, `location` and `version`. |
+| [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `scope`, `problem`, `report`, `plugin`, `severity`, `section`, `command`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
 
 ## Development

@@ -88,7 +88,7 @@ func TestAssembleErrors(t *testing.T) {
 		wantInErr string
 	}{
 		{"unreadable config: nothing to assemble", []string{"assemble", "--report", broken}, 1, "rpt: rpt.yaml:"},
-		{"--draft is gone: assemble never refuses", []string{"assemble", "--report", fixture, "--draft"}, 2, "flag provided but not defined: -draft"},
+		{"--draft is gone: assemble never refuses", []string{"assemble", "--report", fixture, "--draft"}, 2, "unknown flag: --draft"},
 		{"no arguments", []string{"assemble", "--report", fixture, "extra"}, 2, "usage: rpt assemble"},
 	}
 	for _, tt := range tests {

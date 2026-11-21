@@ -115,15 +115,38 @@ func TestDispatch(t *testing.T) {
 			t.Errorf("exit %d, stderr %q; want 126", code, errOut)
 		}
 	})
-	t.Run("no such verb or plugin is a usage error", func(t *testing.T) {
+	t.Run("--report before the plugin's name sets RPT_REPORT_DIR, and isn't passed on", func(t *testing.T) {
+		code, out, errOut := rptCmd(t, t.TempDir(), "--report", fixture, "stub", "--report", "mine")
+		var got stubOut
+		if err := json.Unmarshal([]byte(out), &got); code != 0 || err != nil {
+			t.Fatalf("exit %d, stdout %q, stderr %q", code, out, errOut)
+		}
+		if !slices.Equal(got.Args, []string{"--report", "mine"}) || got.Env["RPT_REPORT_DIR"] != fixture {
+			t.Errorf("stub saw %+v", got)
+		}
+	})
+	t.Run("rpt help <plugin> asks the plugin for --help", func(t *testing.T) {
+		code, out, errOut := rptCmd(t, fixture, "help", "stub")
+		if code != 0 || !strings.Contains(out, `"args":["--help"]`) {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+		}
+	})
+	t.Run("root help lists plugins in their own group, not the shadowed one", func(t *testing.T) {
+		code, out, errOut := rptCmd(t, fixture, "--help")
+		_, plugins, ok := strings.Cut(out, "Plugin commands:")
+		if code != 0 || !ok || !strings.Contains(plugins, "stub") || strings.Contains(plugins, "findings") {
+			t.Errorf("exit %d, stdout %q, stderr %q", code, out, errOut)
+		}
+	})
+	t.Run("no such command or plugin is a usage error", func(t *testing.T) {
 		code, _, errOut := rptCmd(t, fixture, "frobnicate")
-		if code != 2 || !strings.Contains(errOut, `unknown verb "frobnicate"`) {
+		if code != 2 || !strings.Contains(errOut, `unknown command "frobnicate"`) {
 			t.Errorf("exit %d, stderr %q; want 2", code, errOut)
 		}
 	})
 }
 
-func TestVerbsListsPlugins(t *testing.T) {
+func TestHelpListsPlugins(t *testing.T) {
 	b := bins(t)
 	t.Setenv("PATH", b)
 	old := describeTimeout
@@ -131,16 +154,16 @@ func TestVerbsListsPlugins(t *testing.T) {
 	t.Cleanup(func() { describeTimeout = old })
 
 	start := time.Now()
-	code, out, errOut := runIn(t, "", "verbs")
+	code, out, errOut := runIn(t, "", "help", "--json")
 	if took := time.Since(start); took > 2*time.Second {
-		t.Errorf("rpt verbs took %v: it waited on the hanging plugin", took)
+		t.Errorf("rpt help took %v: it waited on the hanging plugin", took)
 	}
 	if code != 0 {
 		t.Errorf("exit %d, want 0: the listing worked", code)
 	}
 	lines := strings.Split(strings.TrimSuffix(pick(t, out, "source", "name", "shadowed", "path", "summary", "input", "output", "roles", "homepage"), "\n"), "\n")
 	if len(lines) != len(builtins)+4 {
-		t.Fatalf("got %d verbs, want %d built-ins and 4 plugins:\n%s", len(lines), len(builtins), out)
+		t.Fatalf("got %d commands, want %d built-ins and 4 plugins:\n%s", len(lines), len(builtins), out)
 	}
 	for _, l := range lines[:len(builtins)] {
 		if !strings.HasPrefix(l, "builtin ") {

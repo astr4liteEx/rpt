@@ -12,13 +12,13 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-var verbColumns = []cli.Column{
+var commandColumns = []cli.Column{
 	{Header: "NAME", Field: "name"}, {Header: "SOURCE", Value: verbSource}, {Header: "IO", Value: verbIO},
 	{Header: "ROLES", Value: verbRoles},
 	{Header: "SUMMARY", Field: "summary"}, {Header: "PATH", Field: "path"},
 }
 
-// verbSource renders where a verb comes from, flagging a shadowed plugin.
+// verbSource renders where a command comes from, flagging a shadowed plugin.
 func verbSource(m map[string]any) string {
 	src, _ := m["source"].(string)
 	if shadowed, _ := m["shadowed"].(bool); shadowed {
@@ -27,7 +27,7 @@ func verbSource(m map[string]any) string {
 	return src
 }
 
-// verbIO renders a verb's input and output for the table. A built-in's
+// verbIO renders a command's input and output for the table. A built-in's
 // description is complete, so a missing side is "-", none; a plugin's is
 // whatever it said, so a missing side is "?", not said.
 func verbIO(m map[string]any) string {
@@ -42,7 +42,7 @@ func verbIO(m map[string]any) string {
 	return cmp.Or(in, "-") + " → " + cmp.Or(out, "-")
 }
 
-// verbRoles renders a verb's declared roles for the table, "checker,filter",
+// verbRoles renders a command's declared roles for the table, "checker,filter",
 // and nothing when it declared none.
 func verbRoles(m map[string]any) string {
 	roles, _ := m["roles"].([]any)
@@ -55,32 +55,38 @@ func verbRoles(m map[string]any) string {
 	return strings.Join(names, ",")
 }
 
-// isBuiltin reports whether name is a built-in verb.
+// isBuiltin reports whether name is a built-in command.
 func isBuiltin(name string) bool {
 	_, ok := builtins[name]
 	return ok
 }
 
-// verbsVerb lists everything rpt <name> can run: the built-ins by name,
+// helpVerb lists everything rpt <name> can run: the built-ins by name,
 // then the plugins on PATH by name, each described the way --describe
-// describes it.
-func verbsVerb(e *env, args []string) int {
-	flags, of := newFlags(e, "verbs")
+// describes it. Given a command (and sub), it shows that one's usage, as
+// rpt <command> [sub] --help does; a plugin is asked for its --help.
+func helpVerb(e *env, args []string) int {
+	flags, of := newFlags(e, "help")
+	flags.Bool("all", false, "list every command, hidden ones too")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
-	if flags.NArg() != 0 {
-		return badUsage(e, "verbs")
+	if flags.NArg() > 0 {
+		name := flags.Arg(0)
+		if !isBuiltin(name) {
+			return dispatch(e, name, []string{"--help"}, globals{})
+		}
+		return execute(e, globals{}, append(flags.Args(), "--help"))
 	}
-	out, err := of.output(e, verbColumns)
+	out, err := of.output(e, commandColumns)
 	if err != nil {
 		e.log.Error(err.Error())
 		return cli.ExitUsage
 	}
-	var list []sdk.Verb
+	var list []sdk.Command
 	for _, name := range slices.Sorted(maps.Keys(builtins)) {
 		d := builtins[name].desc
-		d.Kind, d.Name, d.Source = "verb", name, "builtin"
+		d.Kind, d.Name, d.Source = "command", name, "builtin"
 		list = append(list, d)
 	}
 	for _, v := range append(list, describePlugins(e)...) {

@@ -81,8 +81,8 @@ func TestRun(t *testing.T) {
 		wantOut   func(string) bool
 		wantInErr string
 	}{
-		{name: "no verb prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "usage: rpt <verb>"},
-		{name: "unknown verb exits 2", args: []string{"frobnicate"}, wantCode: 2, wantOut: exactly(""), wantInErr: `unknown verb "frobnicate"`},
+		{name: "no command prints usage and exits 2", wantCode: 2, wantOut: exactly(""), wantInErr: "usage: rpt <command>"},
+		{name: "unknown command exits 2", args: []string{"frobnicate"}, wantCode: 2, wantOut: exactly(""), wantInErr: `unknown command "frobnicate"`},
 		{
 			name:     "findings into a pipe is JSON Lines",
 			args:     []string{"findings", "--report", fixture},
@@ -104,12 +104,12 @@ func TestRun(t *testing.T) {
 		{
 			name:     "--format is gone: use jq",
 			args:     []string{"findings", "--report", fixture, "--format", "{{.id}}"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "flag provided but not defined: -format",
+			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --format",
 		},
 		{
 			name:     "an unknown flag is a usage error",
 			args:     []string{"findings", "--nope"},
-			wantCode: 2, wantOut: exactly(""), wantInErr: "flag provided but not defined: -nope",
+			wantCode: 2, wantOut: exactly(""), wantInErr: "unknown flag: --nope",
 		},
 		{
 			name:     "no report anywhere exits 1",

@@ -17,9 +17,7 @@ var version string
 // versionVerb prints which rpt this is: its version, the record schema
 // version it writes and the report format version it reads.
 func versionVerb(e *env, args []string) int {
-	flags := newFlagSet(e, "version")
-	flags.SetOutput(e.stderr)
-	jsonFlag := flags.Bool("json", false, "write JSON Lines even on a terminal")
+	flags, of := newFlags(e, "version")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
@@ -27,7 +25,7 @@ func versionVerb(e *env, args []string) int {
 		return badUsage(e, "version")
 	}
 	v := sdk.VersionInfo{Kind: "version", Version: versionString(), SchemaVersion: report.SchemaVersion, Format: report.FormatVersion}
-	if isTerminal(e.stdout) && !*jsonFlag {
+	if isTerminal(e.stdout) && !*of.json {
 		fmt.Fprintf(e.stdout, "rpt %s (format %d, schema %d)\n", v.Version, v.Format, v.SchemaVersion)
 		return cli.ExitOK
 	}

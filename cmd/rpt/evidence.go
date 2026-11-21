@@ -81,10 +81,10 @@ func evidencePruneVerb(e *env, args []string) int {
 func evidenceAddVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "evidence add")
 	as := flags.String("as", "", "the copy's file name, exactly (one file only); it must not exist")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) < 2 || *as != "" && len(pos) != 2 {
 		return badUsage(e, "evidence add")
 	}

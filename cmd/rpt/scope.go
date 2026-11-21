@@ -5,8 +5,8 @@ import (
 	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
-	"flag"
 	"fmt"
+	"github.com/spf13/pflag"
 	"slices"
 	"strings"
 
@@ -202,6 +202,8 @@ type colFlags map[string]string
 
 func (c colFlags) String() string { return "" }
 
+func (c colFlags) Type() string { return "name=value" }
+
 func (c colFlags) Set(v string) error {
 	k, val, ok := strings.Cut(v, "=")
 	if !ok || k == "" {
@@ -221,12 +223,12 @@ func scopeAddVerb(e *env, args []string) int {
 	id := flags.String("id", "", "the row's ID (with --host); default: the next free S-N")
 	cols := colFlags{}
 	flags.Var(cols, "col", "another column's value, name=value (with --host; repeatable)")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	fromFlags := false
-	flags.Visit(func(f *flag.Flag) { fromFlags = fromFlags || f.Name != "json" && f.Name != "report" })
+	flags.Visit(func(f *pflag.Flag) { fromFlags = fromFlags || f.Name != "json" && f.Name != "report" })
 	if len(pos) != 0 || fromFlags && *host == "" {
 		return badUsage(e, "scope add")
 	}
@@ -312,10 +314,10 @@ func scopeAddVerb(e *env, args []string) int {
 func scopeDeleteVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "scope delete")
 	force := flags.Bool("force", false, "delete rows even when findings cite them")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) == 0 {
 		return badUsage(e, "scope delete")
 	}

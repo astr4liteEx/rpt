@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"flag"
+	"github.com/spf13/pflag"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
 	"github.com/astr4liteEx/rpt/internal/report"
@@ -24,7 +24,7 @@ func lsVerb(e *env, args []string) int {
 		return cli.ExitUsage
 	}
 	reportSet := false
-	flags.Visit(func(f *flag.Flag) { reportSet = reportSet || f.Name == "report" })
+	flags.Visit(func(f *pflag.Flag) { reportSet = reportSet || f.Name == "report" })
 	if flags.NArg() > 1 || *current && flags.NArg() > 0 || reportSet && !*current {
 		return badUsage(e, "ls")
 	}

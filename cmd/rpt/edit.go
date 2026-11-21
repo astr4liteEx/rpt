@@ -3,8 +3,8 @@ package main
 import (
 	"encoding/json/v2"
 	"errors"
-	"flag"
 	"fmt"
+	"github.com/spf13/pflag"
 	"slices"
 
 	"github.com/astr4liteEx/rpt/internal/cli"
@@ -12,34 +12,13 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-// parseInterspersed parses flags wherever they appear among the arguments,
-// so `rpt findings set F-003 severity high --report dir` works, and returns the
-// positional arguments. "--" ends flag parsing.
-func parseInterspersed(flags *flag.FlagSet, args []string) ([]string, error) {
-	var pos []string
-	for {
-		if err := flags.Parse(args); err != nil {
-			return nil, err
-		}
-		rest := flags.Args()
-		if n := len(args) - len(rest); n > 0 && args[n-1] == "--" {
-			return append(pos, rest...), nil // everything after -- is positional
-		}
-		if len(rest) == 0 {
-			return pos, nil
-		}
-		pos = append(pos, rest[0])
-		args = rest[1:]
-	}
-}
-
 // setVerb changes one frontmatter value of one finding.
 func setVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings set")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) != 3 {
 		code := badUsage(e, "findings set")
 		fmt.Fprintln(e.stderr, `value is YAML: high, '[S-12, S-14]', "9.1"`)
@@ -74,10 +53,10 @@ func setVerb(e *env, args []string) int {
 // unsetVerb removes frontmatter keys from one finding.
 func unsetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings unset")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) < 2 {
 		return badUsage(e, "findings unset")
 	}
@@ -144,6 +123,8 @@ type targetFlags []sdk.Target
 
 func (t *targetFlags) String() string { return "" }
 
+func (t *targetFlags) Type() string { return "target" }
+
 func (t *targetFlags) Set(v string) error {
 	target, err := report.ParseTarget(v)
 	if err != nil {
@@ -166,12 +147,12 @@ func addVerb(e *env, args []string) int {
 	flags.Var(&targets, "target", "a target: a scope ID, or a map like '{scope: S-20, host: 10.0.1.5, port: 22}' (with --title; repeatable)")
 	id := flags.String("id", "", "the finding's ID (with --title); default: the next free one")
 	scaffold := flags.Bool("scaffold", false, "give stdin records an empty heading for each required section they lack")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	fromFlags := false
-	flags.Visit(func(f *flag.Flag) {
+	flags.Visit(func(f *pflag.Flag) {
 		fromFlags = fromFlags || slices.Contains([]string{"title", "severity", "target", "id"}, f.Name)
 	})
 	if len(pos) != 0 || fromFlags && (*title == "" || *severity == "") {
@@ -254,10 +235,10 @@ func addVerb(e *env, args []string) int {
 // was. An unknown ID is logged and the rest are still deleted (exit 1).
 func deleteVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "findings delete")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) == 0 {
 		return badUsage(e, "findings delete")
 	}

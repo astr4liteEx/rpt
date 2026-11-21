@@ -33,10 +33,10 @@ func TestSchemasMatchTypes(t *testing.T) {
 		{"version.schema.json", nil, reflect.TypeFor[VersionInfo]()},
 		{"severity.schema.json", nil, reflect.TypeFor[SeverityLevel]()},
 		{"section.schema.json", nil, reflect.TypeFor[Section]()},
-		{"verb.schema.json", nil, reflect.TypeFor[Verb]()},
+		{"command.schema.json", nil, reflect.TypeFor[Command]()},
 		{"location.schema.json", nil, reflect.TypeFor[Location]()},
 		{"evidence.schema.json", nil, reflect.TypeFor[Evidence]()},
-		{"verb.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
+		{"command.schema.json", []string{"$defs", "description"}, reflect.TypeFor[Description]()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.typ.Name(), func(t *testing.T) {

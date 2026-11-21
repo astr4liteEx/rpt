@@ -17,7 +17,7 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-// describeTimeout is how long rpt verbs waits for each --describe.
+// describeTimeout is how long rpt help waits for each --describe.
 var describeTimeout = 2 * time.Second
 
 // pluginIO renders a plugin's declared input and output for the table,
@@ -33,15 +33,15 @@ func pluginIO(m map[string]any) string {
 }
 
 // describePlugins finds the plugins on PATH and asks each to --describe
-// itself in parallel, carrying every member of its answer into its verb
+// itself in parallel, carrying every member of its answer into its command
 // record except the ones rpt owns. A plugin that doesn't answer in time,
 // fails, or answers with something other than a JSON object is still
 // listed, with a warning.
-func describePlugins(e *env) []sdk.Verb {
+func describePlugins(e *env) []sdk.Command {
 	found := findPlugins()
 	descs := make([]sdk.Description, len(found))
 	errs := make([]error, len(found))
-	env := pluginEnv()
+	env, _ := pluginEnv("") // only a --report flag can fail
 	var wg sync.WaitGroup
 	for i, p := range found {
 		wg.Go(func() { descs[i], errs[i] = askDescription(p.Path, env) })
@@ -67,9 +67,9 @@ func describePlugins(e *env) []sdk.Verb {
 // The first of a name in PATH order wins, as in a shell; one named like a
 // built-in is marked shadowed, because the built-in always runs. Empty and
 // relative PATH entries are skipped, as exec.LookPath refuses them too.
-func findPlugins() []sdk.Verb {
+func findPlugins() []sdk.Command {
 	seen := map[string]bool{}
-	var out []sdk.Verb
+	var out []sdk.Command
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		if dir == "" || !filepath.IsAbs(dir) {
 			continue
@@ -89,10 +89,10 @@ func findPlugins() []sdk.Verb {
 				continue
 			}
 			seen[name] = true
-			out = append(out, sdk.Verb{Kind: "verb", Name: name, Source: "plugin", Path: p, Shadowed: isBuiltin(name)})
+			out = append(out, sdk.Command{Kind: "command", Name: name, Source: "plugin", Path: p, Shadowed: isBuiltin(name)})
 		}
 	}
-	slices.SortFunc(out, func(a, b sdk.Verb) int { return strings.Compare(a.Name, b.Name) })
+	slices.SortFunc(out, func(a, b sdk.Command) int { return strings.Compare(a.Name, b.Name) })
 	return out
 }
 

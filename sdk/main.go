@@ -9,8 +9,8 @@ import (
 )
 
 // Description is what a plugin prints for --describe: one JSON object on
-// one line. rpt verbs shows it; the plugin's name comes from its file
-// name (rpt-parse-nuclei is the verb parse-nuclei), not from here. Every
+// one line. rpt help shows it; the plugin's name comes from its file
+// name (rpt-parse-nuclei is the command parse-nuclei), not from here. Every
 // built-in answers --describe the same way.
 type Description struct {
 	Summary string `json:"summary"`          // one line: what the plugin does
@@ -40,7 +40,7 @@ const (
 	RoleChecker = "checker"
 	// RoleFilter reads records on stdin and writes records on stdout.
 	RoleFilter = "filter"
-	// RoleWriter changes the report, only through $RPT_BIN write verbs.
+	// RoleWriter changes the report, only through $RPT_BIN write commands.
 	RoleWriter = "writer"
 	// RoleRenderer reads a report record and writes a document to a place
 	// it's given (a file or folder flag); it never changes the report and
@@ -49,7 +49,7 @@ const (
 )
 
 // Plugin is a plugin program: its description and the function that does
-// its work. Run gets the arguments after the verb and its streams, and
+// its work. Run gets the arguments after the command and its streams, and
 // returns the exit code: 0 success, 1 problems in the input, 2 usage.
 type Plugin struct {
 	Description

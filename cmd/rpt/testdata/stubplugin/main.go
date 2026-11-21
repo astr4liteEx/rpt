@@ -25,7 +25,7 @@ func main() {
 		Description: sdk.Description{
 			Summary: "Stub plugin for tests", Usage: "rpt stub [exit=N]", Version: "0.0.1",
 			Input: "records", Output: "json/stub", Roles: []string{sdk.RoleChecker, sdk.RoleFilter},
-			// An unknown member rpt verbs must carry, and members it must
+			// An unknown member rpt help must carry, and members it must
 			// not let a plugin override.
 			Extra: map[string]jsontext.Value{
 				"homepage": jsontext.Value(`"https://example.com"`),

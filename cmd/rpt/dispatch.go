@@ -13,33 +13,54 @@ import (
 	"github.com/astr4liteEx/rpt/internal/report"
 )
 
-// dispatch runs the plugin rpt-<verb> from PATH in place of rpt, with its
+// dispatch runs the plugin rpt-<name> from PATH in place of rpt, with its
 // arguments untouched. It only returns if the plugin can't be started.
-// An unknown verb with no plugin is a usage error.
-func dispatch(e *env, verb string, args []string) int {
-	bin, err := exec.LookPath("rpt-" + verb)
+// An unknown command with no plugin is a usage error. Of the global flags
+// given before the name, --report becomes RPT_REPORT_DIR and --json and
+// --help go to the plugin first.
+func dispatch(e *env, name string, args []string, g globals) int {
+	bin, err := exec.LookPath("rpt-" + name)
 	if err != nil {
-		fmt.Fprintf(e.stderr, "rpt: unknown verb %q, and no rpt-%s plugin on PATH\n%s\n", verb, verb, usage())
+		msg := fmt.Sprintf("rpt: unknown command %q, and no rpt-%s plugin on PATH\n", name, name)
+		if s := newRoot(e, nil, g, true).SuggestionsFor(name); len(s) > 0 {
+			msg += "Did you mean this?\n\t" + strings.Join(s, "\n\t") + "\n"
+		}
+		fmt.Fprint(e.stderr, msg+"Run 'rpt --help' for the commands.\n")
 		return cli.ExitUsage
 	}
 	if abs, err := filepath.Abs(bin); err == nil {
 		bin = abs
 	}
-	err = execPlugin(bin, args, pluginEnv())
+	if g.json {
+		args = append([]string{"--json"}, args...)
+	}
+	env, err := pluginEnv(g.report)
+	if err != nil {
+		e.log.Error(err.Error())
+		return cli.ExitProblems
+	}
+	err = execPlugin(bin, args, env)
 	e.log.Error(fmt.Sprintf("start plugin: %v", err), "path", bin)
 	return cli.ExitPluginFailed
 }
 
 // pluginEnv is rpt's environment plus what plugins may read: RPT_BIN (this
 // rpt, so plugins call back into the same version), RPT_SCHEMA_VERSION, and
-// RPT_REPORT_DIR when a report is found the usual way. rpt never parses a
-// plugin's arguments, so a --report meant for the plugin isn't seen here.
-func pluginEnv() []string {
+// RPT_REPORT_DIR: the --report given before the plugin's name, else the
+// report found the usual way, if any. rpt never parses a plugin's own
+// arguments, so a --report after its name is the plugin's.
+func pluginEnv(reportFlag string) ([]string, error) {
 	set := map[string]string{"RPT_SCHEMA_VERSION": strconv.Itoa(report.SchemaVersion)}
 	if self, err := os.Executable(); err == nil {
 		set["RPT_BIN"] = self
 	}
-	if dir, err := report.Root(""); err == nil {
+	if reportFlag != "" {
+		abs, err := filepath.Abs(reportFlag)
+		if err != nil {
+			return nil, fmt.Errorf("--report: %w", err)
+		}
+		set["RPT_REPORT_DIR"] = abs
+	} else if dir, err := report.Root(""); err == nil {
 		if abs, err := filepath.Abs(dir); err == nil {
 			set["RPT_REPORT_DIR"] = abs
 		}
@@ -57,7 +78,7 @@ func pluginEnv() []string {
 			out = append(out, k+"="+v)
 		}
 	}
-	return out
+	return out, nil
 }
 
 var errExecReturned = errors.New("exec returned without an error")

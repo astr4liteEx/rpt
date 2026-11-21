@@ -61,16 +61,14 @@ func validateVerb(e *env, args []string) int {
 // line, on a terminal too. It never refuses: whatever it had to leave out
 // is a warning on stderr. Run rpt validate first to gate on problems.
 func assembleVerb(e *env, args []string) int {
-	flags := newFlagSet(e, "assemble")
-	flags.SetOutput(e.stderr)
-	reportDir := flags.String("report", "", "report folder (default $RPT_REPORT_DIR, then the nearest folder with rpt.yaml)")
+	flags, of := newFlags(e, "assemble")
 	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
 	if flags.NArg() != 0 {
 		return badUsage(e, "assemble")
 	}
-	r := openReport(e, *reportDir)
+	r := openReport(e, *of.report)
 	if r == nil {
 		return cli.ExitProblems
 	}

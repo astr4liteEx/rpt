@@ -49,10 +49,10 @@ func sectionsVerb(e *env, args []string) int {
 // sectionsSetVerb replaces one section's text in one finding with stdin.
 func sectionsSetVerb(e *env, args []string) int {
 	flags, of := newFlags(e, "sections set")
-	pos, err := parseInterspersed(flags, args)
-	if err != nil {
+	if err := flags.Parse(args); err != nil {
 		return cli.ExitUsage
 	}
+	pos := flags.Args()
 	if len(pos) != 2 {
 		return badUsage(e, "sections set")
 	}

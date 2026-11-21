@@ -224,11 +224,11 @@ type Location struct {
 	Extra map[string]jsontext.Value `json:",embed"`
 }
 
-// Verb is one "verb" record rpt verbs emits: something rpt <name> can
+// Command is one "command" record rpt help emits: something rpt <name> can
 // run, a built-in or a plugin, described with the members a --describe
 // answer uses. A plugin's describe members come from its answer, unknown
 // ones in Extra, and are empty when it gave none in time.
-type Verb struct {
+type Command struct {
 	Kind     string   `json:"kind"`
 	Name     string   `json:"name"`
 	Source   string   `json:"source"`           // "builtin" or "plugin"
