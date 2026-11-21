@@ -15,7 +15,7 @@ import (
 // The golden file lives at the repo root so plugin authors can read it as
 // an example report record. The report folder's absolute path is written
 // as $REPORT so the file is the same on every machine.
-const assembleGolden = "../../testdata/assemble.golden.json"
+const assembleGolden = "../../../testdata/assemble.golden.json"
 
 func TestAssembleFixture(t *testing.T) {
 	r := openFixture(t)
@@ -61,7 +61,7 @@ func checkRequired(t *testing.T, golden []byte) {
 			Required []string `json:"required"`
 		} `json:"$defs"`
 	}
-	b, err := os.ReadFile("../../schema/report.schema.json")
+	b, err := os.ReadFile("../../../schema/report.schema.json")
 	if err != nil {
 		t.Fatal(err)
 	}

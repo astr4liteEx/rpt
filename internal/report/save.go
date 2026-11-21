@@ -219,7 +219,8 @@ func (m *Model) writeJournal(ops []op) error {
 	if err != nil {
 		return err
 	}
-	if _, err := out.Write(b); err == nil {
+	_, err = out.Write(b)
+	if err == nil {
 		err = out.Sync()
 	}
 	if cerr := out.Close(); err == nil {

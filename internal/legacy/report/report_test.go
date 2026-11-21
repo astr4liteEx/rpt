@@ -11,7 +11,7 @@ import (
 	"github.com/astr4liteEx/rpt/sdk"
 )
 
-const fixture = "../../testdata/fixture"
+const fixture = "../../../testdata/fixture"
 
 func openFixture(t *testing.T) *Report {
 	t.Helper()
