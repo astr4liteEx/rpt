@@ -36,7 +36,7 @@ Run every check; the plugin is done when all pass:
 
 ## Go plugins
 
-The [`sdk`](../sdk) package implements the protocol; use it instead of re-deriving the rules:
+The [`sdk`](../sdk) module (`go get github.com/astr4liteEx/rpt/sdk@latest`, standard library only) implements the protocol; use it instead of re-deriving the rules:
 
 | Need | Use |
 | --- | --- |

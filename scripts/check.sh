@@ -6,18 +6,23 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # The tools are pinned in the separate tools module; go tool -n builds
-# each one (cached) and prints its path.
-staticcheck=$(go -C tools tool -n staticcheck)
-govulncheck=$(go -C tools tool -n govulncheck)
+# each one (cached) and prints its path. The tools module is not in the
+# workspace, so the lookups run with GOWORK=off.
+staticcheck=$(GOWORK=off go -C tools tool -n staticcheck)
+govulncheck=$(GOWORK=off go -C tools tool -n govulncheck)
 
+# rpt and the SDK are two modules in one workspace (go.work); check both.
+pkgs=(./... ./sdk/...)
 echo "== go vet"
-go vet ./...
+go vet "${pkgs[@]}"
 echo "== staticcheck"
-"$staticcheck" ./...
+"$staticcheck" "${pkgs[@]}"
 echo "== go test -race"
-go test -race ./...
+go test -race "${pkgs[@]}"
+echo "== the SDK on its own, as plugins get it"
+(cd sdk && GOWORK=off go vet ./... && GOWORK=off go test ./...)
 echo "== govulncheck"
-"$govulncheck" ./...
+"$govulncheck" "${pkgs[@]}"
 
 echo "== smoke test of the static binary"
 tmp=$(mktemp -d)

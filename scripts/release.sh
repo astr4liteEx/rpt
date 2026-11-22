@@ -4,6 +4,11 @@
 # (a .zip for windows), each holding the static rpt binary, and
 # dist/SHA256SUMS. It refuses to run on a dirty tree or off a v* tag.
 #
+# A release is two tags on one commit: vX.Y.Z for rpt and sdk/vX.Y.Z for
+# the SDK module, with go.mod requiring that SDK version and go.work
+# replacing it. Push sdk/vX.Y.Z before (or with) vX.Y.Z, so that
+# go install github.com/astr4liteEx/rpt/cmd/rpt@vX.Y.Z can fetch it.
+#
 # The archives are reproducible: the same commit gives the same bytes.
 # Binaries are built with -trimpath; every timestamp is the commit's;
 # entries have fixed owners and order; gzip stores no name or time.
@@ -24,6 +29,21 @@ else
 		echo "release.sh: HEAD is not on a v* tag" >&2
 		exit 1
 	}
+	# go install …/cmd/rpt@$tag builds against the SDK go.mod requires, so
+	# that must be this release's SDK, tagged sdk/$tag on this commit.
+	sdk=github.com/astr4liteEx/rpt/sdk
+	if ! grep -q "^[[:space:]]*$sdk $tag\$" go.mod; then
+		echo "release.sh: go.mod must require $sdk $tag" >&2
+		exit 1
+	fi
+	if ! grep -q "^replace $sdk $tag => ./sdk\$" go.work; then
+		echo "release.sh: go.work must replace $sdk $tag" >&2
+		exit 1
+	fi
+	if [ "$(git rev-parse -q --verify "refs/tags/sdk/$tag^{commit}")" != "$(git rev-parse HEAD)" ]; then
+		echo "release.sh: tag sdk/$tag must be on HEAD too" >&2
+		exit 1
+	fi
 fi
 epoch=$(git log -1 --format=%ct HEAD)
 

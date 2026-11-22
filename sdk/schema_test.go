@@ -2,6 +2,8 @@ package sdk
 
 import (
 	"encoding/json/v2"
+	"errors"
+	"io/fs"
 	"os"
 	"reflect"
 	"slices"
@@ -73,6 +75,9 @@ type objectSchema struct {
 func loadSchema(t *testing.T, file string, path []string) objectSchema {
 	t.Helper()
 	b, err := os.ReadFile("../schema/" + file)
+	if errors.Is(err, fs.ErrNotExist) {
+		t.Skip("needs the rpt repository's schema folder")
+	}
 	if err != nil {
 		t.Fatal(err)
 	}

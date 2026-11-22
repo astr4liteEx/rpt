@@ -177,7 +177,7 @@ rpt parse-scan < scan.csv | rpt scope match --drop-out-of-scope | rpt finding ad
 
 `parse-scan` is a small demo importer from [`docs/demo/setup.sh`](docs/demo/setup.sh); rpt doesn't ship it. For ready-made plugins, see [rpt-plugins](#companion-projects).
 
-Go plugins can use the optional [`sdk`](sdk) package. The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged:
+Go plugins can use the optional [`sdk`](sdk) module, which depends only on the standard library: `go get github.com/astr4liteEx/rpt/sdk@latest`. Its version matches rpt's, so `sdk/v0.1.3` goes with rpt `v0.1.3`. The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged:
 
 ```go
 package main
@@ -252,6 +252,8 @@ go test ./...
 scripts/check.sh   # everything CI runs: vet, staticcheck, race tests, govulncheck and a check of the release binary
 scripts/release.sh --snapshot   # the release archives for every platform, from HEAD, into dist/
 ```
+
+rpt and the SDK are two Go modules; `go.work` puts them in one workspace, so rpt builds against the SDK in `sdk/`. A release tags both on one commit, `vX.Y.Z` and `sdk/vX.Y.Z`, with `go.mod` requiring that SDK version; `scripts/release.sh` checks this.
 
 The README's GIFs are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes in [`docs/demo/`](docs/demo). To re-record one (`quick-start`, `validate` or `pipeline`):
 

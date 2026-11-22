@@ -17,16 +17,24 @@ import (
 )
 
 // rptBin is rpt built for these tests, so Call and Settings have
-// something to call.
+// something to call. It is empty outside the rpt repository (the SDK
+// module on its own), and the tests that need it skip.
 var rptBin string
 
 func TestMain(m *testing.M) {
+	if _, err := os.Stat("../cmd/rpt"); err != nil {
+		os.Exit(m.Run())
+	}
 	dir, err := os.MkdirTemp("", "sdk-test")
 	if err != nil {
 		panic(err)
 	}
 	rptBin = filepath.Join(dir, "rpt")
-	if out, err := exec.Command("go", "build", "-o", rptBin, "../cmd/rpt").CombinedOutput(); err != nil {
+	// rpt is another module: build it from its own folder, where go.work
+	// points it at this SDK.
+	build := exec.Command("go", "-C", "..", "build", "-o", rptBin, "./cmd/rpt")
+	build.Env = append(os.Environ(), "GOWORK=") // the repository's go.work, even under GOWORK=off
+	if out, err := build.CombinedOutput(); err != nil {
 		os.RemoveAll(dir)
 		panic(fmt.Sprintf("build rpt: %v\n%s", err, out))
 	}
@@ -95,6 +103,9 @@ var tagPlugin = sdk.Plugin{
 // report copies the fixture and points the plugin at it, as rpt would.
 func report(t *testing.T) string {
 	t.Helper()
+	if rptBin == "" {
+		t.Skip("needs the rpt repository")
+	}
 	dir := filepath.Join(t.TempDir(), "r")
 	if err := os.CopyFS(dir, os.DirFS("../testdata/fixture")); err != nil {
 		t.Fatal(err)
