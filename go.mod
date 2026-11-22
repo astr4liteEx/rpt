@@ -6,7 +6,7 @@ toolchain go1.27.4
 
 require (
 	charm.land/fang/v2 v2.0.1
-	github.com/astr4liteEx/rpt/sdk v0.1.3
+	github.com/astr4liteEx/rpt/sdk v0.2.0
 	charm.land/lipgloss/v2 v2.0.1
 	github.com/charmbracelet/colorprofile v0.4.2
 	github.com/charmbracelet/x/ansi v0.11.6

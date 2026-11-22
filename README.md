@@ -177,7 +177,7 @@ rpt parse-scan < scan.csv | rpt scope match --drop-out-of-scope | rpt finding ad
 
 `parse-scan` is a small demo importer from [`docs/demo/setup.sh`](docs/demo/setup.sh); rpt doesn't ship it. For ready-made plugins, see [rpt-plugins](#companion-projects).
 
-Go plugins can use the optional [`sdk`](sdk) module, which depends only on the standard library: `go get github.com/astr4liteEx/rpt/sdk@latest`. Its version matches rpt's, so `sdk/v0.1.3` goes with rpt `v0.1.3`. The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged:
+Go plugins can use the optional [`sdk`](sdk) module, which depends only on the standard library: `go get github.com/astr4liteEx/rpt/sdk@latest`. Its version matches rpt's, so `sdk/v0.2.0` goes with rpt `v0.2.0`. The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged:
 
 ```go
 package main

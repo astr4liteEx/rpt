@@ -12,4 +12,4 @@ use (
 	./sdk
 )
 
-replace github.com/astr4liteEx/rpt/sdk v0.1.3 => ./sdk
+replace github.com/astr4liteEx/rpt/sdk v0.2.0 => ./sdk
