@@ -114,3 +114,22 @@ func TestValidateChecksPluginSchemas(t *testing.T) {
 		t.Errorf("%s", out)
 	}
 }
+
+// A plugin's help is rendered from its --describe answer, the same way
+// whichever form asks for it.
+func TestHelpForAPlugin(t *testing.T) {
+	fixture(t)
+	plugins(t, map[string]string{"tag": `echo '{"summary":"Tag findings","usage":"rpt tag < findings.jsonl"}'`})
+	_, want, _ := rpt(t, "", "help", "tag")
+	if !strings.Contains(want, "Tag findings") || !strings.Contains(want, "rpt tag < findings.jsonl") {
+		t.Fatalf("help tag: %q", want)
+	}
+	for _, args := range [][]string{{"--help", "tag"}, {"-h", "tag"}, {"--report", ".", "--help", "tag"}} {
+		if code, out, _ := rpt(t, "", args...); code != 0 || out != want {
+			t.Errorf("rpt %v: exit %d %q", args, code, out)
+		}
+	}
+	if code, out, _ := rpt(t, "", "--help", "finding"); code != 0 || !strings.Contains(out, "Get, add, set, unset and remove findings") {
+		t.Errorf("--help finding: exit %d %q", code, out)
+	}
+}

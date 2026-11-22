@@ -73,6 +73,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			e.execute([]string{"--help"})
 			return cli.ExitUsage
 		}
+		if len(rest) > 1 {
+			// rpt --help <command>: as rpt help <command>, which knows
+			// plugins too; cobra alone would show the root's help.
+			globals := args[:len(args)-len(rest)]
+			return e.execute(slices.Concat(globals, []string{"help"}, rest[1:]))
+		}
 	case len(rest) == 2 && rest[1] == "--describe" && isBuiltin(name):
 		return e.exit(e.describe(name))
 	case !isBuiltin(name) && !strings.HasPrefix(name, "__complete"):

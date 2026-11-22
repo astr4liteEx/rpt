@@ -26,7 +26,7 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 
 Like `--describe`, these do no work, need no report and read no stdin:
 
-- `--help` (or `-h`) alone: print the usage and what the plugin does, as text, and exit 0. `rpt help <plugin>` and `rpt <plugin> --help` show it.
+- `--help` (or `-h`) alone: print the usage and what the plugin does, as text, and exit 0. This is the plugin's help when it runs on its own (`rpt-<plugin> --help`), and `rpt <plugin> --help` reaches it too, since rpt passes a plugin's arguments through. `rpt help <plugin>` (or `rpt --help <plugin>`) doesn't run it: rpt shows the `summary` and `usage` from `--describe`, the same way for every plugin. Keep the two in agreement; the Go SDK answers `--help` from the same description.
 - `__complete <args...> <word>`: shell completion, in cobra's format. Print one candidate per line, `value` or `value<TAB>description`, starting with `<word>` (ignore case), then a last line `:<directive>`: `:4` for "only these", `:0` to let the shell add file names, `:16` for directories only. Exit 0. rpt calls it with stdin from `/dev/null` and the 2-second `--describe` timeout; if the plugin fails, times out or prints anything else, the shell completes file names.
 
 The Go `sdk.Run` answers both; give `sdk.Plugin` a `Complete` function for candidates.

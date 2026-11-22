@@ -141,7 +141,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 | `rpt validate -` | Checks the records on stdin as if they were written, together, so a finding may cite a scope row from the same stream: an existing ID is a replacement, no ID is new, and a `config` record is the new `rpt.yaml`. A clean stream passes through unchanged; otherwise only problems come out (at path `-` and the record's line) and it exits 1, so `rpt validate - < new.jsonl \| rpt finding add` adds nothing when the input is broken. |
 | `rpt assemble` | Prints the whole report as one JSON record for renderers. |
 | `rpt completion <shell>` | Prints the completion script for `bash`, `zsh`, `fish` or `powershell`. |
-| `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed; one whose `requires` this rpt doesn't fit is hidden, and `--all` lists it marked incompatible. With a command, prints its usage, as `rpt <command> --help` does. |
+| `rpt help [command]` | Lists the built-in commands, then the plugins on your `PATH`, each described the same way. A plugin a built-in hides is marked shadowed; one whose `requires` this rpt doesn't fit is hidden, and `--all` lists it marked incompatible. With a command, prints its usage, as `rpt <command> --help` does; a plugin's comes from its `--describe` summary and usage. Help about one command is text only; the list with `--json` is how tools find plugins by `roles`, `input` and `output`. |
 | `rpt version` | Prints the rpt version, the record schema version and the report format version. |
 
 **Output.** Each command prints a table in a terminal and JSON Lines in a pipe, or when you pass `--json`. In a terminal:
