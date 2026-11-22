@@ -168,7 +168,7 @@ For a filled-in example, see [`testdata/fixture`](testdata/fixture); it contains
 
 When a command isn't built in, `rpt <command>` runs `rpt-<command>` from your `PATH` and passes it the arguments unchanged. A `--report` given before the plugin's name reaches it as `$RPT_REPORT_DIR`. A plugin can be anything that reads and writes JSON Lines, such as a scanner importer, a CVSS scorer, a check for your house style or a PDF renderer.
 
-![rpt help parse-scan shows the importer plugin's own help; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt finding add](docs/demo/pipeline.gif)
+![rpt help parse-scan shows the importer plugin's help, drawn from its description; its output is piped through rpt scope match, which drops an out-of-scope host, into rpt finding add](docs/demo/pipeline.gif)
 
 ```sh
 set -o pipefail

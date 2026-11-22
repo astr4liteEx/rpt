@@ -130,7 +130,7 @@ func (e *env) helpCommand() *cobra.Command {
 }
 
 // helpFor shows one command's help: a built-in's from cobra, a plugin's
-// from its description.
+// from its description, both drawn by root's help function (fang's).
 func (e *env) helpFor(root *cobra.Command, args []string) error {
 	if isBuiltin(args[0]) {
 		c, _, err := root.Find(args)
@@ -142,8 +142,7 @@ func (e *env) helpFor(root *cobra.Command, args []string) error {
 	}
 	for _, r := range e.pluginRecords() {
 		if r.Name == args[0] {
-			fmt.Fprintf(e.stdout, "%s\n\n  %s\n\n%s\n", cli.Clean(r.Summary), cli.Clean(r.Usage), r.Path)
-			return nil
+			return e.pluginHelp(root, r)
 		}
 	}
 	return usagef("no command %q: not built in, and no rpt-%s on PATH", args[0], args[0])
@@ -201,4 +200,32 @@ func pluginCompletion(p plugin.Plugin) cobra.CompletionFunc {
 	return func(_ *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		return completeFromPlugin(p, args, toComplete)
 	}
+}
+
+// pluginHelp draws a plugin's help the way a built-in's is drawn, from its
+// --describe answer: a command made for the purpose, standing alone so
+// rpt's own flags don't show as the plugin's. rpt doesn't know a
+// plugin's flags; its usage names them.
+func (e *env) pluginHelp(root *cobra.Command, r sdk.Command) error {
+	long := cli.Clean(r.Summary)
+	var about []string
+	if r.Input != "" {
+		about = append(about, "input: "+cli.Clean(r.Input))
+	}
+	if r.Output != "" {
+		about = append(about, "output: "+cli.Clean(r.Output))
+	}
+	if len(r.Roles) > 0 {
+		about = append(about, "roles: "+cli.Clean(strings.Join(r.Roles, ", ")))
+	}
+	about = append(about, "plugin: "+cli.Clean(r.Path))
+	long += "\n\n" + strings.Join(about, "\n")
+	usage := cli.Clean(r.Usage)
+	if usage == "" {
+		usage = "rpt " + r.Name + " [args]"
+	}
+	c := &cobra.Command{Use: "rpt " + r.Name, Short: cli.Clean(r.Summary), Long: long, Example: usage, Run: func(*cobra.Command, []string) {}}
+	c.SetOut(e.stdout)
+	root.HelpFunc()(c, nil)
+	return nil
 }

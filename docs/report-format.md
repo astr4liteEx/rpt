@@ -56,8 +56,8 @@ S-20,10.0.1.0/24,,,staging
 S-30,*.acme.com,,,prod
 ```
 
-- The header row must name `id` and `host`. `port` and `protocol` (`tcp` or `udp`) are optional. Any other column is kept and passed to renderers, except that no column may be named `kind` or `lines`: rpt sets those on scope records, so a `scope.csv` using one is unreadable.
-- Every row needs an id and a host; ids don't repeat.
+- The header row must name `id` and `host`. `port` and `protocol` (`tcp` or `udp`) are optional. Column names ignore case and surrounding spaces, and a leading byte-order mark is skipped, so a file saved from Excel reads as is. Any other column is kept and passed to renderers, except that no column may be named `kind` or `lines`: rpt sets those on scope records, so a `scope.csv` using one is unreadable.
+- Every row needs an id and a host; ids don't repeat. Ids compare without regard to case, here and wherever a finding cites one: `s-12` is `S-12`.
 - `host` is a CIDR range or `*.domain` (any subdomain, not the bare domain), which are **ranges**, or anything else, which is **one asset**: an address, a name, or any text that names what's in scope, such as `Acme iOS app` or `github.com/acme/api`.
 - A report with no scope has a `scope.csv` holding only its header row.
 
