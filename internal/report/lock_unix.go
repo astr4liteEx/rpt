@@ -24,3 +24,22 @@ func (m *Model) lock() (func(), error) {
 		f.Close()
 	}, nil
 }
+
+// readLock takes the report's lock shared, so no save commits while the
+// report is read: every file read sees the same state. A read never
+// creates the lock file, so reading leaves the folder as it was; a report
+// without one (rpt new and every save make it) is read without the lock.
+func (m *Model) readLock() func() {
+	f, err := m.root.Open(lockFile)
+	if err != nil {
+		return func() {}
+	}
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_SH); err != nil {
+		f.Close()
+		return func() {}
+	}
+	return func() {
+		syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+		f.Close()
+	}
+}

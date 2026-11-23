@@ -133,3 +133,88 @@ func TestHelpForAPlugin(t *testing.T) {
 		t.Errorf("--help finding: exit %d %q", code, out)
 	}
 }
+
+// recordLines splits output into its problem lines and its other lines.
+func recordLines(out string) (recs, problems []string) {
+	for _, l := range strings.SplitAfter(out, "\n") {
+		switch {
+		case l == "":
+		case strings.HasPrefix(l, `{"kind":"problem"`):
+			problems = append(problems, l)
+		default:
+			recs = append(recs, l)
+		}
+	}
+	return recs, problems
+}
+
+func TestValidateRecordsIsTheGetsFromOneRead(t *testing.T) {
+	dir := fixture(t)
+	writeFile(t, filepath.Join(dir, "pages/P-001-summary.md"), "---\nid: P-001\ntitle: Summary\n---\n\nSee ![the login](evidence/login.png).\n")
+	writeFile(t, filepath.Join(dir, "pages/evidence/login.png"), "png")
+	writeFile(t, filepath.Join(dir, "findings/evidence/orphan.png"), "png")
+
+	var want []string
+	for _, args := range [][]string{
+		{"config", "get", "--lines"},
+		{"finding", "get", "--lines"},
+		{"page", "get", "--lines"},
+		{"scope", "get", "--lines"},
+		{"evidence", "get", "--orphans"},
+	} {
+		_, out, _ := rpt(t, "", args...)
+		recs, _ := recordLines(out)
+		want = append(want, recs...)
+	}
+	_, plain, _ := rpt(t, "", "validate")
+	_, wantProblems := recordLines(plain)
+
+	code, out, errOut := rpt(t, "", "validate", "--records")
+	recs, problems := recordLines(out)
+	if code != 1 || strings.Join(recs, "") != strings.Join(want, "") {
+		t.Errorf("exit %d; records\n%s\nwant\n%s\nstderr %s", code, strings.Join(recs, ""), strings.Join(want, ""), errOut)
+	}
+	if strings.Join(problems, "") != strings.Join(wantProblems, "") || len(problems) == 0 {
+		t.Errorf("problems\n%s\nwant validate's\n%s", strings.Join(problems, ""), strings.Join(wantProblems, ""))
+	}
+	if !strings.HasPrefix(recs[0], `{"kind":"config"`) || !strings.HasPrefix(out[len(strings.Join(recs, "")):], `{"kind":"problem"`) {
+		t.Errorf("want the config first and the problems last:\n%s", out)
+	}
+	for _, kind := range []string{"finding", "page", "scope", "evidence"} {
+		if !strings.Contains(out, `{"kind":"`+kind+`"`) {
+			t.Errorf("no %s record", kind)
+		}
+	}
+}
+
+func TestValidateRecordsWithIDs(t *testing.T) {
+	fixture(t)
+	code, out, _ := rpt(t, "", "validate", "--records", "F-002", "S-12")
+	recs, problems := recordLines(out)
+	_, findingOut, _ := rpt(t, "", "finding", "get", "--lines", "F-002")
+	_, scopeOut, _ := rpt(t, "", "scope", "get", "--lines", "S-12")
+	if code != 1 || strings.Join(recs, "") != findingOut+scopeOut || len(problems) != 1 || !strings.Contains(problems[0], "S-99") {
+		t.Errorf("exit %d\n%s", code, out)
+	}
+	if code, out, _ := rpt(t, "", "validate", "--records", "F-404"); code != 1 || strings.Contains(out, `"kind":"finding"`) {
+		t.Errorf("an unknown ID: exit %d %s", code, out)
+	}
+	if code, _, _ := rpt(t, "", "validate", "--records", "-"); code != 2 {
+		t.Errorf("--records with stdin: exit %d, want 2", code)
+	}
+}
+
+func TestValidateRecordsLeavesOutWhatDoesntRead(t *testing.T) {
+	dir := fixture(t)
+	writeFile(t, filepath.Join(dir, "findings/broken.md"), "---\nid: [\n---\n")
+	writeFile(t, filepath.Join(dir, "findings/evidence/orphan.png"), "png")
+	code, out, _ := rpt(t, "", "validate", "--records")
+	recs, problems := recordLines(out)
+	got := strings.Join(recs, "")
+	if code != 1 || strings.Count(got, `"kind":"finding"`) != 3 || strings.Contains(got, "orphan.png") {
+		t.Errorf("exit %d\n%s", code, got)
+	}
+	if !strings.Contains(strings.Join(problems, ""), "findings/broken.md") {
+		t.Errorf("the broken file has no problem:\n%s", strings.Join(problems, ""))
+	}
+}

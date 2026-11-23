@@ -34,14 +34,18 @@ func schemaProblems(m *report.Model, names []report.XName) []report.Problem {
 }
 
 func (e *env) validateCommand() *cobra.Command {
-	return &cobra.Command{
+	var withRecords bool
+	c := &cobra.Command{
 		Use:               "validate [id...]",
 		Short:             "Check the report, or the records on stdin, and print the problems",
-		Example:           "  rpt validate [id...]\n  rpt validate - < records.jsonl",
+		Example:           "  rpt validate [--records] [id...]\n  rpt validate - < records.jsonl",
 		Annotations:       map[string]string{"input": "records", "output": "records", "roles": sdk.RoleChecker},
 		ValidArgsFunction: e.completeAnyID,
 		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) == 1 && args[0] == "-" {
+				if withRecords {
+					return usagef("--records reads the report, not stdin")
+				}
 				return e.validateStream()
 			}
 			m, err := e.load()
@@ -55,9 +59,85 @@ func (e *env) validateCommand() *cobra.Command {
 					return e.fail(err)
 				}
 			}
+			if withRecords {
+				e.out = cli.NewOutput(e.stdout, false, true) // records, on a terminal too
+				if err := e.checkedRecords(m, args); err != nil {
+					return err
+				}
+			}
 			return e.problems(ps)
 		},
 	}
+	c.Flags().BoolVar(&withRecords, "records", false,
+		"Print the records checked before the problems, as the get commands print them with --lines: the config, findings, pages, scope rows and evidence, orphans included; with IDs, only those and their evidence")
+	return c
+}
+
+// checkedRecords prints the records validate --records checked, from the
+// same read as its problems, each as its get command prints it with
+// --lines. What doesn't read has no record; its problem says why. With
+// ids, only the findings, pages and scope rows named, and the evidence
+// of those findings and pages.
+func (e *env) checkedRecords(m *report.Model, ids []string) error {
+	var docs []*report.Doc
+	var rows []*report.Row
+	if len(ids) == 0 {
+		if m.Config.Err == nil {
+			if err := e.out.Write(m.ConfigRecord(true)); err != nil {
+				return err
+			}
+		}
+		for _, k := range report.Kinds {
+			docs = append(docs, m.Docs(k)...)
+		}
+		if m.Scope.Err == nil {
+			rows = m.Scope.Rows
+		}
+	} else {
+		for _, id := range ids { // only_ has checked each is there
+			if k := report.KindOf(id); k != nil {
+				d, _ := m.Get(k, id)
+				docs = append(docs, d)
+			} else if r, err := m.Scope.Row(id); err == nil {
+				rows = append(rows, r)
+			}
+		}
+	}
+	for _, d := range docs {
+		if d.Err == nil {
+			if err := e.out.Write(docRecord(m, d, report.RecordOpts{Lines: true})); err != nil {
+				return err
+			}
+		}
+	}
+	for _, r := range rows {
+		if err := e.out.Write(m.ScopeRecord(r, true)); err != nil {
+			return err
+		}
+	}
+	for _, d := range docs {
+		refs, _ := m.Refs(d)
+		for _, r := range refs {
+			if err := e.out.Write(m.EvidenceRecord(r)); err != nil {
+				return err
+			}
+		}
+	}
+	if len(ids) > 0 {
+		return nil
+	}
+	// Orphans refuses while a document doesn't parse, since that one may
+	// reference what looks orphaned; validate reports the document.
+	files, err := m.Orphans()
+	if err != nil {
+		return nil
+	}
+	for _, f := range files {
+		if err := e.out.Write(m.OrphanRecord(f)); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // only_ keeps the problems in the findings, pages and scope rows named.

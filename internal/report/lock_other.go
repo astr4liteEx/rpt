@@ -17,3 +17,6 @@ func (m *Model) lock() (func(), error) {
 	f.Close()
 	return func() { m.root.Remove(lockFile) }, nil
 }
+
+// readLock is a no-op off unix: the lock file there can't be shared.
+func (m *Model) readLock() func() { return func() {} }

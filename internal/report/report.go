@@ -169,7 +169,9 @@ type file struct {
 
 // Load reads the report in dir. Files that don't parse are kept, with
 // their errors, for Check to report; Load itself fails only when the
-// folder can't be read.
+// folder can't be read. It holds the report's lock shared while it reads,
+// so a save never commits partway through: the model is one state of the
+// report.
 func Load(dir string) (*Model, error) {
 	root, err := os.OpenRoot(dir)
 	if err != nil {
@@ -180,7 +182,10 @@ func Load(dir string) (*Model, error) {
 		root.Close()
 		return nil, err
 	}
-	if err := m.load(); err != nil {
+	unlock := m.readLock()
+	err = m.load()
+	unlock()
+	if err != nil {
 		root.Close()
 		return nil, err
 	}
