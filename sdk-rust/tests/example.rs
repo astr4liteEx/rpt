@@ -223,3 +223,70 @@ fn range_display() {
     let req = Requires { format: Some(r(1, 1)), ..Default::default() };
     assert!(!req.fits(3, 2));
 }
+
+/// A shell script standing in for rpt, at a path of its own.
+fn stand_in(name: &str, body: &str) -> PathBuf {
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join(name);
+    std::fs::create_dir_all(&dir).unwrap();
+    let p = dir.join("rpt");
+    std::fs::write(&p, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&p, std::os::unix::fs::PermissionsExt::from_mode(0o755)).unwrap();
+    p
+}
+
+/// The pid the stand-in wrote to `file`.
+fn pid_in(file: &Path) -> String {
+    for _ in 0..200 {
+        let pid = std::fs::read_to_string(file).unwrap_or_default();
+        if !pid.trim().is_empty() {
+            return pid.trim().to_string();
+        }
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    panic!("the stand-in never wrote its child's pid");
+}
+
+fn alive(pid: &str) -> bool {
+    Process::new("kill").args(["-0", pid]).status().is_ok_and(|s| s.success())
+}
+
+#[test]
+fn call_runs_the_rpt_it_is_given() {
+    let bin =
+        stand_in("env", r#"printf '{"kind":"x-env","dir":"%s","x":"%s","home":"%s"}\n' "$(pwd)" "$X" "${HOME-unset}""#);
+    let dir = Path::new(env!("CARGO_TARGET_TMPDIR")).join("env-dir");
+    std::fs::create_dir_all(&dir).unwrap();
+    let out =
+        Call::new(Vec::<String>::new()).bin(&bin).current_dir(&dir).env("X", "1").env_remove("HOME").run().unwrap();
+    let want = format!(r#"{{"kind":"x-env","dir":"{}","x":"1","home":"unset"}}"#, dir.display());
+    assert_eq!(out.records.iter().map(|r| r.raw.as_str()).collect::<Vec<_>>(), [want.as_str()]);
+}
+
+#[test]
+fn process_group_kills_what_rpt_started() {
+    let pids = Path::new(env!("CARGO_TARGET_TMPDIR")).join("group.pid");
+    let _ = std::fs::remove_file(&pids);
+    let bin = stand_in("group", &format!("sleep 30 &\necho $! > {}\nwait", pids.display()));
+    let started = std::time::Instant::now();
+    let got = Call::new(["scope", "get"]).bin(&bin).process_group().timeout(Duration::from_millis(300)).run();
+    assert!(matches!(got, Err(Error::TimedOut { .. })), "{got:?}");
+    assert!(started.elapsed() < Duration::from_secs(2), "{:?}", started.elapsed());
+    let pid = pid_in(&pids);
+    let gone = (0..200).any(|_| {
+        std::thread::sleep(Duration::from_millis(10));
+        !alive(&pid)
+    });
+    assert!(gone, "the plugin's child outlived the call");
+}
+
+#[test]
+fn call_returns_when_something_rpt_started_holds_the_pipes() {
+    let pids = Path::new(env!("CARGO_TARGET_TMPDIR")).join("pipes.pid");
+    let _ = std::fs::remove_file(&pids);
+    let bin = stand_in("pipes", &format!("sleep 30 &\necho $! > {}\necho '{{\"kind\":\"x\"}}'", pids.display()));
+    let started = std::time::Instant::now();
+    let out = Call::new(Vec::<String>::new()).bin(&bin).run().unwrap();
+    let _ = Process::new("kill").args(["-9", &pid_in(&pids)]).status();
+    assert_eq!((out.code, out.records.len()), (0, 1), "{out:?}");
+    assert!(started.elapsed() < Duration::from_secs(5), "{:?}", started.elapsed());
+}

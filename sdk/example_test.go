@@ -10,8 +10,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/astr4liteEx/rpt/sdk"
 )
@@ -196,5 +198,85 @@ func TestNullSettingsKeepTheDefaults(t *testing.T) {
 	_, out, errOut := run(t, `{"kind":"finding","id":"F-001"}`+"\n")
 	if !strings.Contains(out, `"x-tag-label":"triaged"`) {
 		t.Errorf("stdout %q, stderr %q", out, errOut)
+	}
+}
+
+// standIn writes a shell script to stand in for rpt, and returns its path.
+func standIn(t *testing.T, body string) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "rpt")
+	if err := os.WriteFile(p, []byte("#!/bin/sh\n"+body+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+// gone waits for the process whose pid is in file to go away.
+func gone(t *testing.T, file string) bool {
+	t.Helper()
+	var pid string
+	for range 100 {
+		if b, err := os.ReadFile(file); err == nil && len(bytes.TrimSpace(b)) > 0 {
+			pid = string(bytes.TrimSpace(b))
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if pid == "" {
+		t.Fatal("the stand-in never wrote its child's pid")
+	}
+	for range 200 {
+		if exec.Command("kill", "-0", pid).Run() != nil {
+			return true
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	exec.Command("kill", "-9", pid).Run()
+	return false
+}
+
+func TestCallerRunsTheRptItIsGiven(t *testing.T) {
+	bin := standIn(t, `printf '{"kind":"x-env","dir":"%s","x":"%s","home":"%s"}\n' "$(pwd)" "$X" "${HOME-unset}"`)
+	dir := t.TempDir()
+	res, err := sdk.Caller{Bin: bin, Dir: dir, Env: []string{"X=1"}}.Call(context.Background(), nil)
+	if err != nil || len(res.Records) != 1 {
+		t.Fatalf("%+v %v", res, err)
+	}
+	want := fmt.Sprintf(`{"kind":"x-env","dir":"%s","x":"1","home":"unset"}`, dir)
+	if got := string(res.Records[0].Raw); got != want {
+		t.Errorf("got  %s\nwant %s", got, want)
+	}
+}
+
+func TestCallerProcessGroupKillsWhatRptStarted(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("unix only")
+	}
+	pids := filepath.Join(t.TempDir(), "pid")
+	bin := standIn(t, "sleep 30 &\necho $! > "+pids+"\nwait")
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := sdk.Caller{Bin: bin, ProcessGroup: true}.Call(ctx, nil)
+	if !errors.Is(err, context.DeadlineExceeded) || time.Since(start) > 2*time.Second {
+		t.Errorf("err %v after %v", err, time.Since(start))
+	}
+	if !gone(t, pids) {
+		t.Error("the plugin's child outlived the call")
+	}
+}
+
+func TestCallReturnsWhenSomethingRptStartedHoldsThePipes(t *testing.T) {
+	pids := filepath.Join(t.TempDir(), "pid")
+	bin := standIn(t, "sleep 30 &\necho $! > "+pids+"\necho '{\"kind\":\"x\"}'")
+	t.Cleanup(func() {
+		if b, err := os.ReadFile(pids); err == nil {
+			exec.Command("kill", "-9", string(bytes.TrimSpace(b))).Run()
+		}
+	})
+	start := time.Now()
+	res, err := sdk.Caller{Bin: bin}.Call(context.Background(), nil)
+	if err != nil || res.Code != 0 || len(res.Records) != 1 || time.Since(start) > 5*time.Second {
+		t.Errorf("%+v %v after %v", res, err, time.Since(start))
 	}
 }

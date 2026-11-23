@@ -48,5 +48,6 @@ Save it as `rpt-manual`, executable, somewhere on your `PATH`, and `rpt help` wi
 | Changing one member | `sdk.set_member(raw, name, value)`: the other members keep their bytes |
 | Settings | `sdk.settings("<command>", defaults)`: a `dict`, the merged settings over `defaults`; then parse flags |
 | Calling rpt | `sdk.call("finding", "get", stdin=..., timeout=...)`: a `Result` with the records, exit code and stderr; `problems()` and `stale()` (a write refused with rule `rev`: read again) |
+| Running rpt from a program | `sdk.call(..., bin=, cwd=, env=)` say how to start it; `process_group=True` makes the timeout kill what rpt started too. Not for plugins: Ctrl-C no longer reaches that rpt |
 
 The package's version is rpt's: `rpt-sdk` 0.2.0 goes with rpt v0.2.0. Its tests run the shared conformance cases in the rpt repository's [`testdata/sdk`](https://github.com/astr4liteEx/rpt/tree/main/testdata/sdk), as the Go and Rust SDKs do.

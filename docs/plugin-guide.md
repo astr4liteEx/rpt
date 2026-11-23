@@ -48,12 +48,12 @@ The [`sdk`](../sdk) module (`go get github.com/astr4liteEx/rpt/sdk@latest`, stan
 | Typed records | `sdk.Finding`, `sdk.Page`, `sdk.ScopeRow`, `sdk.Config`, `sdk.Evidence`, `sdk.Problem`, `sdk.Report` (its findings and pages are `Finding` and `Page`, with `Assets`; each `Target` has its scope `Row`; `Section` is a heading), `sdk.Lines` (one shape for every `--lines`), `sdk.Command` (a `Description` with a name), `sdk.Location`, `sdk.VersionInfo`; every record type has `RecordKind()` and the `Kind…` constants name them, so `sdk.Emit` fills an empty `kind`; unknown members ride in `Extra` |
 | Changing one member | `sdk.SetMember(raw, name, value)`: the other members keep their bytes |
 | Settings | `sdk.Settings("<command>", &settings)` over the defaults already in `settings`, then parse flags |
-| Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again) |
+| Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again). A program that starts rpt itself uses `sdk.Caller{Bin, Dir, Env, ProcessGroup}.Call`; `ProcessGroup` kills what rpt started when `ctx` is done, and isn't for plugins, since Ctrl-C no longer reaches that rpt |
 
 Cleanup goes in `Plugin.Run`: `sdk.Main` exits when `Run` returns.
 
 ## Rust and Python plugins
 
-The [Rust](../sdk-rust) crate and the [Python](../sdk-python) package (both `rpt-sdk`) give the same helpers under each language's names: `main` and `run` for the entry point, `records` for reading a stream, `emit`, `set_member`, typed records, `settings`, and a call into rpt (`Call` in Rust, `call` in Python). Each README has the table for its language. The Python package uses only the standard library; the Rust crate needs only `serde` and `serde_json`.
+The [Rust](../sdk-rust) crate and the [Python](../sdk-python) package (both `rpt-sdk`) give the same helpers under each language's names: `main` and `run` for the entry point, `records` for reading a stream, `emit`, `set_member`, typed records, `settings`, and a call into rpt (`Call` in Rust, `call` in Python), with the binary, folder, environment and process group a program that starts rpt itself chooses. Each README has the table for its language. The Python package uses only the standard library; the Rust crate needs only `serde`, `serde_json` and, on Unix, `libc`.
 
 All three SDKs run the shared conformance cases in [`testdata/sdk`](../testdata/sdk), so they read and write records the same way. An SDK for another language should run them too.

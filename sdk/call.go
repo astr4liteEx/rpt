@@ -9,13 +9,19 @@ import (
 	"fmt"
 	"io"
 	"os/exec"
+	"time"
 )
 
 // Result is what one rpt command printed and how it exited.
 type Result struct {
-	Records []Rec  // stdout, record by record
-	Code    int    // the exit code: 0 ok, 1 problems, 2 usage
-	Stderr  string // the text rpt wrote for people
+	Records []Rec // stdout, record by record
+	// Code is the exit code: 0 ok, 1 problems, 2 usage, 3 couldn't do the
+	// work. From one of rpt's own write commands, 3 means a file changed
+	// while it wrote and nothing was written, so running it again is safe;
+	// from a plugin, 3 means its work failed, perhaps partway, so it isn't.
+	// Call never retries: only the caller knows which it ran.
+	Code   int
+	Stderr string // the text rpt wrote for people
 }
 
 // Problems are the problem records in the result's records.
@@ -51,16 +57,66 @@ func (r Result) Stale() bool {
 // started, a canceled ctx, or output that isn't records.
 //
 //	res, err := sdk.Call(ctx, nil, "finding", "get", "F-001")
+//
+// It is Caller{}.Call: a plugin calls back into the rpt that started it.
 func Call(ctx context.Context, stdin io.Reader, args ...string) (Result, error) {
-	cmd := exec.CommandContext(ctx, Bin(), args...)
-	cmd.Stdin = stdin
+	return Caller{}.Call(ctx, stdin, args...)
+}
+
+// A Caller says how to start rpt, for a program that runs rpt itself
+// rather than being started by it: an editor, a TUI, CI tooling. The zero
+// Caller is how Call starts it.
+type Caller struct {
+	Bin string   // the rpt to run; empty is Bin()
+	Dir string   // the folder to run it in; empty is this process's
+	Env []string // its whole environment, as exec.Cmd.Env; nil is this process's
+
+	// ProcessGroup starts rpt in a process group of its own, and when ctx
+	// is done kills the whole group: rpt, the plugin it became, and what
+	// that started, which would otherwise outlive the call. The group is
+	// out of the terminal's reach, so Ctrl-C no longer stops it: use it in
+	// a program that handles keys itself, not in a plugin, whose rpt must
+	// stop when the user stops the pipeline. Unix only; elsewhere it is
+	// ignored.
+	ProcessGroup bool
+}
+
+// waitDelay is how long Call keeps reading rpt's output after rpt has
+// exited, or after ctx is done, while something rpt started holds the
+// pipes open.
+const waitDelay = time.Second
+
+// Call runs rpt as c says, with args, feeding it stdin (nil for none).
+// See the package function Call.
+func (c Caller) Call(ctx context.Context, stdin io.Reader, args ...string) (Result, error) {
+	bin := c.Bin
+	if bin == "" {
+		bin = Bin()
+	}
+	cmd := exec.CommandContext(ctx, bin, args...)
+	cmd.Dir, cmd.Env, cmd.Stdin = c.Dir, c.Env, stdin
+	cmd.WaitDelay = waitDelay
+	if c.ProcessGroup {
+		inGroup(cmd)
+	}
 	var out, errOut bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &errOut
 	err := cmd.Run()
+	canceled := err != nil && ctx.Err() != nil
+	if canceled && c.ProcessGroup && cmd.Process != nil {
+		killGroup(cmd.Process.Pid) // what rpt started, if rpt itself had already exited
+	}
 	res := Result{Stderr: errOut.String()}
-	if ee, ok := errors.AsType[*exec.ExitError](err); ok && ctx.Err() == nil {
+	ee, exited := errors.AsType[*exec.ExitError](err)
+	switch {
+	case err == nil:
+	case canceled:
+		return res, fmt.Errorf("rpt %v: %w", args, ctx.Err())
+	case exited:
 		res.Code = ee.ExitCode()
-	} else if err != nil {
+	case errors.Is(err, exec.ErrWaitDelay):
+		// rpt exited 0; something it started held the pipes past waitDelay.
+	default:
 		return res, fmt.Errorf("rpt %v: %w", args, err)
 	}
 	for rec, err := range Records(&out) {

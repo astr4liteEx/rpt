@@ -3,6 +3,7 @@
 use std::ffi::OsString;
 use std::fmt;
 use std::io::{self, Read, Write};
+use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -14,7 +15,7 @@ use serde_json::Value;
 
 use crate::plugin::bin;
 use crate::record::Problem;
-use crate::stream::{ReadError, Rec, records};
+use crate::stream::{Rec, records};
 
 /// What goes wrong outside reading a stream.
 #[derive(Debug)]
@@ -83,7 +84,10 @@ pub fn emit<W: Write + ?Sized, T: Serialize + ?Sized>(w: &mut W, v: &T) -> Resul
 pub struct Output {
     /// stdout, record by record.
     pub records: Vec<Rec>,
-    /// The exit code: 0 ok, 1 problems, 2 usage, 3 couldn't do its work; -1 for a signal.
+    /// The exit code: 0 ok, 1 problems, 2 usage, 3 couldn't do its work; -1 for a signal. From
+    /// one of rpt's own write commands, 3 means a file changed while it wrote and nothing was
+    /// written, so running it again is safe; from a plugin, 3 means its work failed, perhaps
+    /// partway, so it isn't. [`Call`] never retries: only the caller knows which it ran.
     pub code: i32,
     /// The text rpt wrote for people.
     pub stderr: String,
@@ -102,6 +106,10 @@ impl Output {
     }
 }
 
+/// How long [`Call`] keeps reading rpt's output after rpt has exited, while something rpt
+/// started holds the pipes open.
+const WAIT_DELAY: Duration = Duration::from_secs(1);
+
 /// One rpt command to run, through [`bin`]:
 ///
 /// ```no_run
@@ -112,11 +120,32 @@ impl Output {
 /// A command that runs and exits non-zero is an [`Output`] with that code, not an error: the
 /// error is for an rpt that couldn't be started, one that ran past its timeout, or output that
 /// isn't records.
+///
+/// A program that runs rpt itself rather than being started by it (an editor, a TUI, CI
+/// tooling) says how with [`bin`](Call::bin), [`current_dir`](Call::current_dir),
+/// [`env`](Call::env), [`env_remove`](Call::env_remove) and
+/// [`process_group`](Call::process_group):
+///
+/// ```no_run
+/// # use std::time::Duration;
+/// let out = rpt_sdk::Call::new(["validate", "--records"])
+///     .bin("/usr/local/bin/rpt")
+///     .current_dir("/work/acme-report")
+///     .env_remove("RPT_REPORT_DIR")
+///     .process_group()
+///     .timeout(Duration::from_secs(30))
+///     .run()?;
+/// # Ok::<(), rpt_sdk::Error>(())
+/// ```
 #[derive(Debug, Clone)]
 pub struct Call {
     args: Vec<OsString>,
     stdin: Option<Vec<u8>>,
     timeout: Option<Duration>,
+    bin: Option<OsString>,
+    dir: Option<PathBuf>,
+    env: Vec<(OsString, Option<OsString>)>,
+    group: bool,
 }
 
 impl Call {
@@ -125,7 +154,15 @@ impl Call {
         I: IntoIterator<Item = S>,
         S: Into<OsString>,
     {
-        Call { args: args.into_iter().map(Into::into).collect(), stdin: None, timeout: None }
+        Call {
+            args: args.into_iter().map(Into::into).collect(),
+            stdin: None,
+            timeout: None,
+            bin: None,
+            dir: None,
+            env: vec![],
+            group: false,
+        }
     }
 
     /// What rpt reads on stdin, such as records for `finding add`. Without it, stdin is empty.
@@ -134,29 +171,81 @@ impl Call {
         self
     }
 
-    /// Kills rpt if it runs longer than `timeout`, so a plugin's waits end on their own.
+    /// Kills rpt if it runs longer than `timeout`, so a plugin's waits end on their own. Without
+    /// [`process_group`](Call::process_group) it kills rpt alone.
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
+    /// The rpt to run. Without it, [`bin`](crate::bin).
+    pub fn bin(mut self, bin: impl Into<OsString>) -> Self {
+        self.bin = Some(bin.into());
+        self
+    }
+
+    /// The folder to run rpt in. Without it, this process's.
+    pub fn current_dir(mut self, dir: impl Into<PathBuf>) -> Self {
+        self.dir = Some(dir.into());
+        self
+    }
+
+    /// Sets a variable in rpt's environment, which is otherwise this process's.
+    pub fn env(mut self, key: impl Into<OsString>, value: impl Into<OsString>) -> Self {
+        self.env.push((key.into(), Some(value.into())));
+        self
+    }
+
+    /// Takes a variable out of rpt's environment.
+    pub fn env_remove(mut self, key: impl Into<OsString>) -> Self {
+        self.env.push((key.into(), None));
+        self
+    }
+
+    /// Starts rpt in a process group of its own, and at the timeout kills the whole group: rpt,
+    /// the plugin it became, and what that started, which would otherwise outlive the call. The
+    /// group is out of the terminal's reach, so Ctrl-C no longer stops it: use it in a program
+    /// that handles keys itself, not in a plugin, whose rpt must stop when the user stops the
+    /// pipeline. Unix only; elsewhere it does nothing.
+    pub fn process_group(mut self) -> Self {
+        self.group = true;
+        self
+    }
+
     pub fn run(self) -> Result<Output, Error> {
         let command = self.args.iter().map(|a| a.to_string_lossy()).collect::<Vec<_>>().join(" ");
-        let mut child = Command::new(bin())
-            .args(&self.args)
+        let mut cmd = Command::new(self.bin.unwrap_or_else(bin));
+        cmd.args(&self.args)
             .stdin(if self.stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()?;
+            .stderr(Stdio::piped());
+        if let Some(dir) = &self.dir {
+            cmd.current_dir(dir);
+        }
+        for (key, value) in &self.env {
+            match value {
+                Some(v) => cmd.env(key, v),
+                None => cmd.env_remove(key),
+            };
+        }
+        if self.group {
+            group::start(&mut cmd);
+        }
+        let mut child = cmd.spawn()?;
         if let (Some(input), Some(mut pipe)) = (self.stdin, child.stdin.take()) {
             // A broken pipe means rpt stopped reading; its exit code says why.
             thread::spawn(move || pipe.write_all(&input));
         }
-        let stdout = read_all(child.stdout.take());
-        let stderr = read_all(child.stderr.take());
+        let stdout = read_chunks(child.stdout.take());
+        let stderr = read_chunks(child.stderr.take());
         let deadline = self.timeout.map(|t| Instant::now() + t);
+        let group = self.group;
         let timed_out = |child: &mut Child| {
-            let _ = child.kill();
+            if group {
+                group::kill(child);
+            } else {
+                let _ = child.kill();
+            }
             let _ = child.wait();
             Error::TimedOut { command: command.clone() }
         };
@@ -170,21 +259,20 @@ impl Call {
                 }
             },
         };
-        // Something rpt started may hold a pipe open after it exits; the deadline covers that.
-        let recv = |rx: mpsc::Receiver<io::Result<Vec<u8>>>| match deadline {
-            None => rx.recv().unwrap_or_else(|_| Ok(vec![])),
-            Some(d) => rx
-                .recv_timeout(d.saturating_duration_since(Instant::now()))
-                .unwrap_or_else(|_| Err(io::Error::new(io::ErrorKind::TimedOut, "output still open at the deadline"))),
-        };
-        let out = recv(stdout).map_err(|_| Error::TimedOut { command: command.clone() })?;
-        let err = recv(stderr).map_err(|_| Error::TimedOut { command: command.clone() })?;
+        // Something rpt started may hold the pipes open after rpt exits. Read until they close,
+        // for WAIT_DELAY at most, or until the deadline when that comes first.
+        let delay = Instant::now() + WAIT_DELAY;
+        let limit = deadline.map_or(delay, |d| d.min(delay));
+        let (out, out_closed) = collect(&stdout, limit);
+        let (err, err_closed) = collect(&stderr, limit);
+        if !(out_closed && err_closed) && deadline.is_some_and(|d| d <= limit) {
+            return Err(timed_out(&mut child));
+        }
         let mut output =
             Output { records: vec![], code: status.code().unwrap_or(-1), stderr: String::from_utf8_lossy(&err).into() };
         for rec in records(&out[..]) {
             match rec {
                 Ok(rec) => output.records.push(rec),
-                Err(ReadError::Line(e)) => return Err(Error::BadOutput { command, reason: e.to_string() }),
                 Err(e) => return Err(Error::BadOutput { command, reason: e.to_string() }),
             }
         }
@@ -192,15 +280,69 @@ impl Call {
     }
 }
 
-fn read_all(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<io::Result<Vec<u8>>> {
+/// Reads a pipe on a thread, sending what it reads as it comes; the channel closes at the end.
+fn read_chunks(pipe: Option<impl Read + Send + 'static>) -> mpsc::Receiver<Vec<u8>> {
     let (tx, rx) = mpsc::channel();
     if let Some(mut pipe) = pipe {
         thread::spawn(move || {
-            let mut buf = vec![];
-            let _ = tx.send(pipe.read_to_end(&mut buf).map(|_| buf));
+            let mut buf = vec![0; 64 << 10];
+            loop {
+                match pipe.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if tx.send(buf[..n].to_vec()).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+                    Err(_) => break,
+                }
+            }
         });
     }
     rx
+}
+
+/// What a pipe gave until it closed or `limit` came, and whether it closed.
+fn collect(rx: &mpsc::Receiver<Vec<u8>>, limit: Instant) -> (Vec<u8>, bool) {
+    let mut out = vec![];
+    loop {
+        match rx.recv_timeout(limit.saturating_duration_since(Instant::now())) {
+            Ok(chunk) => out.extend(chunk),
+            Err(mpsc::RecvTimeoutError::Disconnected) => return (out, true),
+            Err(mpsc::RecvTimeoutError::Timeout) => return (out, false),
+        }
+    }
+}
+
+/// rpt in a process group of its own, on Unix.
+#[cfg(unix)]
+mod group {
+    use std::os::unix::process::CommandExt;
+    use std::process::{Child, Command};
+
+    pub(super) fn start(cmd: &mut Command) {
+        cmd.process_group(0);
+    }
+
+    /// Kills the whole group, which outlives rpt itself while anything in it runs.
+    pub(super) fn kill(child: &mut Child) {
+        if let Ok(pgid) = i32::try_from(child.id()) {
+            // SAFETY: killpg only sends a signal; the group is the one rpt leads.
+            unsafe { libc::killpg(pgid, libc::SIGKILL) };
+        }
+    }
+}
+
+#[cfg(not(unix))]
+mod group {
+    use std::process::{Child, Command};
+
+    pub(super) fn start(_: &mut Command) {}
+
+    pub(super) fn kill(child: &mut Child) {
+        let _ = child.kill();
+    }
 }
 
 /// The plugin's settings over `defaults`: the user's `~/.config/rpt/plugins/<plugin>/config.yaml`
