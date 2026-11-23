@@ -36,6 +36,7 @@ type Output struct {
 	tables bool
 	rows   map[string][][]string
 	recs   map[string][]map[string]any
+	others []string // Render's records of kinds with no columns
 	// Severities, when set, orders the totals line under a findings table.
 	Severities []string
 }
@@ -70,11 +71,30 @@ func (o *Output) WriteRaw(raw []byte) error {
 	return err
 }
 
+// Render writes a record as it arrived: byte for byte in JSON Lines; in
+// tables, a row of its kind's table, or for a kind with no columns its
+// line after the tables, so nothing piped in to be shown is lost.
+func (o *Output) Render(raw []byte) error {
+	if !o.tables {
+		return o.WriteRaw(raw)
+	}
+	var m map[string]any
+	if json.Unmarshal(raw, &m) == nil {
+		kind, _ := m["kind"].(string)
+		if slices.ContainsFunc(columns, func(c kindColumns) bool { return c.kind == kind }) {
+			return o.writeRow(m)
+		}
+	}
+	o.others = append(o.others, CleanLine(string(raw)))
+	return nil
+}
+
 // Table reports whether o prints tables rather than JSON Lines.
 func (o *Output) Table() bool { return o.tables }
 
 // Flush prints the tables, rounded and grey-bordered, as wide as the
-// terminal allows; a findings table has a totals line under it.
+// terminal allows; a findings table has a totals line under it. Render's
+// records of other kinds follow, one line each.
 func (o *Output) Flush() error {
 	if !o.tables {
 		return nil
@@ -115,8 +135,12 @@ func (o *Output) Flush() error {
 			out.WriteString(SeverityTotals(o.Severities)(o.recs[c.kind]) + "\n")
 		}
 	}
+	for _, l := range o.others {
+		out.WriteString(l + "\n")
+	}
 	clear(o.rows)
 	clear(o.recs)
+	o.others = nil
 	_, err := io.WriteString(Styled(o.w), out.String())
 	return err
 }

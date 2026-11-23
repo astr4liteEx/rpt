@@ -20,7 +20,7 @@ func (e *env) commands() []*cobra.Command {
 	return []*cobra.Command{
 		e.assembleCommand(), e.completionCommand(), e.configCommand(), e.evidenceCommand(),
 		e.docCommand(report.FindingKind), e.helpCommand(), e.lsCommand(), e.newCommand(),
-		e.docCommand(report.PageKind), e.scopeCommand(), e.validateCommand(), e.versionCommand(),
+		e.docCommand(report.PageKind), e.scopeCommand(), e.tableCommand(), e.validateCommand(), e.versionCommand(),
 	}
 }
 
@@ -172,8 +172,9 @@ func (e *env) completionCommand() *cobra.Command {
 }
 
 // runPlugin runs rpt-<name> with args untouched, in place of rpt where
-// the system allows. A plugin whose requires this rpt doesn't fit runs
-// after one warning.
+// the system allows; a plugin that prints records, run on a terminal,
+// runs as rpt's child instead, its records shown as tables. A plugin
+// whose requires this rpt doesn't fit runs after one warning.
 func (e *env) runPlugin(name string, args []string) int {
 	p, err := plugin.Lookup(os.Getenv("PATH"), name)
 	if errors.Is(err, plugin.ErrNotFound) {
@@ -182,9 +183,13 @@ func (e *env) runPlugin(name string, args []string) int {
 	}
 	dir, _ := e.reportDir()
 	d := describer(dir)
-	if a := d.Describe([]plugin.Plugin{p})[name]; a.Err == nil && !a.Desc.Requires.Fits(report.SchemaVersion, report.FormatVersion) {
+	a := d.Describe([]plugin.Plugin{p})[name]
+	if a.Err == nil && !a.Desc.Requires.Fits(report.SchemaVersion, report.FormatVersion) {
 		e.log.Warn(fmt.Sprintf("plugin %s may not work with this rpt: it requires schema_version %s and format %s; this rpt writes schema_version %d and reads format %d",
 			name, a.Desc.Requires.SchemaVersion, a.Desc.Requires.Format, report.SchemaVersion, report.FormatVersion))
+	}
+	if a.Err == nil && e.tablesFor(a.Desc, args) {
+		return e.pluginTables(p, args, d.Env)
 	}
 	code, err := plugin.Exec(p, args, d.Env)
 	if err != nil {

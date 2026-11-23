@@ -2,6 +2,7 @@ package report
 
 import (
 	"errors"
+	"os"
 	"slices"
 	"strings"
 
@@ -152,4 +153,22 @@ func (c *Config) Plugin(key string) (doc.Entry, bool) {
 		}
 	}
 	return doc.Entry{}, false
+}
+
+// Severities is the severity levels of the report in dir, most severe
+// first, or nil when its config can't be read.
+func Severities(dir string) []string {
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return nil
+	}
+	defer root.Close()
+	src, err := root.ReadFile(ConfigFile)
+	if err != nil {
+		return nil
+	}
+	if c := parseConfig(src); c.Err == nil {
+		return c.Severities
+	}
+	return nil
 }

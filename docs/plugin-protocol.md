@@ -2,14 +2,14 @@
 
 A plugin is any program, in any language, that follows this page. The core runs it as `rpt <command>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. Optional SDKs implement it for [Go](../sdk), [Rust](../sdk-rust) and [Python](../sdk-python). For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
 
-Supported systems: Linux and macOS, where rpt replaces itself with the plugin. On Windows rpt runs the plugin as a child, passing its standard streams and exit code through.
+Supported systems: Linux and macOS, where rpt replaces itself with the plugin. On Windows rpt runs the plugin as a child, passing its standard streams and exit code through. On every system, a plugin that prints records runs as rpt's child on a terminal so rpt can draw its tables (see Output and exit codes).
 
 ## Finding and running a plugin
 
 - **Name:** an executable regular file named `rpt-<command>` in a `PATH` folder. `<command>` is lowercase letters, digits and hyphens.
 - **Lookup:** `rpt <command>` runs the built-in command if there is one (`rpt help` lists them); built-ins always win. Otherwise it runs the first `rpt-<command>` in `PATH` order, skipping empty and relative `PATH` entries.
 - **Arguments:** passed byte for byte, without the command name: `rpt parse-nuclei --strict a.json` runs `rpt-parse-nuclei --strict a.json`. rpt never parses them.
-- **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. If the plugin can't be started, rpt exits 126.
+- **Process:** rpt replaces itself with the plugin (`exec`), so the plugin owns stdin, stdout, stderr, signals and the exit code. The one exception is a plugin declaring `"output":"records"` run on a terminal: rpt runs it as a child and reads its stdout to draw tables (see Output and exit codes). If the plugin can't be started, rpt exits 126.
 - **Listing:** `rpt help` lists the built-ins, then every plugin it finds with its `--describe` answer, all as `command` records with `source` `builtin` or `plugin`. A plugin named like a built-in is listed with `shadowed: true`: `rpt <command>` never runs it. `rpt --help` also lists every plugin that isn't shadowed, under "Plugin commands".
 
 ## Environment
@@ -60,7 +60,7 @@ Declare only roles whose promise the plugin keeps every run. Absent means "not s
 {"summary":"Lint finding files with rumdl","usage":"rpt lint [file...]","output":"records","roles":["checker"]}
 ```
 
-rpt never checks or acts on `input`, `output` or `roles`. `rpt help` carries every member of the answer into the plugin's `command` record, unknown ones too, except `schemas` and the members that are rpt's: `kind`, `name`, `source`, `path`, `shadowed` and `incompatible`.
+rpt never checks `input`, `output` or `roles`, and acts only on `"output":"records"`, which shows the plugin's records as tables on a terminal (see Output and exit codes). `rpt help` carries every member of the answer into the plugin's `command` record, unknown ones too, except `schemas` and the members that are rpt's: `kind`, `name`, `source`, `path`, `shadowed` and `incompatible`.
 
 ### `requires`
 
@@ -104,6 +104,7 @@ Filtering a stream (stdin to stdout):
 ## Output and exit codes
 
 - stdout carries records only: JSON Lines when stdout is a pipe or file. A table or other human form is allowed on a terminal.
+- **rpt draws the tables for you** when the plugin's `--describe` says `"output":"records"` and `rpt <plugin>` runs on a terminal: rpt runs the plugin as its child, with stdout a pipe, and shows the records the way `rpt table` does. rpt's own kinds get rpt's tables; other kinds print as JSON lines after them; `problem` records are left out, since the plugin has put them on stderr. stdin and stderr are rpt's own, so prompts on `/dev/tty` work, and Ctrl-C at the terminal reaches the plugin directly. The exit code is the plugin's, or `1` when it exited 0 but printed a line that isn't a record; a plugin killed by a signal shows nothing and gives 128 and the signal's number. An argument that is `--json`, `--help`, `-h` or `--describe` or starts with `__complete`, `rpt --json <plugin>`, and a stdout that isn't a terminal run the plugin in rpt's place as usual. Output that doesn't start with `{` (help or version text from a subcommand) passes through unchanged. So declare `"output":"records"` only when the plugin prints records on every run that isn't one of those; a plugin that draws on the terminal itself leaves it out.
 - **Problems go both ways:** each one is a `problem` record on stdout, in the stream with the other records, and a text line on stderr. On a terminal showing a table, the text alone. A problem names the `command` that found it (your plugin's name, as in `rpt <name>`); never change the `command` of a problem passing through. rpt does the same: a broken finding file in `rpt finding get` is a problem record (rule `readable`) after the good findings, and an unknown ID is one with rule `exists`.
 - stderr carries messages, one per line: `<program>: <path>:<line>:<column>: <message>`, with `warning: ` before the message for warnings; leave out what isn't known (most messages have no column).
 - Exit codes: `0` success; `1` problems in the report or its input (the run still did what it could), or a failure after the arguments were understood; `2` usage error, and only that; `3` the plugin couldn't do its work, such as a tool it needs being missing, failing or timing out, so its output says nothing about the report (say why in one stderr line). `126` belongs to rpt (the plugin couldn't start). rpt's own commands use `3` the same way: a file changed while rpt wrote it, nothing was written, and running again is the fix.

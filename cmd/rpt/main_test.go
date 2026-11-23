@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/astr4liteEx/rpt/internal/plugin"
@@ -31,9 +32,29 @@ func fixture(t *testing.T) string {
 // rpt runs rpt in-process and returns its exit code, stdout and stderr.
 func rpt(t *testing.T, stdin string, args ...string) (int, string, string) {
 	t.Helper()
-	var out, errOut bytes.Buffer
-	code := run(args, strings.NewReader(stdin), &out, &errOut)
+	var out bytes.Buffer
+	errOut := &lockedBuffer{}
+	code := run(args, strings.NewReader(stdin), &out, errOut)
 	return code, out.String(), errOut.String()
+}
+
+// lockedBuffer is stderr shared by rpt and a plugin it runs as a child,
+// whose stderr exec copies in from another goroutine.
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
 
 // records decodes JSON Lines into maps.

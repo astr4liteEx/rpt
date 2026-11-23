@@ -232,7 +232,7 @@ func wire(e *env, c *cobra.Command, err *error) {
 	runE := c.RunE
 	c.RunE = func(cc *cobra.Command, args []string) error {
 		e.command = commandName(cc)
-		e.out = cli.NewOutput(e.stdout, isTerminal(e.stdout), e.json)
+		e.out = cli.NewOutput(e.stdout, stdoutIsTerminal(e.stdout), e.json)
 		rerr := runE(cc, args)
 		if ferr := e.out.Flush(); rerr == nil {
 			rerr = ferr
@@ -257,7 +257,7 @@ func isBuiltin(name string) bool {
 	return slices.Contains(builtinNames, name)
 }
 
-var builtinNames = []string{"assemble", "completion", "config", "evidence", "finding", "help", "ls", "new", "page", "scope", "validate", "version"}
+var builtinNames = []string{"assemble", "completion", "config", "evidence", "finding", "help", "ls", "new", "page", "scope", "table", "validate", "version"}
 
 // isTerminal reports whether w is a terminal; anything that isn't a file,
 // a test's buffer, is a pipe.
