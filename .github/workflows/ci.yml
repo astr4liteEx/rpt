@@ -12,4 +12,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      # The runner has Rust and Python; uv runs the Python SDK's pinned linters.
+      - run: pipx install uv==0.13.9
       - run: scripts/check.sh

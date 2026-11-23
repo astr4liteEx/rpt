@@ -1,0 +1,66 @@
+[
+  {
+    "name": "line ends, blank lines, malformed lines and records without a kind",
+    "input": "{\"kind\":\"finding\",\"id\":\"F-1\"}\r\n\n   \t\nnot json\n[1,2]\n{\"no\":\"kind\"}\nnull\n{\"kind\":\"scope\", \"id\":\"S-1\"}",
+    "want": [
+      {"kind": "finding", "raw": "{\"kind\":\"finding\",\"id\":\"F-1\"}", "line": 1},
+      {"error_line": 4},
+      {"error_line": 5},
+      {"kind": "", "raw": "{\"no\":\"kind\"}", "line": 6},
+      {"error_line": 7},
+      {"kind": "scope", "raw": "{\"kind\":\"scope\", \"id\":\"S-1\"}", "line": 8}
+    ]
+  },
+  {
+    "name": "a kind that isn't a string is no kind",
+    "input": "{\"kind\":3}\n{\"kind\":null,\"a\":1}\n",
+    "want": [
+      {"kind": "", "raw": "{\"kind\":3}", "line": 1},
+      {"kind": "", "raw": "{\"kind\":null,\"a\":1}", "line": 2}
+    ]
+  },
+  {
+    "name": "bytes pass through as received",
+    "input": "{ \"kind\" : \"x-a\",\"t\":\"\\u00e9 é\" }\n",
+    "want": [
+      {"kind": "x-a", "raw": "{ \"kind\" : \"x-a\",\"t\":\"\\u00e9 é\" }", "line": 1}
+    ]
+  },
+  {
+    "name": "not quite JSON is malformed",
+    "input": "{\"a\":1,}\n{\"a\":NaN}\n{\"a\":1} {\"b\":2}\n{\"a\":1,\"a\":2}\n{\"o\":{\"b\":1,\"b\":2}}\n{'a':1}\n\"str\"\n",
+    "want": [
+      {"error_line": 1},
+      {"error_line": 2},
+      {"error_line": 3},
+      {"error_line": 4},
+      {"error_line": 5},
+      {"error_line": 6},
+      {"error_line": 7}
+    ]
+  },
+  {
+    "name": "an empty stream yields nothing",
+    "input": "",
+    "want": []
+  },
+  {
+    "name": "without stop_at_error, problems pass like any record",
+    "input": "{\"kind\":\"problem\",\"level\":\"error\"}\n{\"kind\":\"finding\"}\n",
+    "want": [
+      {"kind": "problem", "raw": "{\"kind\":\"problem\",\"level\":\"error\"}", "line": 1},
+      {"kind": "finding", "raw": "{\"kind\":\"finding\"}", "line": 2}
+    ]
+  },
+  {
+    "name": "stop_at_error stops at the first error-level problem, after warnings",
+    "stop_at_error": true,
+    "input": "{\"kind\":\"problem\",\"level\":\"warning\"}\nbad\n{\"kind\":\"finding\",\"level\":\"error\"}\n{\"kind\":\"problem\",\"level\":\"error\",\"message\":\"m\"}\n{\"kind\":\"finding\"}\n",
+    "want": [
+      {"kind": "problem", "raw": "{\"kind\":\"problem\",\"level\":\"warning\"}", "line": 1},
+      {"error_line": 2},
+      {"kind": "finding", "raw": "{\"kind\":\"finding\",\"level\":\"error\"}", "line": 3},
+      {"stopped": {"kind": "problem", "raw": "{\"kind\":\"problem\",\"level\":\"error\",\"message\":\"m\"}", "line": 4}}
+    ]
+  }
+]

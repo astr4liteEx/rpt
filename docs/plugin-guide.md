@@ -51,3 +51,9 @@ The [`sdk`](../sdk) module (`go get github.com/astr4liteEx/rpt/sdk@latest`, stan
 | Calling rpt | `sdk.Call(ctx, stdin, "finding", "get")`: the records, exit code and stderr; `Problems()` and `Stale()` (a write refused with rule `rev`: read again) |
 
 Cleanup goes in `Plugin.Run`: `sdk.Main` exits when `Run` returns.
+
+## Rust and Python plugins
+
+The [Rust](../sdk-rust) crate and the [Python](../sdk-python) package (both `rpt-sdk`) give the same helpers under each language's names: `main` and `run` for the entry point, `records` for reading a stream, `emit`, `set_member`, typed records, `settings`, and a call into rpt (`Call` in Rust, `call` in Python). Each README has the table for its language. The Python package uses only the standard library; the Rust crate needs only `serde` and `serde_json`.
+
+All three SDKs run the shared conformance cases in [`testdata/sdk`](../testdata/sdk), so they read and write records the same way. An SDK for another language should run them too.

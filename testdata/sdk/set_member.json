@@ -1,0 +1,13 @@
+[
+  {"name": "replaces in place", "in": "{\"a\":1,\"scope\":[\"x\"],\"b\":{\"c\":2}}", "member": "scope", "value": ["S-1"], "want": "{\"a\":1,\"scope\":[\"S-1\"],\"b\":{\"c\":2}}"},
+  {"name": "appends when absent, keeping the others' bytes", "in": "{\"a\":1, \"b\" : [1, 2]}", "member": "scope", "value": ["S-1"], "want": "{\"a\":1,\"b\":[1, 2],\"scope\":[\"S-1\"]}"},
+  {"name": "empty object", "in": "{}", "member": "scope", "value": ["S-1"], "want": "{\"scope\":[\"S-1\"]}"},
+  {"name": "whitespace around the object", "in": "  {\"a\":1}  ", "member": "b", "value": true, "want": "{\"a\":1,\"b\":true}"},
+  {"name": "names compare decoded, and a replaced name is written plainly", "in": "{\"sc\\u006fpe\":1,\"t\":\"a\\\"}\"}", "member": "scope", "value": 2, "want": "{\"scope\":2,\"t\":\"a\\\"}\"}"},
+  {"name": "values of every type", "in": "{\"k\":\"finding\"}", "member": "x-v", "value": {"n": null, "s": "é<>&", "f": 1.5, "l": [false]}, "want": "{\"k\":\"finding\",\"x-v\":{\"f\":1.5,\"l\":[false],\"n\":null,\"s\":\"é<>&\"}}"},
+  {"name": "a name that needs escaping", "in": "{}", "member": "a\"b", "value": 1, "want": "{\"a\\\"b\":1}"},
+  {"name": "two objects", "in": "{\"a\":1} {\"b\":2}", "member": "scope", "value": 1, "error": true},
+  {"name": "trailing bytes", "in": "{\"a\":1}x", "member": "scope", "value": 1, "error": true},
+  {"name": "not an object", "in": "[1]", "member": "scope", "value": 1, "error": true},
+  {"name": "not JSON", "in": "{\"a\":}", "member": "scope", "value": 1, "error": true}
+]

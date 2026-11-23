@@ -7,7 +7,9 @@
 # A release is two tags on one commit: vX.Y.Z for rpt and sdk/vX.Y.Z for
 # the SDK module, with go.mod requiring that SDK version and go.work
 # replacing it. Push sdk/vX.Y.Z before (or with) vX.Y.Z, so that
-# go install github.com/astr4liteEx/rpt/cmd/rpt@vX.Y.Z can fetch it.
+# go install github.com/astr4liteEx/rpt/cmd/rpt@vX.Y.Z can fetch it. The
+# Rust crate (sdk-rust) and Python package (sdk-python) carry X.Y.Z too;
+# publishing them to crates.io and PyPI is a separate step, not done here.
 #
 # The archives are reproducible: the same commit gives the same bytes.
 # Binaries are built with -trimpath; every timestamp is the commit's;
@@ -42,6 +44,18 @@ else
 	fi
 	if [ "$(git rev-parse -q --verify "refs/tags/sdk/$tag^{commit}")" != "$(git rev-parse HEAD)" ]; then
 		echo "release.sh: tag sdk/$tag must be on HEAD too" >&2
+		exit 1
+	fi
+	# The Rust and Python SDKs carry rpt's version too, without the v.
+	version=${tag#v}
+	for file in sdk-rust/Cargo.toml sdk-python/pyproject.toml; do
+		if ! grep -q "^version = \"$version\"\$" "$file"; then
+			echo "release.sh: $file must say version = \"$version\"" >&2
+			exit 1
+		fi
+	done
+	if ! grep -q "^__version__ = \"$version\"\$" sdk-python/src/rpt_sdk/__init__.py; then
+		echo "release.sh: sdk-python/src/rpt_sdk/__init__.py must say __version__ = \"$version\"" >&2
 		exit 1
 	fi
 fi

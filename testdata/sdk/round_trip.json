@@ -1,0 +1,115 @@
+[
+  {
+    "name": "finding keeps known and unknown members",
+    "type": "finding",
+    "in": {"kind":"finding","id":"F-003","title":"SQL injection in login","severity":"high","targets":[{"host":"login.acme.com","vhost":"v","scope":"S-30"},{"scope":"S-14","port":8443,"protocol":"tcp"}],"path":"findings/sqli-login.md","sections":{"description":"d","poc":"p"},"evidence":["evidence/F-003-login.png"],"cvss":"9.1","source":{"kb":"sqli"}}
+  },
+  {
+    "name": "a finding's empty members are left out, its required ones kept",
+    "type": "finding",
+    "in": {"kind":"finding","id":"","title":"","targets":[{"scope":"S-1","port":0,"host":""}],"severity":"low","rev":""},
+    "want": {"kind":"finding","title":"","targets":[{"scope":"S-1"}],"severity":"low"}
+  },
+  {
+    "name": "a missing kind is filled in, and missing required members written",
+    "type": "finding",
+    "in": {"title":"t"},
+    "want": {"kind":"finding","title":"t","targets":[],"severity":""}
+  },
+  {
+    "name": "lines, assets and positions keep unknown members",
+    "type": "finding",
+    "in": {"kind":"finding","title":"t","targets":[],"severity":"low","aaa":1,"lines":{"keys":{"id":{"line":2,"column":1,"end":9}},"sections":{"poc":{"heading":14,"text":15,"note":"x"}},"zzz":true,"file":"/r/a.md","body":3,"row":4},"assets":[{"ref":"e/a.png","path":"findings/e/a.png","file":"/r/findings/e/a.png","source":"body","media_type":"image/png","text":"cap","image":true,"q":1}]}
+  },
+  {
+    "name": "page",
+    "type": "page",
+    "in": {"kind":"page","id":"P-001","title":"Summary","path":"pages/summary.md","body":"## Hi\n","evidence":["e.png"],"rev":"ab","lines":{"body":5},"x-tag-label":"v"}
+  },
+  {
+    "name": "a page's body and id are always written",
+    "type": "page",
+    "in": {"kind":"page"},
+    "want": {"kind":"page","id":"","title":"","body":""}
+  },
+  {
+    "name": "scope row keeps extra CSV columns",
+    "type": "scope",
+    "in": {"kind":"scope","id":"S-12","host":"10.0.0.5","port":443,"protocol":"tcp","env":"prod","rev":"r","lines":{"file":"/r/scope.csv","row":3}}
+  },
+  {
+    "name": "scope row without a port leaves it out",
+    "type": "scope",
+    "in": {"kind":"scope","id":"S-20","host":"10.0.1.0/24","port":0},
+    "want": {"kind":"scope","id":"S-20","host":"10.0.1.0/24"}
+  },
+  {
+    "name": "config keeps plugin sections",
+    "type": "config",
+    "in": {"kind":"config","format":2,"severities":["critical","high"],"sections":{"poc":"PoC"},"required_sections":["poc"],"rules":{"scopeIDsExist":"warning"},"pages":["P-001","findings"],"required_pages":["P-001"],"rev":"r","lines":{"file":"/r/rpt.yaml","keys":{"format":{"line":1,"column":1}}},"x-tag":{"label":"verified"}}
+  },
+  {
+    "name": "evidence is an asset with an owner",
+    "type": "evidence",
+    "in": {"kind":"evidence","finding":"F-001","ref":"e/a.png","path":"findings/e/a.png","exists":true,"image":true,"section":"poc","line":7,"rev":"r","x":1}
+  },
+  {
+    "name": "an orphan has no owner, and exists is always written",
+    "type": "evidence",
+    "in": {"kind":"evidence","path":"findings/evidence/old.png","exists":false},
+    "want": {"kind":"evidence","path":"findings/evidence/old.png","exists":false}
+  },
+  {
+    "name": "problem with column, suggestions and rev",
+    "type": "problem",
+    "in": {"kind":"problem","path":"findings/a.md","line":12,"column":7,"end_column":9,"rule":"houseStyle","level":"warning","message":"m","command":"spag","suggestions":["a","b"],"rev":"r","hint":"x"}
+  },
+  {
+    "name": "problem about the whole report has no line",
+    "type": "problem",
+    "in": {"kind":"problem","path":"scope.csv","line":0,"rule":"scopeIDsExist","level":"warning","message":"m"},
+    "want": {"kind":"problem","path":"scope.csv","rule":"scopeIDsExist","level":"warning","message":"m"}
+  },
+  {
+    "name": "a report's findings are findings, each target with its row",
+    "type": "report",
+    "in": {"kind":"report","schema_version":3,"severities":["high"],"sections":[{"key":"poc","heading":"PoC","x":1}],"order":["findings"],"summary":{"high":1},"scope":[{"kind":"scope","id":"S-12","host":"10.0.0.5"}],"findings":[{"kind":"finding","id":"F-003","title":"t","severity":"high","targets":[{"scope":"S-12","row":{"kind":"scope","id":"S-12","host":"10.0.0.5","env":"prod"},"note":"n"}],"cvss":"9.1"}],"pages":[],"generator":"x"}
+  },
+  {
+    "name": "an empty report writes every member",
+    "type": "report",
+    "in": {"kind":"report"},
+    "want": {"kind":"report","schema_version":0,"severities":[],"sections":[],"order":[],"summary":{},"scope":[],"findings":[],"pages":[]}
+  },
+  {
+    "name": "location keeps a zero count",
+    "type": "location",
+    "in": {"kind":"location","path":"/r","format":2,"findings":0,"x":1}
+  },
+  {
+    "name": "location of a report whose config doesn't parse",
+    "type": "location",
+    "in": {"kind":"location","path":"/r"}
+  },
+  {
+    "name": "a command is a description with a name",
+    "type": "command",
+    "in": {"kind":"command","name":"tag","source":"plugin","path":"/bin/rpt-tag","shadowed":true,"incompatible":true,"summary":"s","usage":"u","version":"1","input":"records","output":"records","roles":["filter"],"requires":{"format":{"min":2}},"x":1}
+  },
+  {
+    "name": "version",
+    "type": "version",
+    "in": {"kind":"version","version":"v0.2.0","schema_version":3,"format":2,"x":1}
+  },
+  {
+    "name": "a description keeps its schemas as given",
+    "type": "description",
+    "in": {"summary":"s","schemas":{"finding":{"x-tag-label":{"type":"string"}},"page":{"x-tag-p":{"type":"integer"}},"scope":{"x-tag-env":{"enum":["a"]}},"config":{"type":"object"},"kinds":{"x-tag-note":{"type":"object"}},"q":1},"requires":{"schema_version":{"min":3,"max":4,"r":1},"format":{"max":2},"w":true},"extra":[1]}
+  },
+  {
+    "name": "a description's open bounds are left out",
+    "type": "description",
+    "in": {"summary":"s","requires":{"format":{"min":0,"max":2}},"usage":""},
+    "want": {"summary":"s","requires":{"format":{"max":2}}}
+  }
+]

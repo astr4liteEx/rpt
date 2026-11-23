@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# check.sh runs every check CI runs: vet, staticcheck, race tests,
-# govulncheck, and a smoke test of the static release binary. CI calls
-# only this script, so running it locally is running CI.
+# check.sh runs every check CI runs: vet, staticcheck, race tests, the
+# Rust and Python SDKs' lints and tests, govulncheck, and a smoke test of
+# the static release binary. CI calls only this script, so running it
+# locally is running CI.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -21,6 +22,19 @@ echo "== go test -race"
 go test -race "${pkgs[@]}"
 echo "== the SDK on its own, as plugins get it"
 (cd sdk && GOWORK=off go vet ./... && GOWORK=off go test ./...)
+
+# The Rust and Python SDKs run the shared conformance cases in
+# testdata/sdk, check their types against schema/, and test an example
+# plugin against rpt built from this checkout.
+echo "== the Rust SDK"
+(cd sdk-rust && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked -q)
+echo "== the Python SDK"
+# ruff and mypy are pinned here and run through uv (CI installs it).
+(cd sdk-python &&
+	uvx ruff@0.14.0 check src tests &&
+	uvx ruff@0.14.0 format --check src tests &&
+	MYPYPATH=src uvx mypy@1.18.2 --strict --python-version 3.10 src/rpt_sdk tests &&
+	PYTHONPATH=src python3 -m unittest discover -s tests)
 echo "== govulncheck"
 "$govulncheck" "${pkgs[@]}"
 

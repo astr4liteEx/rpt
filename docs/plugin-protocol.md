@@ -1,6 +1,6 @@
 # rpt plugin protocol
 
-A plugin is any program, in any language, that follows this page. The core runs it as `rpt <command>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. The Go [`sdk`](../sdk) package implements this protocol for Go plugins and is optional. For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
+A plugin is any program, in any language, that follows this page. The core runs it as `rpt <command>`; it also runs on its own. The record shapes live in [`schema/`](../schema); everything else a plugin must do is here. Optional SDKs implement it for [Go](../sdk), [Rust](../sdk-rust) and [Python](../sdk-python). For a step-by-step walk through building one, see the [plugin guide](plugin-guide.md).
 
 Supported systems: Linux and macOS, where rpt replaces itself with the plugin. On Windows rpt runs the plugin as a child, passing its standard streams and exit code through.
 
@@ -26,10 +26,10 @@ Set when rpt starts the plugin. A plugin runs without any of them: started direc
 
 Like `--describe`, these do no work, need no report and read no stdin:
 
-- `--help` (or `-h`) alone: print the usage and what the plugin does, as text, and exit 0. This is the plugin's help when it runs on its own (`rpt-<plugin> --help`), and `rpt <plugin> --help` reaches it too, since rpt passes a plugin's arguments through. `rpt help <plugin>` (or `rpt --help <plugin>`) doesn't run it: rpt draws help from `--describe` (the `summary`, `input`, `output`, `roles` and the plugin's path, then `usage` as the example) in the same style as a built-in's help. rpt doesn't know a plugin's flags, so `usage` should name them. Keep the two in agreement; the Go SDK answers `--help` from the same description.
+- `--help` (or `-h`) alone: print the usage and what the plugin does, as text, and exit 0. This is the plugin's help when it runs on its own (`rpt-<plugin> --help`), and `rpt <plugin> --help` reaches it too, since rpt passes a plugin's arguments through. `rpt help <plugin>` (or `rpt --help <plugin>`) doesn't run it: rpt draws help from `--describe` (the `summary`, `input`, `output`, `roles` and the plugin's path, then `usage` as the example) in the same style as a built-in's help. rpt doesn't know a plugin's flags, so `usage` should name them. Keep the two in agreement; the SDKs answer `--help` from the same description.
 - `__complete <args...> <word>`: shell completion, in cobra's format. Print one candidate per line, `value` or `value<TAB>description`, starting with `<word>` (ignore case), then a last line `:<directive>`: `:4` for "only these", `:0` to let the shell add file names, `:16` for directories only. Exit 0. rpt calls it with stdin from `/dev/null` and the 2-second `--describe` timeout; if the plugin fails, times out or prints anything else, the shell completes file names.
 
-The Go `sdk.Run` answers both; give `sdk.Plugin` a `Complete` function for candidates.
+Each SDK's `run` answers both; give the plugin a completion function for candidates.
 
 ## `--describe`
 

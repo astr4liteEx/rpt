@@ -1,0 +1,18 @@
+[package]
+name = "rpt-sdk"
+version = "0.2.1"
+edition = "2024"
+rust-version = "1.85"
+description = "The Rust implementation of the rpt plugin protocol"
+license = "MIT"
+repository = "https://github.com/astr4liteEx/rpt"
+documentation = "https://github.com/astr4liteEx/rpt/blob/main/docs/plugin-protocol.md"
+keywords = ["rpt", "pentest", "report", "plugin", "jsonl"]
+categories = ["command-line-utilities"]
+# Only the crate: the conformance cases and schemas its tests read live in
+# the rest of the repository, and the tests skip without them.
+include = ["src/**", "examples/**", "tests/**", "Cargo.toml", "README.md", "LICENSE"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

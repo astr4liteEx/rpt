@@ -216,7 +216,7 @@ func main() {
 }
 ```
 
-Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
+Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The same plugin in [Rust](sdk-rust) and [Python](sdk-python) uses those SDKs, whose versions also match rpt's. They will be `rpt-sdk` on crates.io and PyPI; until they're published, depend on them from this repository. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
 > A shell pipeline's exit status is that of its last command. A parser that reports its failure as an error-level `problem` record stops `rpt finding add` from writing anything; one that just dies partway through can still leave a partial import, and without `set -o pipefail` the pipeline looks fine. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt finding add < out.jsonl`.
@@ -241,7 +241,7 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 | --- | --- |
 | [`docs/report-format.md`](docs/report-format.md) | The report folder (`rpt.yaml`, `scope.csv`, finding files) and every `rpt validate` rule. |
 | [`docs/plugin-protocol.md`](docs/plugin-protocol.md) | What a plugin must do: naming, `--describe`, records, output, exit codes and how it works with a report. |
-| [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which Go `sdk` functions to use. |
+| [`docs/plugin-guide.md`](docs/plugin-guide.md) | How to build a plugin step by step, the checks it should pass, and which SDK functions to use. |
 | [`schema/`](schema) | JSON Schemas for each record kind: `finding`, `page`, `scope`, `config`, `evidence`, `problem`, `report`, `command`, `location` and `version`. |
 | [`GLOSSARY.md`](GLOSSARY.md) | The project's terms, as the code and docs use them. |
 
@@ -249,11 +249,11 @@ Both follow the [plugin protocol](docs/plugin-protocol.md), so once on your `PAT
 
 ```sh
 go test ./...
-scripts/check.sh   # everything CI runs: vet, staticcheck, race tests, govulncheck and a check of the release binary
+scripts/check.sh   # everything CI runs: vet, staticcheck, race tests, the Rust and Python SDKs, govulncheck and a check of the release binary
 scripts/release.sh --snapshot   # the release archives for every platform, from HEAD, into dist/
 ```
 
-rpt and the SDK are two Go modules; `go.work` puts them in one workspace, so rpt builds against the SDK in `sdk/`. A release tags both on one commit, `vX.Y.Z` and `sdk/vX.Y.Z`, with `go.mod` requiring that SDK version; `scripts/release.sh` checks this.
+rpt and the Go SDK are two Go modules; `go.work` puts them in one workspace, so rpt builds against the SDK in `sdk/`. A release tags both on one commit, `vX.Y.Z` and `sdk/vX.Y.Z`, with `go.mod` requiring that SDK version. The Rust (`sdk-rust/`) and Python (`sdk-python/`) SDKs carry the same version in `Cargo.toml` and `pyproject.toml`; `scripts/release.sh` checks all of this. `scripts/check.sh` needs `cargo`, `python3` and [`uv`](https://docs.astral.sh/uv/) for those two. The SDKs share the conformance cases in [`testdata/sdk`](testdata/sdk).
 
 The README's GIFs are recorded with [VHS](https://github.com/charmbracelet/vhs) from the tapes in [`docs/demo/`](docs/demo). To re-record one (`quick-start`, `validate` or `pipeline`):
 

@@ -1,0 +1,19 @@
+{
+  "plugin": {
+    "description": {"summary":"Tag findings with a label","usage":"rpt tag < findings.jsonl","version":"1.2.3","input":"records","output":"records","roles":["filter"],"schemas":{"finding":{"x-tag-label":{"type":"string"}}},"requires":{"schema_version":{"min":2}}},
+    "complete": ["--label\tthe label to set", "--dry-run"]
+  },
+  "cases": [
+    {"name": "--describe prints the description on one line", "args": ["--describe"], "describe": true},
+    {"name": "--help prints the usage and summary", "args": ["--help"], "stdout": "Usage: rpt tag < findings.jsonl\n\nTag findings with a label\n"},
+    {"name": "-h is --help", "args": ["-h"], "stdout": "Usage: rpt tag < findings.jsonl\n\nTag findings with a label\n"},
+    {"name": "--help without a usage prints the summary", "args": ["--help"], "no_usage": true, "stdout": "Tag findings with a label\n"},
+    {"name": "__complete gives the candidates, then only them", "args": ["__complete", "F-001", "--l"], "stdout": "--label\tthe label to set\n--dry-run\n:4\n", "complete_args": ["F-001"], "complete_word": "--l"},
+    {"name": "__completeNoDesc drops the descriptions", "args": ["__completeNoDesc", ""], "stdout": "--label\n--dry-run\n:4\n", "complete_args": [], "complete_word": ""},
+    {"name": "__complete with no word", "args": ["__complete"], "stdout": "--label\tthe label to set\n--dry-run\n:4\n", "complete_args": [], "complete_word": ""},
+    {"name": "__complete without a complete function lets the shell complete files", "args": ["__complete", ""], "no_complete": true, "stdout": ":0\n"},
+    {"name": "anything else runs the plugin, arguments as given", "args": ["a b", "", "--describe", "ü"], "runs": true},
+    {"name": "--describe among other arguments runs the plugin", "args": ["--describe", "x"], "runs": true},
+    {"name": "no arguments runs the plugin", "args": [], "runs": true}
+  ]
+}

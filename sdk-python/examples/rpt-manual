@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""rpt-manual: adds "source": "manual" to every finding record and passes all other records
+through unchanged. Put it on PATH, executable, with rpt_sdk installed."""
+
+import rpt_sdk as sdk
+
+
+def work(args, stdin, stdout, stderr):
+    code = 0
+    for item in sdk.records(stdin):
+        if isinstance(item, sdk.LineError):
+            # A malformed line: report it, drop it, read on, exit 1 at the end.
+            print(f"rpt-manual: -:{item.line}: {item.reason}", file=stderr)
+            code = 1
+            continue
+        raw = item.raw
+        if item.kind == sdk.KIND_FINDING:
+            raw = sdk.set_member(raw, "source", "manual")
+        stdout.write(raw + b"\n")
+    return code
+
+
+sdk.main(
+    sdk.Plugin(
+        sdk.Description(
+            summary="Mark findings as entered by hand",
+            usage="rpt manual < findings.jsonl",
+            input="records",
+            output="records",
+            roles=[sdk.ROLE_FILTER],
+        ),
+        work,
+    )
+)

@@ -7,3 +7,9 @@ docs/agents/
 docs/adr/
 prototypes/
 .claude/
+
+# SDK build output
+sdk-rust/target/
+__pycache__/
+*.egg-info/
+sdk-python/dist/
