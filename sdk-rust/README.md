@@ -3,8 +3,7 @@
 The Rust implementation of the [rpt plugin protocol](https://github.com/astr4liteEx/rpt/blob/main/docs/plugin-protocol.md). It's optional: a plugin is any program that follows the protocol. The crate depends only on `serde`, `serde_json` and, on Unix, `libc`.
 
 ```sh
-cargo add rpt-sdk   # once published; until then:
-cargo add rpt-sdk --git https://github.com/astr4liteEx/rpt
+cargo add rpt-sdk
 ```
 
 The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged ([`examples/manual.rs`](examples/manual.rs)):

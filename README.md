@@ -218,7 +218,7 @@ func main() {
 }
 ```
 
-Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The same plugin in [Rust](sdk-rust) and [Python](sdk-python) uses those SDKs, whose versions also match rpt's. They will be `rpt-sdk` on crates.io and PyPI; until they're published, depend on them from this repository. The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
+Build it as `rpt-mark-manual` somewhere on your `PATH`, and `rpt help` will list it. The same plugin in [Rust](sdk-rust) and [Python](sdk-python) uses those SDKs, whose versions also match rpt's. Both are `rpt-sdk`, on [crates.io](https://crates.io/crates/rpt-sdk) and [PyPI](https://pypi.org/project/rpt-sdk/). The [plugin guide](docs/plugin-guide.md) walks through building and checking a plugin in any language.
 
 > [!WARNING]
 > A shell pipeline's exit status is that of its last command. A parser that reports its failure as an error-level `problem` record stops `rpt finding add` from writing anything; one that just dies partway through can still leave a partial import, and without `set -o pipefail` the pipeline looks fine. When a partial import would cause problems, write the records to a file first: `rpt-x < in > out.jsonl && rpt finding add < out.jsonl`.

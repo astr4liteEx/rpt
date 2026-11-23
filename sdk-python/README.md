@@ -3,8 +3,7 @@
 The Python implementation of the [rpt plugin protocol](https://github.com/astr4liteEx/rpt/blob/main/docs/plugin-protocol.md). It's optional: a plugin is any program that follows the protocol. The package uses only the standard library and needs Python 3.10 or later.
 
 ```sh
-pip install rpt-sdk   # once published; until then:
-pip install 'rpt-sdk @ git+https://github.com/astr4liteEx/rpt#subdirectory=sdk-python'
+pip install rpt-sdk
 ```
 
 The plugin below adds `"source": "manual"` to every finding record and passes all other records through unchanged ([`examples/rpt-manual`](examples/rpt-manual)):
